@@ -181,4 +181,11 @@
   .prose :where(a):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
     @apply text-primary underline-offset-4 hover:text-primary/80;
   }
+  /* Drop the typography plugin's literal backtick characters around
+     inline <code>. The plugin emits them via ::before/::after to mimic
+     markdown source — visually noisy in a rendered doc page. */
+  .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
+  .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
+    content: none;
+  }
 }
