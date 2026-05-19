@@ -58,21 +58,26 @@
 	});
 
 	// Resolves a shadcn `--token` to a colour mermaid can parse.
-	// The tokens in this project are oklch() values, which mermaid's
-	// colour parser doesn't accept. Trick: feed the raw value to a
-	// canvas2d fillStyle setter and read it back — the browser
-	// converts whatever colour syntax was supplied (oklch, hsl, hex,
-	// keyword) into a normalised `#rrggbb` or `rgba(...)` string.
+	// The tokens in this project are oklch() values; mermaid's
+	// colour parser only handles rgb/hex/hsl. Trick: set the raw
+	// colour on a hidden DOM element and read it back via
+	// getComputedStyle — the browser's CSS engine always normalises
+	// `color` to `rgb(r, g, b)` or `rgba(...)` regardless of the
+	// input syntax (oklch, hsl, hex, named). Far more reliable
+	// across browsers than the canvas2d round-trip, which some
+	// engines return un-normalised.
 	function token(name: string): string {
 		const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 		if (!raw) return '';
-		const ctx = document.createElement('canvas').getContext('2d');
-		if (!ctx) return raw;
-		// fillStyle setter silently rejects invalid colours and keeps
-		// the previous value, so a known-good fallback comes first.
-		ctx.fillStyle = '#000';
-		ctx.fillStyle = raw;
-		return ctx.fillStyle as string;
+		const probe = document.createElement('span');
+		probe.style.color = raw;
+		probe.style.position = 'absolute';
+		probe.style.visibility = 'hidden';
+		probe.style.pointerEvents = 'none';
+		document.body.appendChild(probe);
+		const resolved = getComputedStyle(probe).color;
+		probe.remove();
+		return resolved || raw;
 	}
 
 	$effect(() => {
