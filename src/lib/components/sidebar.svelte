@@ -15,9 +15,13 @@
 
 	const pathname = $derived(page.url.pathname.replace(base, '') || '/');
 
+	// Exact match only. Every nav entry is its own concrete page, so
+	// there's no "parent lights up when a child is active" case to
+	// support — and using a prefix match here would highlight the
+	// Action-reference Overview entry whenever any /action-reference/*
+	// child page was open.
 	function isActive(href: string): boolean {
-		if (href === '/') return pathname === '/';
-		return pathname === href || pathname.startsWith(href + '/');
+		return pathname === href;
 	}
 </script>
 
