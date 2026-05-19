@@ -57,27 +57,60 @@
 		})();
 	});
 
+	// oklch() → sRGB conversion. Per CSS Color 4, modern browsers
+	// preserve wide-gamut colours through both canvas2d.fillStyle
+	// and CSSOM.color to avoid lossy down-conversion — which means
+	// neither of the obvious round-trip tricks actually flattens
+	// oklch into rgb. So we do the math directly:
+	//   OKLch → OKLab → LMS → linear sRGB → gamma-corrected sRGB.
+	// Refs: https://bottosson.github.io/posts/oklab/ +
+	// the CSS Color 4 spec matrices.
+	function oklchToRgb(value: string): string {
+		const m = value.match(
+			/oklch\(\s*([\d.]+%?)\s+([\d.]+%?)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/i
+		);
+		if (!m) return value;
+		const pct = (s: string, scale = 1) =>
+			s.endsWith('%') ? parseFloat(s) / 100 : parseFloat(s) * scale;
+		const L = pct(m[1]);
+		const C = pct(m[2], m[2].endsWith('%') ? 0.4 : 1); // 100% chroma = 0.4 per spec
+		const H = (parseFloat(m[3]) * Math.PI) / 180;
+		const A = m[4] ? pct(m[4]) : 1;
+
+		const a = C * Math.cos(H);
+		const b = C * Math.sin(H);
+
+		const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+		const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+		const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+
+		const lc = l_ * l_ * l_;
+		const mc = m_ * m_ * m_;
+		const sc = s_ * s_ * s_;
+
+		const r = 4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc;
+		const g = -1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc;
+		const bl = -0.0041960863 * lc - 0.7034186147 * mc + 1.707614701 * sc;
+
+		const toSrgb = (v: number) => {
+			const c = Math.max(0, Math.min(1, v));
+			return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+		};
+
+		const R = Math.round(toSrgb(r) * 255);
+		const G = Math.round(toSrgb(g) * 255);
+		const B = Math.round(toSrgb(bl) * 255);
+		return A === 1 ? `rgb(${R}, ${G}, ${B})` : `rgba(${R}, ${G}, ${B}, ${A})`;
+	}
+
 	// Resolves a shadcn `--token` to a colour mermaid can parse.
 	// The tokens in this project are oklch() values; mermaid's
-	// colour parser only handles rgb/hex/hsl. Trick: set the raw
-	// colour on a hidden DOM element and read it back via
-	// getComputedStyle — the browser's CSS engine always normalises
-	// `color` to `rgb(r, g, b)` or `rgba(...)` regardless of the
-	// input syntax (oklch, hsl, hex, named). Far more reliable
-	// across browsers than the canvas2d round-trip, which some
-	// engines return un-normalised.
+	// colour parser only handles rgb/hex/hsl, so we convert in JS.
 	function token(name: string): string {
 		const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 		if (!raw) return '';
-		const probe = document.createElement('span');
-		probe.style.color = raw;
-		probe.style.position = 'absolute';
-		probe.style.visibility = 'hidden';
-		probe.style.pointerEvents = 'none';
-		document.body.appendChild(probe);
-		const resolved = getComputedStyle(probe).color;
-		probe.remove();
-		return resolved || raw;
+		if (raw.startsWith('oklch')) return oklchToRgb(raw);
+		return raw;
 	}
 
 	$effect(() => {
