@@ -291,6 +291,15 @@
 	   typography plugin's `.prose pre { color, background-color }`.
 	   This is straight from the official Shiki guide:
 	   https://shiki.style/guide/dual-themes */
+
+	/* Tint the pre's light-mode background. github-light ships #fff
+	   which has no contrast against the page background. var(--muted)
+	   is shadcn's neutral surface token, so the code block sits as a
+	   distinct surface against the prose without looking jarring.
+	   !important beats Shiki's inline style="background-color:#fff". */
+	:global(.shiki) {
+		background-color: var(--muted) !important;
+	}
 	:global(html.dark .shiki),
 	:global(html.dark .shiki span) {
 		color: var(--shiki-dark) !important;
