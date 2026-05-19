@@ -47,10 +47,18 @@
 		void (async () => {
 			try {
 				const { codeToHtml } = await import('shiki');
+				// Dual-theme per the official Shiki guide:
+				// https://shiki.style/guide/dual-themes
+				// Light theme renders as direct inline `color:` and
+				// `background-color:` on each span/pre (default
+				// behaviour). Dark theme values are emitted as
+				// `--shiki-dark` CSS variables on the same elements.
+				// The CSS rule below swaps them in only when html.dark
+				// is present, with !important to beat the typography
+				// plugin's .prose pre color/background.
 				highlighted = await codeToHtml(content.trimEnd(), {
 					lang: language,
-					themes: { light: 'github-light', dark: 'github-dark' },
-					defaultColor: false
+					themes: { light: 'github-light', dark: 'github-dark' }
 				});
 			} catch (err) {
 				console.warn('[CodeBlock] highlight failed', { language, err });
@@ -269,20 +277,17 @@
 		fill: var(--background) !important;
 	}
 
-	/* Shiki dual-theme output: with defaultColor:false, every span
-	   carries inline --shiki-light + --shiki-dark CSS variables, but
-	   nothing reads them. These two rules pick the right one based on
-	   the document's dark-mode class. All other styling (border,
-	   padding, background of the pre itself) belongs to the typography
-	   plugin's .prose pre rule and we deliberately don't touch it. */
-	:global(.shiki),
-	:global(.shiki span) {
-		color: var(--shiki-light);
-		background-color: var(--shiki-light-bg);
-	}
+	/* Shiki dual-theme: light colours arrive inline on each span as
+	   `color:` / `background-color:` (default defaultColor behaviour).
+	   Dark colours arrive on the same spans as `--shiki-dark` /
+	   `--shiki-dark-bg` CSS variables. When html.dark is present we
+	   swap the variables in. !important is required to beat the
+	   typography plugin's `.prose pre { color, background-color }`.
+	   This is straight from the official Shiki guide:
+	   https://shiki.style/guide/dual-themes */
 	:global(html.dark .shiki),
 	:global(html.dark .shiki span) {
-		color: var(--shiki-dark);
-		background-color: var(--shiki-dark-bg);
+		color: var(--shiki-dark) !important;
+		background-color: var(--shiki-dark-bg) !important;
 	}
 </style>
