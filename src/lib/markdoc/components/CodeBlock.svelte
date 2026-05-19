@@ -1,26 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { mode } from 'mode-watcher';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils';
+	import Mermaid from './Mermaid.svelte';
 
 	// Fenced code block. Two branches:
 	//
-	//   - language === 'mermaid' — render as a diagram via mermaid.js.
-	//     Dynamic-imported on mount so the ~500KB mermaid bundle never
-	//     ships unless the page actually has a diagram. Re-renders when
-	//     the colour mode flips so light/dark stays correct.
+	//   - language === 'mermaid' — author writes a (subset of) Mermaid
+	//     flowchart in the fence; we parse it and render via SvelteFlow
+	//     for nicer chrome (rounded nodes, animated edges, auto-routed
+	//     connectors). See src/lib/diagrams/parse.ts for the supported
+	//     subset. SvelteFlow is dynamic-imported inside the Mermaid
+	//     component so its bundle never ships on pages without diagrams.
 	//
-	//   - everything else — Shiki-highlight on mount. Same dynamic-
-	//     import pattern: zero added weight on the initial paint, brief
-	//     flash of unhighlighted code on first render (acceptable for
-	//     docs; switch to build-time highlighting if it ever annoys).
+	//   - everything else — Shiki-highlight on mount. Dynamic-import:
+	//     zero added weight on initial paint, brief flash of
+	//     unhighlighted code on first render (acceptable for docs).
 	//
-	// The copy button is independent of highlighting and works regardless
-	// of whether Shiki/mermaid has loaded — for mermaid fences we hide it
-	// because copying the DSL source out of a rendered diagram is rarely
-	// what the reader wants.
+	// The copy button is independent of highlighting and works
+	// regardless of whether Shiki has loaded.
 
 	type Props = {
 		content: string;
@@ -32,16 +31,10 @@
 	const isMermaid = $derived(language === 'mermaid');
 
 	let highlighted = $state<string | null>(null);
-	let mermaidSvg = $state<string | null>(null);
-	let mermaidError = $state<string | null>(null);
 	let copied = $state(false);
 
-	// Stable id per mounted component so mermaid.render's xlink:href
-	// targets don't collide when a page has more than one diagram.
-	const diagramId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
-
 	onMount(() => {
-		if (isMermaid) return; // mermaid is handled by its own $effect (theme-reactive)
+		if (isMermaid) return; // handled by <Mermaid />
 		void (async () => {
 			try {
 				const { codeToHtml } = await import('shiki');
@@ -52,32 +45,6 @@
 				});
 			} catch (err) {
 				console.warn('[CodeBlock] highlight failed', { language, err });
-			}
-		})();
-	});
-
-	$effect(() => {
-		if (!isMermaid) return;
-		// Re-render when mode flips. mermaid is initialized once with
-		// the current theme — to switch themes we re-initialize and
-		// re-render. This is what mermaid.js's own docs recommend.
-		const theme = mode.current === 'dark' ? 'dark' : 'default';
-		void (async () => {
-			try {
-				const mermaid = (await import('mermaid')).default;
-				mermaid.initialize({
-					startOnLoad: false,
-					theme,
-					securityLevel: 'strict',
-					fontFamily: 'inherit'
-				});
-				const { svg } = await mermaid.render(diagramId, content.trim());
-				mermaidSvg = svg;
-				mermaidError = null;
-			} catch (err) {
-				const msg = err instanceof Error ? err.message : String(err);
-				mermaidError = msg;
-				console.warn('[CodeBlock] mermaid render failed', { err });
 			}
 		})();
 	});
@@ -96,22 +63,7 @@
 </script>
 
 {#if isMermaid}
-	<div class="not-prose my-6 overflow-hidden rounded-lg border border-border bg-muted/20 p-4">
-		{#if mermaidError}
-			<div class="text-sm text-destructive">
-				Mermaid render failed: <code>{mermaidError}</code>
-			</div>
-			<pre class="mt-2 overflow-x-auto text-xs text-muted-foreground"><code>{content}</code></pre>
-		{:else if mermaidSvg}
-			<div class="flex justify-center [&_svg]:max-w-full [&_svg]:h-auto">
-				{@html mermaidSvg}
-			</div>
-		{:else}
-			<div class="flex h-32 items-center justify-center text-sm text-muted-foreground">
-				Rendering diagram…
-			</div>
-		{/if}
-	</div>
+	<Mermaid {content} />
 {:else}
 	<div class="not-prose group relative my-6">
 		<button
