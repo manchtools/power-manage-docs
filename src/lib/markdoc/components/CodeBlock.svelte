@@ -235,12 +235,7 @@
 <style>
 	/* Mermaid output polish. The library inlines most styling onto
 	   SVG elements via themeVariables, but a few global tweaks help
-	   it sit cleanly in prose:
-	   - Cap the rendered SVG width so wide flowcharts don't blow
-	     out the layout. mermaid's useMaxWidth:true does the inverse
-	     (scale up); this caps the upper bound.
-	   - Nudge font weight on node labels so they read as a heading
-	     rather than body text. */
+	   it sit cleanly in prose. */
 	:global(.mermaid-figure svg) {
 		max-width: 100%;
 		height: auto;
@@ -249,8 +244,23 @@
 	:global(.mermaid-figure .edgeLabel) {
 		font-weight: 500;
 	}
-	:global(.mermaid-figure .edgeLabel) {
+	/* Edge labels: mermaid bakes textColor + edgeLabelBackground in
+	   at render time. Re-rendering on mode flip races with the new
+	   tokens (and mermaid sometimes carries the old fill into the
+	   <rect> behind the foreignObject). Pin them to live CSS
+	   variables so the .dark class flip handles theming without any
+	   mermaid re-render at all. */
+	:global(.mermaid-figure .edgeLabel),
+	:global(.mermaid-figure .edgeLabel p),
+	:global(.mermaid-figure .edgeLabel span) {
+		color: var(--foreground) !important;
+		background-color: var(--background) !important;
 		font-size: 12px;
+	}
+	:global(.mermaid-figure .edgeLabel rect),
+	:global(.mermaid-figure rect.label-background),
+	:global(.mermaid-figure .edge-label-background) {
+		fill: var(--background) !important;
 	}
 
 	/* Shiki dual-theme output: with defaultColor:false, every span
