@@ -55,7 +55,7 @@
 		class="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
 		transition:fade={{ duration: 120 }}
 	></div>
-	<aside
+	<div
 		role="dialog"
 		aria-modal="true"
 		aria-label="Navigation menu"
@@ -76,5 +76,5 @@
 			</button>
 		</div>
 		<Sidebar />
-	</aside>
+	</div>
 {/if}
