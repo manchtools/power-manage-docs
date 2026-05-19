@@ -59,7 +59,7 @@ is_compliance: true
 
 ## Gotchas
 
-- The exit code of the *remediation* script doesn't gate idempotency. Only the detection script does. A remediation that exits non-zero reports as a failure but doesn't auto-retry; the next reconciliation tick handles that.
+- The exit code of the *remediation* script doesn't gate idempotency. Only the detection script does. A remediation that exits non-zero reports as a failure but doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
 - Secrets in `script` or `detection_script` get redacted from the audit log, but they're sent to the agent in cleartext over mTLS. For credentials at rest, use `LPS`, `ENCRYPTION`, or the IdP credential store instead.
 - The detection-verify-retry sequence runs detection twice if the remediation script ran. Budget for that.
 - `interpreter` is invoked literally. `/bin/bash`, `/usr/bin/env python3`, even `/usr/bin/perl` all work. The script body goes in on stdin.

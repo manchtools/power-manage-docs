@@ -30,7 +30,7 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 The agent compares the to-be-installed binary's checksum against its own running version. Match means `changed=false`. Mismatch triggers the self-test.
 
-Multiple `AGENT_UPDATE` actions in one reconciliation cycle deduplicate to one execution.
+Multiple `AGENT_UPDATE` actions in one [reconciliation cycle](/concepts/reconciliation) deduplicate to one execution.
 
 ## Example
 

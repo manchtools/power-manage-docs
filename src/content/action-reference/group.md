@@ -42,6 +42,6 @@ desired_state: PRESENT
 
 ## Gotchas
 
-- Membership is exact, not additive. If a user has been manually added to the group on the device and isn't in the action's `members` list, they get removed on the next reconciliation tick. To allow ad-hoc additions, use `USER` to bake users' group memberships into their account record instead.
+- Membership is exact, not additive. If a user has been manually added to the group on the device and isn't in the action's `members` list, they get removed on the next [reconciliation tick](/concepts/reconciliation). To allow ad-hoc additions, use `USER` to bake users' group memberships into their account record instead.
 - A user listed in `members` who doesn't exist on the device is silently skipped with a warning in the audit log. The action doesn't fail.
 - `gid` is honoured on creation only. Changing it later requires removing the group and recreating, which loses members.

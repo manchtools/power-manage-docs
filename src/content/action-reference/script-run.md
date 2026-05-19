@@ -25,5 +25,5 @@ script: |
 ## Gotchas
 
 - Output goes to the execution event in the audit log, capped at the agent's per-execution output limit (1 MB by default). Anything over that is truncated, with a note.
-- No idempotency means the script runs on every reconciliation tick if you put it in an assignment without a schedule. Add a cron schedule or a maintenance window unless you want it firing every 5 minutes.
+- No idempotency means the script runs on every [reconciliation tick](/concepts/reconciliation) if you put it in an assignment without a schedule. Add a cron schedule or a maintenance window unless you want it firing every 5 minutes.
 - For sensitive output (passwords, tokens), prefer `SHELL` with a detection script that doesn't echo the value. The audit redactor doesn't scrub script output.

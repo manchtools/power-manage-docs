@@ -1,6 +1,6 @@
 # SYNC
 
-Triggers an out-of-band reconciliation tick. The agent immediately fetches its current assignments from the gateway and applies anything that's due, rather than waiting for the next scheduled tick.
+Triggers an out-of-band [reconciliation tick](/concepts/reconciliation). The agent immediately fetches its current assignments from the gateway and applies anything that's due, rather than waiting for the next scheduled tick.
 
 `SYNC` is an **instant action**. It bypasses maintenance windows and reconciliation cadence. That's the whole point.
 

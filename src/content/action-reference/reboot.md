@@ -2,7 +2,7 @@
 
 Reboots the device. Scheduled 5 minutes out, with a wall message broadcast to any logged-in users: *"System Reboot: This system will reboot in 5 minutes."*
 
-`REBOOT` is an **instant action**. It dispatches over the agent's stream immediately rather than waiting for the next reconciliation tick. It also doesn't respect maintenance windows when dispatched as an instant action; if you want a windowed reboot, put it inside an action set.
+`REBOOT` is an **instant action**. It dispatches over the agent's stream immediately rather than waiting for the next [reconciliation tick](/concepts/reconciliation). It also doesn't respect maintenance windows when dispatched as an instant action; if you want a windowed reboot, put it inside an action set.
 
 ## Parameters
 

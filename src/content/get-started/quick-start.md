@@ -70,7 +70,7 @@ Save. The action is in the catalogue but isn't running anywhere yet.
 | Target | device group `production` |
 | Mode | `enforce` |
 
-Save. On the next reconciliation tick (default 5 minutes) every production agent picks up the dispatch.
+Save. On the next [reconciliation tick](/concepts/reconciliation) (default 5 minutes) every production agent picks up the dispatch.
 
 ### 5. Watch it land
 

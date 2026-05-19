@@ -6,7 +6,7 @@ Windows are evaluated in the **device's local timezone**, not the operator's and
 
 ## Why use them
 
-Without windows, every assignment fires on its reconciliation tick (default 5 minutes). That's fine for small idempotent actions. For things that hurt when they go wrong (package updates, kernel patches, services that restart on config change) you want them firing when nobody is on the box. Windows give you that without per-device scheduling.
+Without windows, every assignment fires on its [reconciliation tick](/concepts/reconciliation) (default 5 minutes). That's fine for small idempotent actions. For things that hurt when they go wrong (package updates, kernel patches, services that restart on config change) you want them firing when nobody is on the box. Windows give you that without per-device scheduling.
 
 ## Defining a window
 

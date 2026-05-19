@@ -2,7 +2,7 @@
 
 Runs the device's package manager in upgrade mode. Equivalent to `apt-get update && apt-get upgrade`, `dnf upgrade`, `pacman -Syu`, or `zypper update` depending on the distro.
 
-`UPDATE` is the maintenance-window action: it can be slow, can pull large downloads, and may require a reboot. Run it on a schedule with a maintenance window rather than every reconciliation tick.
+`UPDATE` is the maintenance-window action: it can be slow, can pull large downloads, and may require a reboot. Run it on a schedule with a maintenance window rather than every [reconciliation tick](/concepts/reconciliation).
 
 ## Parameters
 

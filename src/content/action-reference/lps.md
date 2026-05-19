@@ -16,7 +16,7 @@ LPS is roughly analogous to Microsoft's LAPS: keep local admin passwords strong,
 
 ## Idempotency
 
-The agent tracks per-user rotation state in a local SQLite store. On every reconciliation tick:
+The agent tracks per-user rotation state in a local SQLite store. On every [reconciliation tick](/concepts/reconciliation):
 
 1. If a user is unmanaged, generate a password and set it. Send the new value back to the control server.
 2. If a user is managed and within the rotation interval, no-op.

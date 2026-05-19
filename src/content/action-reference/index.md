@@ -26,7 +26,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 | `FILE` | Manage file content, ownership, and mode. Managed-block diffing for fragments inside a larger file. |
 | `DIRECTORY` | Manage directory presence, ownership, and mode |
 | `REBOOT` | Reboot the device |
-| `SYNC` | Trigger an out-of-band reconciliation tick |
+| `SYNC` | Trigger an out-of-band [reconciliation tick](/concepts/reconciliation) |
 
 ## Identity and access
 

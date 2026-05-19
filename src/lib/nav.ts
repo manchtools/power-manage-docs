@@ -38,6 +38,7 @@ export const nav: NavGroup[] = [
 		items: [
 			{ title: 'Architecture', href: '/concepts/architecture' },
 			{ title: 'Event sourcing', href: '/concepts/event-sourcing' },
+			{ title: 'Reconciliation', href: '/concepts/reconciliation' },
 			{ title: 'RBAC and scopes', href: '/concepts/rbac' },
 			{ title: 'Dynamic device groups', href: '/concepts/dynamic-groups' },
 			{ title: 'Maintenance windows', href: '/concepts/maintenance-windows' },

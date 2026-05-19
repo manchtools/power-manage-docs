@@ -1,6 +1,6 @@
 # Compliance policies
 
-A compliance policy is a bundle of rules the agent evaluates against device state on every reconciliation tick. The output is status (compliant, drifting, or violating), not corrective action. Compliance detects drift. Assignments fix it.
+A compliance policy is a bundle of rules the agent evaluates against device state on every [reconciliation tick](/concepts/reconciliation). The output is status (compliant, drifting, or violating), not corrective action. Compliance detects drift. Assignments fix it.
 
 The distinction is intentional. An assignment in `enforce` mode flips state. A compliance policy reports on state. The same `PACKAGE` action can be either; you decide by wrapping it in an assignment or in a policy.
 
