@@ -165,6 +165,19 @@
    (sidebar, header, etc.). Approximates @tailwindcss/typography
    without the dependency. */
 @layer components {
+  /* Anything inside a `.not-prose` subtree opts out of the
+     surrounding `.prose` styling. Our hand-rolled `.prose X` rules
+     match on plain descendant selectors (e.g. `.prose pre`), which
+     leak through a `.not-prose` boundary because that boundary
+     isn't part of the selector. `all: revert-layer` reverses every
+     declaration that came from this layer (.prose pre / h1 / ...)
+     without touching Tailwind utilities in @layer utilities — so
+     widgets like CodeBlock can still apply their own classes. */
+  .prose .not-prose,
+  .prose .not-prose :where(*) {
+    all: revert-layer;
+  }
+
   .prose {
     @apply text-foreground leading-7 max-w-none;
   }
