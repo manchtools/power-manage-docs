@@ -39,4 +39,4 @@ desired_state: PRESENT
 - The corresponding `authorized_keys` for each user has to be managed separately. Use `USER` with `ssh_authorized_keys` for that.
 - Multiple `SSH` actions can coexist on a device. Each gets its own group + drop-in, so policies stack.
 - Re-naming the action creates a new group and a new drop-in. The agent doesn't garbage-collect the old one automatically; remove the old action with `desired_state: ABSENT` first.
-- `allow_password: true` is generally not what you want. Pair it with a policy that constrains source IPs (`SSHD` action with `Match Address`) if you must enable it.
+- `allow_password: true` is rarely the right answer. If you must enable it, scope it with an `SSHD` action carrying a `Match Address` directive to constrain source IPs.

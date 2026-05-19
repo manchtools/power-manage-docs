@@ -22,7 +22,7 @@ Decoupled release cadence. The Connect-RPC surface is the stable contract; the U
 
 Smaller server footprint. Operators who only want the API (CLI-only deployments, automation, integrations) don't carry a frontend build pipeline they aren't using.
 
-One UI, many servers. The same hosted UI connects to dev, staging, and production by changing the URL field on the sign-in screen. Useful for support staff who jump between tenants.
+One UI, many servers. The same hosted UI connects to dev, staging, and production by changing the URL field on the sign-in screen. Support staff jumping between tenants don't need to remember three different bookmarks.
 
 Static hosting. The UI is a SPA. Static-plus-tiny-proxy is much cheaper and more available than hosting a stateful application server.
 
@@ -34,7 +34,7 @@ Two things.
 
 **Asset rewriting** for avatars and screenshots referenced by external URL, so the SPA doesn't have to do CORS preflights against arbitrary user-provided origins.
 
-That's it. RPCs, file uploads, event subscriptions, the terminal WebSocket — all of those connect from your browser to your control server with no intermediary.
+That's it. RPCs, file uploads, event subscriptions, the terminal WebSocket: all of those connect from your browser to your control server with no intermediary.
 
 ## CORS and your control server
 

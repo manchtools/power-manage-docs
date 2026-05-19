@@ -17,7 +17,7 @@ The agent creates a dedicated Linux group per action, writes a policy file in `/
 
 `FULL` grants unrestricted sudo with password required.
 
-`LIMITED` allows the package managers (apt, dnf, pacman, zypper), systemctl, reboot, mount, network tools, container runtimes (docker, podman, containerd), and standard diagnostic tools. It explicitly denies modifications to `/etc/sudoers`, `/etc/sudoers.d/*`, and `power-manage-agent.service`. Useful for ops engineers who shouldn't be able to break the agent.
+`LIMITED` allows the package managers (apt, dnf, pacman, zypper), systemctl, reboot, mount, network tools, container runtimes (docker, podman, containerd), and standard diagnostic tools. It denies modifications to `/etc/sudoers`, `/etc/sudoers.d/*`, and `power-manage-agent.service`. The intended audience is ops engineers who shouldn't be able to disable the agent.
 
 `CUSTOM` is raw policy. The `{group}` placeholder substitutes the action's managed group name. The agent runs `visudo -c` against the rendered output before installing; a syntax error fails the action.
 

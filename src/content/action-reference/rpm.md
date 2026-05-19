@@ -7,7 +7,7 @@ Installs an `.rpm` package from a URL. Same shape as `DEB`, different backend. U
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `url` | string | yes | — | HTTPS URL to fetch the `.rpm` from. |
-| `checksum_sha256` | string | no | — | 64-char hex digest. Strongly recommended. |
+| `checksum_sha256` | string | no | — | 64-char hex digest. Skip only for repos you trust the TLS chain of. |
 | `install_path` | string | no | system tmp | Directory to download into before install. |
 
 ## Idempotency
@@ -32,4 +32,4 @@ desired_state: PRESENT
 - The package name comes from the rpm header itself, not the filename.
 - `rpm -i` doesn't resolve dependencies. For dependency resolution, install through `dnf install <url>` via a `SHELL` action, or use `PACKAGE` after configuring a repo.
 - A signed RPM is verified against the keyring on install. Unsigned RPMs install with a warning unless `rpm --nosignature` is set globally on the device.
-- The checksum is optional but strongly recommended. Without it, you're trusting the URL's TLS chain not to lie.
+- The checksum is optional. Skip it only when you trust the URL's TLS chain.

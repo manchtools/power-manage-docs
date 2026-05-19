@@ -42,6 +42,6 @@ desired_state: PRESENT
 ## Gotchas
 
 - Passwords flow control → agent in cleartext over the mTLS stream. They never appear in the audit log. Only "rotation occurred" events do.
-- The target accounts have to exist before LPS runs. Pair LPS with a `USER` action in the same set if you're managing both.
+- The target accounts have to exist before LPS runs. If you're managing both, put a `USER` action ahead of LPS in the same action set.
 - After rotation, active user sessions on the device get killed. If an operator is logged in via SSH when rotation fires, they'll be disconnected. Plan rotation cadence around that.
 - The grace-period feature requires the agent to observe auth events (login / sudo). Detection happens via syslog; on devices without those logs configured, the grace period is silently ignored.

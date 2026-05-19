@@ -1,6 +1,6 @@
 # Remote terminal access
 
-The agent can open an interactive shell to authorised operators through the control server. Useful for triage when an action's audit trail isn't enough and you actually need to look at the box.
+The agent can open an interactive shell to authorised operators through the control server. The tool you reach for when an action's audit trail isn't enough and you need to actually look at the box.
 
 The trust model leans toward the device. The agent decides whether terminal access is allowed at all. The server cannot bypass that decision.
 

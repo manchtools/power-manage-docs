@@ -1,6 +1,6 @@
 # GROUP
 
-Creates or removes a system group and manages its membership exactly. Useful when you want a specific group of users assembled by name, separate from any `USER` action.
+Creates or removes a system group and manages its membership exactly. Use it when you want a specific list of users assembled into a named group, separate from any `USER` action.
 
 ## Parameters
 

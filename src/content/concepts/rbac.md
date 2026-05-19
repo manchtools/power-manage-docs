@@ -17,7 +17,7 @@ A new RPC that operates on per-device data has to wire `userFilterID(ctx, "<RPCN
 
 ## User groups
 
-A user group is a named collection of users with an additive permission set. Membership can be static (operator picks users) or dynamic (a query over user-profile fields like email, linux_username, disabled — same grammar as device groups).
+A user group is a named collection of users with an additive permission set. Membership is either static (operator picks users) or dynamic (a query over user-profile fields like email, linux_username, disabled, using the same grammar as device groups).
 
 Permissions are unioned across all groups a user belongs to. There is no "deny" semantic. To take a permission away, remove the user from the group that grants it.
 

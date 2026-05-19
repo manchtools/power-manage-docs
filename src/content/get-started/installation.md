@@ -3,7 +3,7 @@
 Power Manage deploys as a Compose stack. Six containers: Traefik, Postgres, Valkey (with RediSearch), the control server, the gateway, and the indexer. A `setup.sh` helper generates the cert chain, secrets, and `valkey.conf` so you don't have to assemble them by hand.
 
 {% callout type="warn" title="No web UI is bundled" %}
-The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **https://app.power-manage.manchtools.com** — point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
+The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **https://app.power-manage.manchtools.com**. Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
 {% /callout %}
 
 ## Prerequisites

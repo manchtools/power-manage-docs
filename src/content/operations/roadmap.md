@@ -6,7 +6,7 @@ This page reflects the milestone tracker as of mid-May 2026. The canonical sourc
 
 ## 2026.06: in scope
 
-### Phase 0 — hardening (weeks 1–2)
+### Phase 0: hardening (weeks 1–2)
 
 - Proto v1 consolidation. Removing the last of the v1alpha experimental fields.
 - Peer-class mTLS hardening: SPIFFE SANs enforced on every inter-service connection, not just agent-to-gateway.
@@ -14,14 +14,14 @@ This page reflects the milestone tracker as of mid-May 2026. The canonical sourc
 - Inline action validation: every action's parameters validate at the API boundary, not just inside the agent.
 - CA role separation: the agent CA, inter-service CA, and HTTPS CA become independently rotatable.
 
-### Phase 1 — fleet ergonomics (weeks 3–4)
+### Phase 1: fleet ergonomics (weeks 3–4)
 
 - **`UNINSTALL` assignment mode.** A new mode alongside `enforce` / `report` that runs the action's reverse on the target. Replaces the current "set state to ABSENT and re-assign" dance.
 - **Serial action-set execution.** Action sets execute in declared order with abort-on-first-failure (configurable). Today's behaviour is parallel with no ordering guarantee.
 - **One-shot scheduled dispatch.** Delayed Asynq tasks let you say "run this at 03:00 tomorrow" without standing up a recurring schedule.
 - **Per-group maintenance windows.** See [Maintenance windows](/concepts/maintenance-windows). Already partially landed; the milestone finishes the device-local timezone enforcement.
 
-### Phase 2 — terminal admin model (weeks 5–7)
+### Phase 2: terminal admin model (weeks 5–7)
 
 The remote terminal landed earlier; this phase ships its proper authorisation model.
 
@@ -32,7 +32,7 @@ The remote terminal landed earlier; this phase ships its proper authorisation mo
   - Editor-escape mitigation: how does `:!sh` from inside `vi` get captured?
   - TTY auth model: permanent, time-boxed, or operator-requested?
 
-### Phase 3 — operability (week 8)
+### Phase 3: operability (week 8)
 
 - `power-manage-control doctor` subcommand. Health-checks for the stack: certificate expiry, Postgres replication lag (if applicable), Valkey memory, Asynq dead queue, indexer drift, retention horizon.
 - `SECURITY.md` covering the threat model, trust boundaries, secret handling, and the rotation playbooks.

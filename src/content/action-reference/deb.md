@@ -7,7 +7,7 @@ Installs a `.deb` package from a URL. Used when the package isn't in a repositor
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `url` | string | yes | — | HTTPS URL to fetch the `.deb` from. |
-| `checksum_sha256` | string | no | — | 64-char hex digest. Strongly recommended. |
+| `checksum_sha256` | string | no | — | 64-char hex digest. Skip only for repos you trust the TLS chain of. |
 | `install_path` | string | no | system tmp | Directory to download into before install. |
 
 ## Idempotency
@@ -32,6 +32,6 @@ desired_state: PRESENT
 ## Gotchas
 
 - The package name is extracted from the `.deb` control file, not parsed from the URL. URLs like `https://example/foo-utils-1.2.deb` won't mislead the agent.
-- `dpkg -i` doesn't resolve dependencies. If the `.deb` needs deps that aren't installed, the action will fail. Pair it with a `PACKAGE` action for the dependencies.
+- `dpkg -i` doesn't resolve dependencies. If the `.deb` needs deps that aren't installed, the action fails. Put a `PACKAGE` action for the dependencies ahead of it in the action set.
 - The download honours system proxy settings (via `HTTP_PROXY` / `HTTPS_PROXY` in the agent's environment).
-- The checksum is optional but strongly recommended. Without it, you're trusting the URL's TLS chain not to lie.
+- The checksum is optional. Skip it only when you trust the URL's TLS chain.

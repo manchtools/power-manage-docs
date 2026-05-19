@@ -36,11 +36,11 @@ If the signature doesn't verify, the agent records an `ExecutionFailed` event wi
 
 For every dispatch arriving over the bidirectional stream:
 
-1. **TLS handshake** — gateway cert chain + hostname.
-2. **Stream identity** — the agent confirms the gateway is presenting a cert with the `gateway` SPIFFE class.
-3. **Envelope HMAC** — the Asynq task signing key check (see [Asynq task signing](/security/task-signing)) catches Valkey tampering before the gateway can even forward.
-4. **Action signature** — the per-action RSA signature.
-5. **Action-type sanity** — the payload deserialises into the expected proto schema and passes inline validation.
+1. **TLS handshake.** Gateway cert chain and hostname.
+2. **Stream identity.** The agent confirms the gateway is presenting a cert with the `gateway` SPIFFE class.
+3. **Envelope HMAC.** The Asynq task-signing key check (see [Asynq task signing](/security/task-signing)) catches Valkey tampering before the gateway forwards anything.
+4. **Action signature.** The per-action RSA signature.
+5. **Action-type sanity.** The payload deserialises into the expected proto schema and passes inline validation.
 
 A failure at any layer ends the dispatch and emits an event. No silent drops.
 

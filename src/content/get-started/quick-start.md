@@ -88,7 +88,7 @@ Schedule the assignment. Cron expressions or fixed intervals both work, and the 
 
 Constrain *when* work runs with maintenance windows. A window attached to a device group bounds execution to specific hours in the device's local timezone. See [Maintenance windows](/concepts/maintenance-windows).
 
-Layer compliance on top for drift detection that doesn't force convergence. Compliance policies evaluate the same way actions do but only report status — useful when remediation is risky enough that you want a human in the loop.
+Layer compliance on top for drift detection that doesn't force convergence. Compliance policies evaluate the same way actions do but only report status. Pick that mode when remediation is risky enough that you want a human in the loop.
 
 ## What not to do
 

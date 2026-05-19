@@ -36,8 +36,8 @@ Audit log entries surface every state transition, so you can prove compliance ov
 
 ## When to pick which
 
-Reach for an **assignment** when the agent should make the assertion true. "Every production host has curl" maps to a `PACKAGE` assignment, `PRESENT`, mode `enforce`.
+Use an **assignment** when the agent should make the assertion true. "Every production host has curl" maps to a `PACKAGE` assignment, `PRESENT`, mode `enforce`.
 
-Reach for a **policy** when you want drift visibility but not automatic remediation. "Every production host should have curl" maps to a policy with the same check. Useful when the corrective action is risky (kernel pinning, encryption key rotation) and you'd rather a human approve the fix.
+Use a **policy** when you want drift visibility but no automatic remediation. "Every production host should have curl" maps to a policy with the same check. The right choice when the corrective action is risky (kernel pinning, encryption key rotation) and you'd rather a human approve the fix.
 
 Using both together is fine: an assignment that converges, paired with a policy that monitors. The assignment runs on every tick. The policy reports if something locally undoes the assignment's work.

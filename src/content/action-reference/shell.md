@@ -1,6 +1,6 @@
 # SHELL
 
-Runs a shell script on the device. The most general-purpose action, useful when no specialised type fits. Pair it with a detection script and SHELL becomes idempotent: the agent only runs the remediation script if the detection script reports drift.
+Runs a shell script on the device. The general-purpose action for when no specialised type fits. Add a detection script and SHELL becomes idempotent: the agent only runs the remediation script if the detection script reports drift.
 
 For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same parameters, different semantics. `SCRIPT_RUN` always runs and never reports `changed=false`.
 
@@ -26,7 +26,7 @@ For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same paramet
 
 If `detection_script` is unset, the remediation script runs every time and the action always reports `changed=true`.
 
-`is_compliance=true` makes the agent run only the detection step. The remediation is ignored even when present. Useful for read-only audit policies.
+`is_compliance=true` makes the agent run only the detection step. The remediation is ignored even when present. That's the mode for read-only audit policies.
 
 ## Examples
 

@@ -1,6 +1,6 @@
 # Adding screenshots
 
-Most of the docs you'll write are prose plus diagrams. For walkthroughs it helps to show the web UI as the operator sees it. Here's the workflow.
+Walkthroughs read better with screenshots of the web UI alongside the prose. Here's the workflow.
 
 ## Where they live
 
@@ -90,7 +90,7 @@ Both variants support an optional `width=` override (default is the prose column
 
 ## What to avoid
 
-- **Personal data.** Use seeded demo data. The hosted UI has a `?demo=1` query param that swaps in deterministic fake fleets — point your demo control server at the same data set so every shot is reproducible.
+- **Personal data.** Use seeded demo data. The hosted UI has a `?demo=1` query param that swaps in deterministic fake fleets; point your demo control server at the same data set so every shot is reproducible.
 - **API tokens or JWTs.** Even the URL bar of a fresh screenshot can leak. The faux-browser frame the tag draws has no URL bar deliberately.
 - **Logos or names from real customers.** Same reason.
 - **Drift.** A docs screenshot from six versions ago is misleading. When the UI changes, the screenshot referenced in the prose needs to too. A `grep -r "{% screenshot" src/content` after a UI release shows you what to re-shoot.

@@ -2,7 +2,7 @@
 
 Creates, modifies, or removes a system user. Covers UID, primary group, home, shell, GECOS comment, SSH authorized_keys, and account disabled / hidden state.
 
-Pair `USER` with `GROUP` if you need fine-grained group membership, and with `SSH` if you want managed authorized_keys at the policy level rather than baked into the user.
+For fine-grained group membership, combine with `GROUP`. For managed `authorized_keys` at the policy level rather than baked into the user record, combine with `SSH`.
 
 ## Parameters
 
@@ -64,7 +64,7 @@ desired_state: PRESENT
 
 ## Gotchas
 
-- The agent refuses to manage the user that owns the agent process itself. Don't try to disable `root` through here.
+- The agent refuses to manage the user that owns the agent process itself. Disabling `root` through `USER` is rejected.
 - `linux_uid` autoassignment uses the next free UID in the normal range (or system range if `system_user: true`). To pin a UID across a fleet, set `uid` explicitly.
 - SSH keys are managed via append-if-missing semantics. The agent won't *remove* keys that aren't listed unless the action's mode is `enforce` (defaults to enforce). For pure additive policy, use the `SSH` action instead.
 - `hidden` requires `accountsservice` installed; otherwise the field is ignored and a warning ends up in the audit log.
