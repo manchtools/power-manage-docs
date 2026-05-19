@@ -183,9 +183,11 @@
   }
   /* Drop the typography plugin's literal backtick characters around
      inline <code>. The plugin emits them via ::before/::after to mimic
-     markdown source — visually noisy in a rendered doc page. */
+     markdown source — visually noisy in a rendered doc page. Plugin
+     rules and ours sit in the same cascade layer, so !important is
+     required to win against `content: "\`"`. */
   .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
   .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
-    content: none;
+    content: none !important;
   }
 }
