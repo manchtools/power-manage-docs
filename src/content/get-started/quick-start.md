@@ -68,7 +68,7 @@ Save. The action is in the catalogue but isn't running anywhere yet.
 |---|---|
 | Action | `Install curl` |
 | Target | device group `production` |
-| Mode | `enforce` |
+| Mode | `REQUIRED` |
 
 Save. On the next [reconciliation tick](/concepts/reconciliation) (default 5 minutes) every production agent picks up the dispatch.
 

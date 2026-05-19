@@ -10,7 +10,7 @@ Without windows, every assignment fires on its [reconciliation tick](/concepts/r
 
 ## Defining a window
 
-Open a device group in the web UI, switch to **Maintenance**, and add a window:
+Open a device group in the web UI, switch to **Maintenance**, and add a window. (RPC: `SetDeviceGroupMaintenanceWindow` on `ControlService`.)
 
 | Field | Example |
 |---|---|

@@ -16,7 +16,7 @@ This page reflects the milestone tracker as of mid-May 2026. The canonical sourc
 
 ### Phase 1: fleet ergonomics (weeks 3–4)
 
-- **`UNINSTALL` assignment mode.** A new mode alongside `enforce` / `report` that runs the action's reverse on the target. Replaces the current "set state to ABSENT and re-assign" dance.
+- **`UNINSTALL` assignment mode plumbed through the agent.** The mode exists in the proto enum already alongside `REQUIRED` / `AVAILABLE` / `EXCLUDED`; the 2026.06 work finishes the agent-side wiring so the agent forces `desired_state: ABSENT` for any action under an UNINSTALL assignment. Replaces the current "set state to ABSENT and re-assign" dance.
 - **Serial action-set execution.** Action sets execute in declared order with abort-on-first-failure (configurable). Today's behaviour is parallel with no ordering guarantee.
 - **One-shot scheduled dispatch.** Delayed Asynq tasks let you say "run this at 03:00 tomorrow" without standing up a recurring schedule.
 - **Per-group maintenance windows.** See [Maintenance windows](/concepts/maintenance-windows). Already partially landed; the milestone finishes the device-local timezone enforcement.
@@ -34,7 +34,7 @@ The remote terminal landed earlier; this phase ships its proper authorisation mo
 
 ### Phase 3: operability (week 8)
 
-- `power-manage-control doctor` subcommand. Health-checks for the stack: certificate expiry, Postgres replication lag (if applicable), Valkey memory, Asynq dead queue, indexer drift, retention horizon.
+- A health-check / diagnostic surface for the stack: certificate expiry, Postgres replication lag (if applicable), Valkey memory, Asynq dead queue, indexer drift, retention horizon. Form not yet decided (CLI subcommand vs. internal RPC vs. dashboard widget).
 - `SECURITY.md` covering the threat model, trust boundaries, secret handling, and the rotation playbooks.
 - Five ADRs:
   - mTLS identity

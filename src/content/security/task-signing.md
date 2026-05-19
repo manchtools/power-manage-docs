@@ -42,22 +42,13 @@ level=warn msg="task signature verification failed"
 
 A pattern of `hmac_mismatch` warnings on one side means that side's key is wrong (or has drifted out of sync with the others). A burst across all three usually means an in-flight rotation hasn't finished.
 
-The web UI's **Operations** → **Dead queue** view surfaces the same envelopes for review. Don't replay them. Diagnose the mismatch instead.
+Dead-letter envelopes sit in Valkey under the `asynq:dead:*` keys. `docker compose exec valkey valkey-cli` plus the Asynq CLI inspector (`asynq dash` if you install it on the host) are the diagnostic surfaces today. A web UI view for the dead queue is not implemented.
 
 ## Key rotation
 
-Two modes are supported.
+Today there's one supported mode: drain-and-cut. Pause new work, wait for all Asynq queues to drain, update `PM_TASK_SIGNING_KEY` in `.env` for all three services (control, gateway, indexer), restart the containers. Total outage is whatever your slowest queue takes to clear — usually under a minute.
 
-**Drain-and-cut** (simpler, brief outage). Pause new work, wait for all queues to drain, update `.env` on all three services, restart. Total outage is whatever your slowest queue takes to clear, usually under a minute.
-
-**Overlap rotation** (zero downtime, requires the secondary-key env var). The verifier accepts two keys at once. The producer signs with only the primary:
-
-1. Add `PM_TASK_SIGNING_KEY_SECONDARY=<new key>` to all three services. Restart. Verifiers now accept either key; producers still sign with the original primary.
-2. Wait long enough for any in-flight tasks signed with the original key to have either been processed or moved to the dead queue (default Asynq retention is 30 days; you can wait less if you check the queue is empty).
-3. Swap: set `PM_TASK_SIGNING_KEY=<new key>` and `PM_TASK_SIGNING_KEY_SECONDARY=<old key>`. Restart. Producers now sign with the new key; verifiers still accept the old one for any stragglers.
-4. After enough time has passed that all old-key tasks have processed, drop `PM_TASK_SIGNING_KEY_SECONDARY` and restart.
-
-The overlap window only needs to be longer than your longest task queue's residency time. For action dispatches that's typically minutes.
+A zero-downtime overlap mode (verifier accepting two keys at once, producer signing with one) is not yet implemented. It's tracked under the 2026.06 milestone alongside the rest of the secret rotation playbook.
 
 ## When to rotate
 

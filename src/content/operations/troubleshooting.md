@@ -8,7 +8,7 @@ A long page on purpose. Search ("Search docs…" in the top nav, or ⌘K) for th
 
 Three things to check, in order:
 
-1. **Token has been used already.** Enrolment tokens are single-use. The web UI's **Devices** → **Enrolment tokens** page shows the consumed status. Generate a new one.
+1. **Token has been used already.** Enrolment tokens are single-use. The web UI's **Devices** → **Enrolment tokens** page (backed by `ListTokens`) shows the consumed status; `CreateToken` generates a new one.
 2. **Token expired.** Default lifetime is 24 hours. The token list shows expiry; expired tokens stay visible for audit but don't enrol.
 3. **Rate-limited.** The control server caps enrolment at 5 attempts per minute per IP. If you've been retrying a broken setup, wait a minute.
 
@@ -31,7 +31,7 @@ A clean TLS handshake plus a redirect to the SNI passthrough is what you want. C
 | TLS handshake fails | `GATEWAY_DOMAIN` in `.env` doesn't match the actual public DNS name |
 | Connection succeeds but mTLS fails | Agent cert was signed by a CA the gateway doesn't trust (usually means the gateway has been redeployed without the same CA bundle) |
 
-For the mTLS case, the gateway's logs show `tls: client certificate signed by unknown authority`. Re-mount the CA bundle volume, or trigger a `ForceRenewCertificate` from the device-detail page so the agent gets a cert signed by the current CA.
+For the mTLS case, the gateway's logs show `tls: client certificate signed by unknown authority`. Re-mount the CA bundle volume or unenrol + re-enrol the agent (single-use registration token, then `pm-enroll` again) so its cert is signed by the current CA.
 
 ### Agent shows "offline" in the UI but the process is running
 
@@ -74,10 +74,7 @@ The agent self-heals package manager locks before every package operation. If yo
 Three layers:
 
 1. **TOTP enabled but not entered.** If the account has TOTP, the password is only step 1. The sign-in form should show the TOTP prompt after the password; if it doesn't, the JS is broken (browser console will tell you). Try an incognito window in case it's a cached bundle.
-2. **Bootstrap admin password forgotten.** The bootstrap admin's credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and are written to the database on first boot only. Changing them in `.env` later does nothing. To reset, either use the admin's "Forgot password" flow (if SMTP is configured) or run the password-reset CLI:
-   ```bash
-   docker compose exec control power-manage-control reset-admin-password admin@example.com
-   ```
+2. **Bootstrap admin password forgotten.** The bootstrap admin's credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and are written to the database on first boot only. Changing them in `.env` later does nothing — the user record already exists with the original (hashed) password. Another admin can reset it: web UI **Users** → user-detail → **Reset password**, which calls the `UpdateUserPassword` RPC. If you don't have another admin, recover the password from a Postgres backup or rebuild the bootstrap admin row directly via `psql`.
 3. **CONTROL_PASSWORD_AUTH_ENABLED is false.** If you disabled password auth for SSO-only mode and your SSO provider isn't working, password fall-back is also blocked. Flip the env var back to `true`, restart the control container, sign in, then fix SSO.
 
 ### OIDC sign-in redirects to a CORS error
@@ -90,11 +87,7 @@ Set the IdP's `redirect_uri` to `https://app.power-manage.manchtools.com/auth/ca
 
 The SCIM bearer token is bcrypt-hashed at rest. If you copied it from the web UI when you created the provider, that was the only time it's visible. Once you save, it can't be retrieved.
 
-To fix:
-
-1. Web UI → **Identity providers** → **SCIM** tab → edit the provider
-2. Click **Rotate token**. A new token displays once.
-3. Update the IdP's SCIM config with the new token.
+To fix, call `RotateSCIMToken` — in the UI: **Identity providers** → **SCIM** tab → **Rotate token** on the provider. A new token displays once. Copy it, then update the IdP's SCIM config with the new value.
 
 If the rotation also doesn't work, the IdP is rate-limited at the SCIM endpoint (10 requests/minute per slug). Wait a minute and retry.
 
@@ -124,7 +117,7 @@ Dead queue entries mean the consumer permanently failed a task (max retries exha
 docker compose exec valkey valkey-cli SCAN 0 MATCH 'asynq:dead*' COUNT 100
 ```
 
-The web UI's **Operations** → **Dead queue** view shows the same envelopes with their failure reason. Don't blindly replay them. Diagnose the underlying issue first — most commonly an action-signing key mismatch, an agent cert that's been revoked, or a malformed action payload from a now-fixed bug.
+Most commonly the failure is an action-signing key mismatch, an agent that's gone offline, or a malformed action payload from a now-fixed bug. Don't blindly re-enqueue; diagnose the cause first.
 
 ### Compliance policies report "evaluating" indefinitely
 
@@ -191,18 +184,14 @@ Two failure modes:
 
 ### RediSearch returns stale data
 
-The indexer reconciles against Postgres every hour by default. If a recent change isn't appearing in search:
+The indexer reconciles against Postgres on a schedule. If a recent change isn't appearing in search:
 
 ```bash
 docker compose exec valkey valkey-cli FT._LIST
 docker compose exec valkey valkey-cli FT.INFO devices_idx
 ```
 
-`last_indexing_finished_time` shows when the index was last fully rebuilt. To force a rebuild:
-
-```bash
-docker compose exec control power-manage-control reindex --target=devices
-```
+`last_indexing_finished_time` on the index shows when it was last rebuilt. The `RebuildSearchIndex` RPC on the control server triggers a forced rebuild — the web UI exposes it under **Settings** → **Search** for any user with the `RebuildSearchIndex` permission.
 
 ## Diagnostic commands cheat-sheet
 
@@ -210,6 +199,9 @@ docker compose exec control power-manage-control reindex --target=devices
 # Stack health
 docker compose ps
 docker compose logs control gateway indexer --since=5m --tail=200
+
+# Control / gateway / indexer version (logged on boot)
+docker compose logs control --since=10m | grep '"starting control server"'
 
 # Postgres
 docker compose exec postgres psql -U powermanage -d powermanage -c '\dt'
@@ -223,10 +215,6 @@ docker compose exec valkey valkey-cli KEYS 'asynq:queues:*' | head
 # Agent
 sudo systemctl status power-manage-agent
 sudo journalctl -u power-manage-agent --since=10m -n 200
-
-# Control server
-docker compose exec control power-manage-control doctor   # landing in 2026.06
-docker compose exec control power-manage-control diag list-devices
 ```
 
-If none of the above gets you unstuck, the [FAQ](/operations/faq) covers a few common "is this supposed to work like this?" questions. Beyond that, file an issue at [`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) with the symptom, the logs, and the version (`docker compose exec control power-manage-control version`).
+If none of the above gets you unstuck, the [FAQ](/operations/faq) covers a few common "is this supposed to work like this?" questions. Beyond that, file an issue at [`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) with the symptom, the logs, and the server version (from the startup log line above).

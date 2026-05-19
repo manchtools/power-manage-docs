@@ -33,7 +33,7 @@ Anything that mutates server-side state, plus a handful of read events that matt
 
 ## How to read it
 
-The web UI's **Audit** section lets you filter by:
+The web UI's **Audit** section (backed by `ListAuditEvents`) lets you filter by:
 
 - Actor (which user / agent / IdP triggered the event)
 - Subject (which device / user / group / action the event mutated)

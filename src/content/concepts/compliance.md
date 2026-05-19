@@ -2,7 +2,7 @@
 
 A compliance policy is a bundle of rules the agent evaluates against device state on every [reconciliation tick](/concepts/reconciliation). The output is status (compliant, drifting, or violating), not corrective action. Compliance detects drift. Assignments fix it.
 
-The distinction is intentional. An assignment in `enforce` mode flips state. A compliance policy reports on state. The same `PACKAGE` action can be either; you decide by wrapping it in an assignment or in a policy.
+The distinction is intentional. An assignment in `REQUIRED` mode flips state. A compliance policy reports on state. The same `PACKAGE` action can be either; you decide by wrapping it in an assignment or in a policy.
 
 ## Anatomy of a rule
 
@@ -36,7 +36,7 @@ Audit log entries surface every state transition, so you can prove compliance ov
 
 ## When to pick which
 
-Use an **assignment** when the agent should make the assertion true. "Every production host has curl" maps to a `PACKAGE` assignment, `PRESENT`, mode `enforce`.
+Use an **assignment** when the agent should make the assertion true. "Every production host has curl" maps to a `PACKAGE` assignment, `PRESENT`, mode `REQUIRED`.
 
 Use a **policy** when you want drift visibility but no automatic remediation. "Every production host should have curl" maps to a policy with the same check. The right choice when the corrective action is risky (kernel pinning, encryption key rotation) and you'd rather a human approve the fix.
 

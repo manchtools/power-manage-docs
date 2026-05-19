@@ -16,26 +16,18 @@ The agent depends on Linux-specific subsystems (systemd / OpenRC / runit / s6 fo
 
 ## "How do I rotate the encryption key?"
 
-`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, SCIM bearer tokens, LUKS keys, LPS passwords). Rotating it means re-encrypting every encrypted column in Postgres under the new key.
+`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, SCIM bearer tokens, LUKS keys, LPS passwords). There's no built-in rotation tooling yet — every encrypted column has to be decrypted with the old key and re-encrypted with the new one as a manual migration.
 
-Procedure:
+The honest path today:
 
-```bash
-# 1. Add the new key as a secondary, restart control.
-# Both keys decrypt; new writes use the primary.
-echo "CONTROL_ENCRYPTION_KEY_PREVIOUS=$(grep ^CONTROL_ENCRYPTION_KEY= .env | cut -d= -f2)" >> .env
-sed -i 's/^CONTROL_ENCRYPTION_KEY=.*/CONTROL_ENCRYPTION_KEY=<new 64-hex value>/' .env
-docker compose up -d control
+1. Stand up a maintenance window: nothing writing to the database. Stop the `control` container.
+2. With both old and new keys available, run a Postgres migration script that walks every `*_encrypted` column, decrypts using `old`, re-encrypts using `new`, writes back.
+3. Update `CONTROL_ENCRYPTION_KEY` in `.env` to the new value.
+4. Restart the control container.
 
-# 2. Run the migration that re-encrypts existing rows under the new key.
-docker compose exec control power-manage-control rotate-encryption-key
+This is tracked as a real CLI subcommand under the upcoming `SECURITY.md` ADR ([Roadmap](/operations/roadmap)) — until then, write the migration script per-deploy or operate as if the key is permanent.
 
-# 3. Once it completes successfully, drop the previous key.
-sed -i '/^CONTROL_ENCRYPTION_KEY_PREVIOUS=/d' .env
-docker compose up -d control
-```
-
-For `PM_TASK_SIGNING_KEY` rotation see [Asynq task signing](/security/task-signing). Different mechanism, documented overlap mode.
+For `PM_TASK_SIGNING_KEY` rotation see [Asynq task signing](/security/task-signing).
 
 ## "How do I back up?"
 
@@ -78,27 +70,20 @@ curl -X POST https://control.example.com/pm.v1.ControlService/ListDevices \
 
 The full RPC surface (164 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
 
-## "How do I export the audit log to my SIEM?"
+## "How do I forward logs / events to my SIEM?"
 
-The Connect-RPC API includes a streaming `ListAuditEvents` RPC that takes a time range and filter set. A small Go or TS script that polls hourly is the typical integration. The events come back as JSON; pipe them to your SIEM's ingest endpoint.
+Power Manage does not ship a SIEM integration on the server side, and one isn't planned. The architectural split is:
 
-```go
-stream, err := client.ListAuditEvents(ctx, &pb.ListAuditEventsRequest{
-    Since: timestamppb.New(lastCheckpoint),
-})
-for stream.Receive() {
-    forward(stream.Msg())
-}
-lastCheckpoint = time.Now()
-```
+- **Host-level events** (syslog, journald, file integrity, audit subsystem) are the **agent's** territory. Use the existing host tooling you already deploy via Power Manage (`filebeat`, `vector`, `fluent-bit`, `auditbeat`, whatever your SIEM vendor wants) to ship those off-host. The agent is the right place to install and configure these.
+- **The audit log on the control server** is the events table in Postgres. The `ListAuditEvents` RPC exposes it for polling-style integrations if you want to write your own bridge, but it's unary (one call returns one page), not a stream. There's no planned server-side SIEM uploader to do this for you.
 
-A worker example that does this for Splunk and Loki is on the [Roadmap](/operations/roadmap) under "after 2026.06". Until that lands, the pattern above is the path.
+For the host-tooling path, ship a `SHELL` or `FILE` action that drops the agent vendor's config and a `SERVICE` action that runs the daemon. Same as you'd manage any other system service.
 
 ## "How do I decommission a device?"
 
 Two steps:
 
-1. **Delete the device record** in the web UI. This emits a `DeviceDeleted` event. The projection row is dropped, the events table keeps the history (so the audit log remembers the device existed), and the control server stops enqueueing actions for it.
+1. **Delete the device record** via the `DeleteDevice` RPC (web UI: device-detail → **Delete**). This emits a `DeviceDeleted` event. The projection row is dropped, the events table keeps the history (so the audit log remembers the device existed), and the control server stops enqueueing actions for it.
 2. **Uninstall the agent** on the host: `sudo apt remove power-manage-agent` (or distro equivalent). The agent's local state lives under `/var/lib/power-manage-agent/`; `--purge` removes it too.
 
 {% callout type="warn" title="Cert revocation isn't implemented yet" %}
@@ -122,11 +107,7 @@ The Asynq queue and the RediSearch indexes are gone. Concretely:
 - **Already-in-flight tasks** are lost — Asynq is in-memory in Valkey. When Valkey comes back, the queue is empty.
 - **Agents' bidi streams** stay open (they don't talk to Valkey directly).
 
-When Valkey restarts, run the indexer's reconciliation manually to rebuild search:
-
-```bash
-docker compose exec control power-manage-control reindex --all
-```
+When Valkey restarts, the search index needs to be rebuilt. The control server exposes the `RebuildSearchIndex` RPC for that; in the web UI it's **Settings** → **Search** → **Rebuild index** (available to users with the `RebuildSearchIndex` permission).
 
 For HA, the Compose stack isn't the right shape. Switch to a Valkey replica setup with Sentinel or run on a managed Redis-compatible service.
 
@@ -134,7 +115,7 @@ For HA, the Compose stack isn't the right shape. Switch to a Valkey replica setu
 
 | If you want... | Use |
 |---|---|
-| The agent to make the assertion true | Assignment, `enforce` mode |
+| The agent to make the assertion true | Assignment, `REQUIRED` mode |
 | To know about drift but not fix it | Compliance policy |
 | To know AND have the agent fix it | Both — assignment + policy with the same check |
 
@@ -148,10 +129,10 @@ For most operators, "dev" is a staging host that mirrors prod. For per-developer
 
 ## "Can I have multiple admins?"
 
-Yes. The `Admin` role is just a seeded role with all permissions; it's not special. Create users, assign them the Admin role from **Users** → user-detail → **Roles**. Or build your own admin-equivalent role with the subset of permissions you actually want to grant.
+Yes. The `Admin` role is just a seeded role with all permissions; it's not special. Create users, then call `AssignRoleToUser` to grant them Admin (web UI: **Users** → user-detail → **Roles** → add). Or build your own admin-equivalent role from `CreateRole` + the subset of permissions you actually want to grant.
 
 Treat the bootstrap admin (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) as break-glass once you have at least one real admin: switch off password auth (`CONTROL_PASSWORD_AUTH_ENABLED=false`) and you'll only reach it by toggling that back on.
 
 ## "Where do I file bugs?"
 
-[`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) for the server stack, `power-manage-agent` for agent issues, `power-manage-sdk` for proto / SDK questions. Include version (`docker compose exec control power-manage-control version`), a reproducer, and any relevant logs.
+[`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) for the server stack, `power-manage-agent` for agent issues, `power-manage-sdk` for proto / SDK questions. Include the server version (logged on container startup — `docker compose logs control --since=24h | grep '"starting control server"'`), a reproducer, and any relevant logs.
