@@ -29,7 +29,7 @@
 		     render their content into this slot. The TOC sits inside
 		     the page-specific layout because the landing page doesn't
 		     have one. -->
-		<main class="min-w-0 flex-1">
+		<main class="min-w-0 flex-1" data-pagefind-body>
 			{@render children?.()}
 		</main>
 	</div>
