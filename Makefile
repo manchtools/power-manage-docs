@@ -7,7 +7,7 @@
 #
 #   make dev DEV_WEB_UI_URL=http://localhost:3000
 #
-DEV_WEB_UI_URL ?= http://localhost:5174
+DEV_WEB_UI_URL ?= http://localhost:5173
 
 # Build-time tokens that pass through to the bun subprocess. `export`
 # covers all the ways an operator might set them: shell env, make

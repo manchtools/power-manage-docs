@@ -48,10 +48,10 @@
 	role="note"
 >
 	<div class="flex items-start gap-3">
-		<Icon class="mt-0.5 size-5 shrink-0" />
+		<Icon class="mt-1 size-5 shrink-0" />
 		<div class="min-w-0 flex-1">
 			{#if title}
-				<p class="mb-1 font-semibold">{title}</p>
+				<p class="mt-0 mb-1 font-semibold">{title}</p>
 			{/if}
 			<div class="prose-sm [&_p]:my-1 [&_p:last-child]:mb-0">
 				{@render children?.()}

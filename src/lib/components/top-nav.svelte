@@ -3,17 +3,19 @@
 	import { Button } from '$lib/components/ui/button';
 	import ThemeToggle from './theme-toggle.svelte';
 	import Search from './search.svelte';
+	import MobileNav from './mobile-nav.svelte';
 	import Github from '@lucide/svelte/icons/github';
 
-	// Top nav bar: site title + search + GitHub link + theme toggle.
-	// The search trigger collapses to an icon on small screens; the
-	// full input shape returns at md+.
+	// Top nav bar: mobile hamburger + site title + search + GitHub +
+	// theme toggle. Hamburger renders only at md:hidden; the desktop
+	// sticky sidebar covers nav from md+.
 </script>
 
 <header
 	class="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
 >
-	<div class="flex h-14 items-center gap-4 px-4 lg:px-6">
+	<div class="flex h-14 items-center gap-2 px-4 sm:gap-4 lg:px-6">
+		<MobileNav />
 		<a
 			href={base + '/'}
 			class="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
