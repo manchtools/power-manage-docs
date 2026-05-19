@@ -8,6 +8,8 @@
 
 @plugin "@tailwindcss/typography";
 
+@config "../tailwind.config.js";
+
 @custom-variant dark (&:is(.dark *));
 
 /* `data-active`, `data-open`, `data-closed`, `data-checked`,
@@ -180,14 +182,5 @@
      default is theme-independent text-blue. */
   .prose :where(a):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
     @apply text-primary underline-offset-4 hover:text-primary/80;
-  }
-  /* Drop the typography plugin's literal backtick characters around
-     inline <code>. The plugin emits them via ::before/::after to mimic
-     markdown source — visually noisy in a rendered doc page. Plugin
-     rules and ours sit in the same cascade layer, so !important is
-     required to win against `content: "\`"`. */
-  .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::before,
-  .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *))::after {
-    content: none !important;
   }
 }
