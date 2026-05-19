@@ -62,13 +62,9 @@
 		<pre class="mt-2 overflow-x-auto text-xs text-muted-foreground"><code>{content}</code></pre>
 	</div>
 {:else}
-	<div
-		class="not-prose my-6 overflow-hidden rounded-lg border border-border bg-muted/20"
-		style="height: {height}px"
-	>
+	<figure class="not-prose my-8" style="height: {height}px">
 		{#if browser && mod}
 			{@const SvelteFlow = mod.SvelteFlow}
-			{@const Background = mod.Background}
 			<SvelteFlow
 				nodes={result.value.nodes}
 				edges={result.value.edges}
@@ -84,13 +80,31 @@
 				panOnScroll={false}
 				panOnDrag={false}
 				preventScrolling={false}
-			>
-				<Background />
-			</SvelteFlow>
+			/>
 		{:else}
 			<div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-				Diagram (interactive — enable JavaScript to view)
+				Diagram (enable JavaScript to view)
 			</div>
 		{/if}
-	</div>
+	</figure>
 {/if}
+
+<style>
+	/* Hide the SvelteFlow background grid and viewport border so the
+	   diagram sits inside the page flow like an inline figure rather
+	   than a framed canvas. The viewport stays interactive enough for
+	   fitView/zoom transforms but loses the boxed-in feel. */
+	:global(.svelte-flow) {
+		background: transparent !important;
+	}
+	:global(.svelte-flow__edge-textbg) {
+		fill: hsl(var(--background));
+	}
+	:global(.svelte-flow__edge-text) {
+		fill: hsl(var(--foreground));
+		font-weight: 500;
+	}
+	:global(.svelte-flow__arrowhead) {
+		fill: hsl(var(--foreground) / 0.7);
+	}
+</style>

@@ -51,12 +51,12 @@
 			Documentation
 		</p>
 		<h1 class="text-4xl font-bold tracking-tight md:text-5xl">
-			Linux fleet management,<br />declarative + audit-first
+			Linux fleet management,<br />declarative and audit-first
 		</h1>
 		<p class="mt-6 text-lg leading-relaxed text-muted-foreground">
-			Power Manage is an open-source Linux device management platform with mTLS-authenticated agents,
-			event-sourced audit trails, OIDC + SCIM provisioning, and seventeen idempotent action types
-			covering packages, services, files, LUKS rotation, and more.
+			Power Manage is an open-source platform for managing Linux endpoints. mTLS-authenticated
+			agents, an event-sourced audit log, OIDC and SCIM provisioning, and seventeen idempotent
+			action types covering packages, services, files, and LUKS rotation.
 		</p>
 		<div class="mt-8 flex flex-wrap gap-3">
 			<Button href={base + '/get-started/installation'}>

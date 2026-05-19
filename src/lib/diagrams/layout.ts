@@ -1,42 +1,58 @@
-import { Position, type Node, type Edge } from '@xyflow/svelte';
+import { Position, type Node, type Edge, MarkerType } from '@xyflow/svelte';
 import dagre from '@dagrejs/dagre';
 import type { DiagramSpec, NodeKind, EdgeStyle } from './parse';
 
-// Fixed node dimensions keep dagre's layout deterministic across
-// re-renders and let us reserve the right canvas height. Adjust here
-// if labels start clipping.
 const NODE_W = 180;
-const NODE_H = 60;
-const NODESEP = 50;
-const RANKSEP = 80;
-const PAD = 24;
+const NODE_H = 56;
+const NODESEP = 40;
+const RANKSEP = 70;
+const PAD = 16;
+
+const BASE_NODE =
+	'border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line; font-weight: 500; box-shadow: 0 1px 2px hsl(var(--foreground) / 0.05);';
 
 const STYLES: Record<NodeKind, string> = {
 	service:
-		'background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;',
+		BASE_NODE +
+		'background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: 1px solid hsl(var(--primary));',
 	store:
-		'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;',
+		BASE_NODE +
+		'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border: 1px solid hsl(var(--border));',
 	actor:
-		'background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 9999px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;'
+		BASE_NODE +
+		'background: hsl(var(--background)); color: hsl(var(--foreground)); border: 1.5px dashed hsl(var(--muted-foreground));'
 };
 
 function edgeProps(style: EdgeStyle): Partial<Edge> {
+	// labelBg / labelStyle aren't first-class props in Svelte Flow
+	// (unlike React Flow) — label chrome is styled globally via CSS
+	// in Mermaid.svelte's <style>. Per-edge we only control stroke
+	// and arrowhead.
+	const base: Partial<Edge> = {
+		markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 }
+	};
 	switch (style) {
 		case 'dashed':
-			return { animated: true, style: 'stroke-dasharray: 5 5;' };
+			return {
+				...base,
+				animated: true,
+				style: 'stroke: hsl(var(--muted-foreground)); stroke-width: 1.5px; stroke-dasharray: 6 4;'
+			};
 		case 'thick':
-			return { style: 'stroke-width: 2.5px;' };
+			return {
+				...base,
+				style: 'stroke: hsl(var(--foreground)); stroke-width: 2.5px;'
+			};
 		default:
-			return {};
+			return {
+				...base,
+				style: 'stroke: hsl(var(--foreground) / 0.6); stroke-width: 1.5px;'
+			};
 	}
 }
 
 export type Laid = { nodes: Node[]; edges: Edge[]; height: number };
 
-// layout runs dagre over a parsed Mermaid spec and produces
-// SvelteFlow-shaped nodes/edges plus the canvas height needed to
-// fit them with a margin on each side. Pure function — same spec
-// in, same numbers out, so SSR and client agree on the layout.
 export function layout(spec: DiagramSpec): Laid {
 	const g = new dagre.graphlib.Graph();
 	g.setGraph({
@@ -60,8 +76,6 @@ export function layout(spec: DiagramSpec): Laid {
 		const { x, y } = g.node(n.id);
 		return {
 			id: n.id,
-			// dagre returns the node *centre*; SvelteFlow expects the
-			// top-left of the bounding box.
 			position: { x: x - NODE_W / 2, y: y - NODE_H / 2 },
 			data: { label: n.label },
 			style: STYLES[n.kind],
@@ -83,8 +97,6 @@ export function layout(spec: DiagramSpec): Laid {
 		...edgeProps(e.style)
 	}));
 
-	const graphLabel = g.graph();
-	const height = (graphLabel.height ?? 0) + PAD * 2;
-
+	const height = (g.graph().height ?? 0) + PAD * 2;
 	return { nodes, edges, height };
 }

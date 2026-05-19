@@ -1,10 +1,10 @@
 # Dynamic device groups
 
-A dynamic device group is defined by a query rather than an explicit member list. Membership is re-evaluated whenever a device's inventory or labels change, plus on a periodic tick the operator can configure per-group.
+A dynamic group is a query, not a list. Membership recomputes whenever a device's inventory or labels change, plus on a periodic tick you configure per group.
 
 ## Query language
 
-The expression grammar is small on purpose:
+The grammar is intentionally small:
 
 ```
 labels.environment equals "production" and labels.role equals "web"
@@ -16,32 +16,32 @@ Operators:
 - `contains`, `notContains`
 - `startsWith`, `endsWith`
 - `greaterThan`, `lessThan`, `greaterThanOrEquals`, `lessThanOrEquals`
-- `in`, `notIn` — comma-separated value list
-- `exists`, `notExists` — unary, no value
+- `in`, `notIn` for comma-separated value lists
+- `exists`, `notExists` (unary, no value)
 
 Fields:
 
-- `labels.<key>` — device labels (case-insensitive on the key)
-- `device.os`, `device.kernel`, `device.hostname`, … — inventory fields
-- `device.group` — name(s) of other groups this device is in (for composition)
+- `labels.<key>` for device labels (the key match is case-insensitive)
+- `device.os`, `device.kernel`, `device.hostname`, ... for inventory fields
+- `device.group` for membership of other groups, so you can compose
 
-Boolean composition with `and`, `or`, `not`, and parentheses. Empty query matches every device.
+Compose with `and`, `or`, `not`, and parentheses. An empty query matches every device.
 
 ## Examples
 
 | Query | Members |
 |---|---|
 | `labels.environment equals "production"` | every production device |
-| `device.os equals "linux" and labels.role in "web,api"` | Linux web + api hosts |
+| `device.os equals "linux" and labels.role in "web,api"` | Linux web and api hosts |
 | `not labels.role equals "deprecated"` | everything not flagged for removal |
-| (empty) | every registered device (this is what the **All Devices** seed group uses) |
+| (empty) | every registered device — what the **All Devices** seed group uses |
 
 {% callout type="info" title="All Devices" %}
-A built-in dynamic group named "All Devices" is seeded on first boot. Its query is empty — so it matches every registered device. Use it as the default assignment target for organisation-wide actions.
+A built-in dynamic group called "All Devices" is seeded on first boot. Its query is empty, so it matches every registered device. Use it as the default target for fleet-wide actions.
 {% /callout %}
 
-## Evaluation cadence
+## When membership recomputes
 
-- **Event-driven** — a label change or device-registered event re-evaluates the affected groups synchronously inside the projector.
-- **Periodic** — each group has an optional `sync_interval_minutes` for full re-evaluation. Useful for queries against inventory fields the agent reports on every heartbeat.
-- **Operator-triggered** — the `EvaluateDynamicGroup` RPC forces a re-evaluation.
+- **Event-driven.** A label change or device-registered event re-evaluates the affected groups inside the projector, synchronously.
+- **Periodic.** Each group has an optional `sync_interval_minutes` for a full re-evaluation. Use it for queries that hit inventory fields the agent reports every heartbeat.
+- **Manual.** The `EvaluateDynamicGroup` RPC forces a re-evaluation on demand.

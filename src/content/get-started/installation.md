@@ -1,16 +1,16 @@
 # Installation
 
-Power Manage ships as a Compose stack with five containers: Postgres, Valkey, Traefik, the control server, the gateway, and an indexer. The `setup.sh` helper renders the cert chain, secrets, and `valkey.conf` for you.
+Power Manage runs as a Compose stack: Postgres, Valkey, Traefik, the control server, the gateway, and an indexer. A helper script generates the cert chain, secrets, and `valkey.conf` so you don't have to.
 
 ## Prerequisites
 
-- Linux host with **Docker 24+** or **Podman 4.5+** and the Compose plugin.
-- Two DNS names that resolve to the host: one for the web UI (e.g. `control.example.com`), one for the agent gateway (`gateway.example.com`).
-- TCP port 443 reachable from the public internet (Traefik handles Let's Encrypt).
-- `openssl` and `bash` on the host.
+- A Linux host with Docker 24+ or Podman 4.5+ and the Compose plugin
+- Two DNS names pointing at the host: one for the web UI (`control.example.com`), one for the agent gateway (`gateway.example.com`)
+- TCP port 443 reachable from the internet (Traefik handles Let's Encrypt)
+- `openssl` and `bash` on the host
 
 {% callout type="warn" title="Linux only" %}
-The control + gateway servers are designed for Linux endpoints. Agents do not run on Windows or macOS. If you need cross-platform management, this isn't the tool.
+The agent runs on Linux. There is no Windows or macOS build planned. If you need cross-platform endpoint management, look elsewhere.
 {% /callout %}
 
 ## Setup
@@ -23,16 +23,16 @@ cd power-manage-server/deploy
 ./setup.sh
 ```
 
-`setup.sh` will prompt for:
+`setup.sh` asks for:
 
-- Control + gateway domain names
+- Control and gateway domain names
 - Let's Encrypt email
-- Postgres + Valkey passwords
+- Postgres and Valkey passwords
 - `CONTROL_ENCRYPTION_KEY` (AES-GCM, 64 hex chars)
-- `PM_TASK_SIGNING_KEY` (HMAC, 64 hex chars — shared between control, gateway, indexer)
-- Initial admin email + password
+- `PM_TASK_SIGNING_KEY` (HMAC, 64 hex chars; shared between control, gateway, indexer)
+- Initial admin email and password
 
-All generated values are written to `.env`. Re-running `setup.sh` is idempotent — existing values are kept unless you explicitly opt to regenerate.
+Values get written to `.env`. Re-running the script is safe; existing values stay put unless you choose to regenerate them.
 
 ## First boot
 
@@ -40,10 +40,10 @@ All generated values are written to `.env`. Re-running `setup.sh` is idempotent 
 docker compose up -d
 ```
 
-Once Traefik has acquired certificates (usually under a minute), visit `https://control.example.com` and sign in with the admin credentials you set during setup.
+Traefik usually has certificates in under a minute. After that, open `https://control.example.com` and sign in with the admin credentials from setup.
 
 {% callout type="info" title="Health checks" %}
-The control server reports readiness at `/health` (public, returns `ok`). The internal mTLS-protected endpoint at the gateway-side listener carries version info for operator-controlled monitoring.
+The control server exposes `/health` publicly (returns `ok`). Version info sits behind the gateway-side mTLS listener for monitoring you control.
 {% /callout %}
 
 ## Enrolling your first agent
@@ -69,4 +69,4 @@ sudo systemctl enable --now power-manage-agent
 {% /tab %}
 {% /tabs %}
 
-The agent registers via the local enrolment socket, receives a CA-signed client certificate, and immediately starts streaming heartbeats to the gateway. You'll see it appear in the web UI within seconds.
+The agent registers through its local enrolment socket, gets a CA-signed client certificate, and starts heartbeating to the gateway. It shows up in the web UI within a few seconds.

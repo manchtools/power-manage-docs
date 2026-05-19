@@ -1,7 +1,7 @@
 # SERVICE
 
-Documentation for the `SERVICE` action type. **TODO: fill in.**
+Reference for the `SERVICE` action type is still being written.
 
-This stub exists so prev/next navigation works while the rest of the action reference is being written. The full schema, idempotency semantics, parameters, and worked examples will be migrated from the source READMEs and the `internal/actionparams/` proto descriptors.
+This page is a placeholder so prev/next navigation works while the docs catch up. Schema, idempotency contract, parameters, and worked examples will land here as the source READMEs and the `internal/actionparams/` proto descriptors get migrated over.
 
-See [the action reference index](/action-reference) for the action-type catalogue.
+For the full action catalogue, see [the action reference index](/action-reference).

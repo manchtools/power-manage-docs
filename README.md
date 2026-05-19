@@ -1,6 +1,6 @@
 # Power Manage Documentation
 
-The public docs site for [Power Manage](https://github.com/manchtools/power-manage-server) — a SvelteKit 2 / Svelte 5 + Markdoc app, modelled on the same stack as `web/`.
+The public docs site for [Power Manage](https://github.com/manchtools/power-manage-server). SvelteKit 2 and Svelte 5 with Markdoc for content. Stack mirrors `web/`.
 
 ## Stack
 
@@ -21,7 +21,7 @@ bun install
 bun run dev
 ```
 
-The dev server runs at `http://localhost:5173`. Authoring is hot-reload: save any `.md` under `src/content/` and the page rebuilds.
+Dev server runs at `http://localhost:5173`. Hot reload covers content: save any `.md` under `src/content/` and the page rebuilds.
 
 ## Authoring content
 
@@ -33,13 +33,14 @@ Drop a Markdown file under `src/content/<group>/<slug>.md`, then add an entry to
 | `src/content/foo/index.md` | `/foo` |
 | `src/content/concepts/architecture.md` | `/concepts/architecture` |
 
-Markdoc custom tags available:
+Markdoc tags:
 
-- `{% callout type="info\|warn\|danger\|success" title="..." %}` — highlighted block
-- `{% tabs %} {% tab label="apt" %} ... {% /tab %} {% /tabs %}` — tabbed content
-- Code fences (```` ```ts ````) get Shiki highlighting + copy button automatically
+- `{% callout type="info\|warn\|danger\|success" title="..." %}` for highlighted blocks
+- `{% tabs %} {% tab label="apt" %} ... {% /tab %} {% /tabs %}` for tabbed content
+- Code fences (```` ```ts ````) get Shiki highlighting and a copy button
+- Code fences with `mermaid` get rendered as a Svelte Flow diagram
 
-Headings get auto-generated anchors. The right-side TOC is built from the DOM after render, so no separate index needs maintaining.
+Headings auto-generate anchors. The right-side TOC is built from the DOM at render time, so there's no separate index to maintain.
 
 ## Build
 
@@ -82,12 +83,12 @@ src/
 
 ## Conventions
 
-Mirrors `web/` wherever it makes sense:
+Patterns mirror `web/` where it makes sense:
 
-- `cn()` helper for class merging (`clsx` + `tailwind-merge`)
-- `WithElementRef<T>` type for shadcn-style `bind:ref` props
+- `cn()` for class merging (`clsx` plus `tailwind-merge`)
+- `WithElementRef<T>` for shadcn-style `bind:ref` props
 - `mode-watcher` for the dark-mode toggle
-- Same Tailwind theme tokens — copy any visual change between `web/src/app.css` and `docs/src/app.css` in lock-step
+- Same Tailwind tokens. Copy any visual change between `web/src/app.css` and `docs/src/app.css` in lock-step.
 - `@lucide/svelte/icons/*` for icons
 - CSP wired in `svelte.config.js` via `kit.csp.directives`
 - Defensive headers in `src/hooks.server.ts`

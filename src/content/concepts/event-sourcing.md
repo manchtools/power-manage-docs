@@ -1,6 +1,6 @@
 # Event sourcing
 
-Every state-changing operation in Power Manage appends an immutable event to the `events` table. Read paths consult **projection tables** (`*_projection`) that are kept up to date by Go-side **projector listeners** that fire post-commit. The events table itself is the canonical audit log.
+Every state-changing operation appends an immutable event to the `events` table. Reads come from projection tables (`*_projection`) kept current by Go projector listeners that fire after the event commits. The `events` table itself is the audit log.
 
 ```mermaid
 flowchart LR
@@ -13,21 +13,21 @@ flowchart LR
     Read -->|response| Client
 ```
 
-## Why not just mutate the projection directly?
+## Why not mutate the projection directly?
 
-Mutating the projection directly would buy ~5ms of write latency but cost us:
+You'd save maybe 5ms of write latency. In exchange:
 
-- **Auditability** — there's no record of who did what, when, with what payload.
-- **Replayability** — a corrupt projection can't be rebuilt from history.
-- **Schema evolution** — a new column means a destructive migration; a new event type is purely additive.
-- **Concurrency control** — the events table's `UNIQUE (stream_type, stream_id, stream_version)` constraint is the optimistic-concurrency knob the whole system relies on.
+- No record of who did what, when, with what payload.
+- A corrupted projection can't be rebuilt; the history is gone.
+- A new column means a destructive migration. A new event type is purely additive.
+- You lose the optimistic-concurrency knob that `UNIQUE (stream_type, stream_id, stream_version)` on the events table gives you.
 
 ## Projector pattern
 
 A projector is two pure functions plus a wiring step:
 
 ```go
-// 1. Decoder — pure, no DB access. Validates the event payload
+// 1. Decoder. Pure, no DB access. Validates the event payload
 // against the typed schema and returns a normalised struct.
 func FooBarHappenedFromEvent(e store.PersistedEvent) (FooBarHappenedPayload, error) {
     if e.StreamType != "foo" || e.EventType != string(eventtypes.FooBarHappened) {
@@ -41,7 +41,7 @@ func FooBarHappenedFromEvent(e store.PersistedEvent) (FooBarHappenedPayload, err
     return out, nil
 }
 
-// 2. Apply — sqlc-driven, runs inside a WithTx so the projection
+// 2. Apply. sqlc-driven, runs inside WithTx so the projection
 // write commits atomically with whatever other state changes the
 // event implies.
 func applyFooBarHappened(ctx context.Context, q *store.Queries, e store.PersistedEvent) error {
@@ -51,14 +51,14 @@ func applyFooBarHappened(ctx context.Context, q *store.Queries, e store.Persiste
 }
 ```
 
-The listener factory `FooBarListener` wires the two together and is registered on store boot via `projectors.WireAll(store, logger)`.
+`FooBarListener` wires the two together and gets registered on store boot via `projectors.WireAll(store, logger)`.
 
 {% callout type="info" title="TDD rule" %}
-Decoder unit tests live in `internal/projectors/foo_test.go` and use table-driven fixtures with synthetic `store.PersistedEvent` values — no DB needed. Listener integration tests in the same file write events via `AppendEvent` and assert the projection row appears.
+Decoder unit tests live in `internal/projectors/foo_test.go` with table-driven fixtures and synthetic `store.PersistedEvent` values; no DB needed. Listener integration tests in the same file write events through `AppendEvent` and assert the projection row appears.
 {% /callout %}
 
 ## Optimistic concurrency
 
-`AppendEvent` auto-increments `stream_version`; retries internally on `23505` unique-constraint violations. `AppendEventWithVersion` takes a caller-supplied expected version — used when the handler needs to enforce that nothing else has touched the stream since it read the projection.
+`AppendEvent` auto-increments `stream_version` and retries internally on `23505` unique-constraint violations. `AppendEventWithVersion` takes a caller-supplied expected version; use it when the handler needs to assert nothing has touched the stream since it read the projection.
 
-See [F-07](/security/threat-model) (TOTP backup-code consume) for a worked example of using `AppendEventWithVersion` to race-protect a CQRS operation.
+[F-07](/security/threat-model) (the TOTP backup-code consume) is a worked example of using `AppendEventWithVersion` to race-protect a CQRS operation.
