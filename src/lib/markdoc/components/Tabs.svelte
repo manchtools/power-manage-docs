@@ -1,51 +1,48 @@
 <script lang="ts">
-	import { setContext } from 'svelte';
+	import { untrack } from 'svelte';
 	import * as Tabs from '$lib/components/ui/tabs';
 
-	// {% tabs initial="apt" %}
+	// {% tabs labels="apt,dnf" initial="apt" %}
 	//   {% tab label="apt" %} ... {% /tab %}
 	//   {% tab label="dnf" %} ... {% /tab %}
 	// {% /tabs %}
 	//
-	// Markdoc-friendly authoring on top of shadcn-svelte's <Tabs>.
-	// Children register themselves by label via context, the parent
-	// builds the trigger row from that registry, and Tabs.Content
-	// from each child renders below.
+	// `labels` lists the tab order up-front so the trigger row can
+	// render during SSR. Previous attempts relied on each child
+	// registering its label via context during render, but Svelte 5
+	// SSR is single-pass top-to-bottom: the parent's {#each} block
+	// emits before {@render children?.()} runs, so children couldn't
+	// populate the list in time.
 	//
-	// No styling overrides — the shadcn-svelte primitive already
-	// has the right look (pill-on-muted strip, raised active tab via
-	// data-active:bg-background + shadow-sm). Earlier attempts to
-	// "improve" the chrome broke the selected-tab affordance.
+	// Authors do duplicate labels once (parent attribute + each tab's
+	// `label`), but the alternative (a Markdoc transform that lifts
+	// child attributes into the parent) is much more code for the
+	// same result.
 
 	type Props = {
+		labels: string;
 		initial?: string;
 		children?: import('svelte').Snippet;
 	};
 
-	const { initial, children }: Props = $props();
+	const { labels, initial, children }: Props = $props();
 
-	type TabsCtx = {
-		register: (label: string) => void;
-	};
+	// `labels` is a comma-separated string from the Markdoc
+	// attribute — split + trim so authors can write
+	// labels="apt, dnf" with a space and it still works.
+	const labelList = $derived(
+		labels
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean)
+	);
 
-	let registered = $state<string[]>([]);
-	let value = $state('');
-	$effect.pre(() => {
-		if (!value && initial) value = initial;
-	});
-
-	setContext<TabsCtx>('docs:tabs', {
-		register(label) {
-			if (registered.includes(label)) return;
-			registered = [...registered, label];
-			if (!value) value = label;
-		}
-	});
+	let value = $state(untrack(() => initial ?? '') || untrack(() => labelList[0] ?? ''));
 </script>
 
 <Tabs.Root bind:value class="not-prose my-6">
 	<Tabs.List>
-		{#each registered as label (label)}
+		{#each labelList as label (label)}
 			<Tabs.Trigger value={label}>{label}</Tabs.Trigger>
 		{/each}
 	</Tabs.List>

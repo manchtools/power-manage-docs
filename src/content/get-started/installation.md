@@ -91,7 +91,7 @@ The stack runs six containers:
 
 On any Linux endpoint:
 
-{% tabs initial="curl" %}
+{% tabs labels="curl, manual" initial="curl" %}
 {% tab label="curl" %}
 ```bash
 curl -sSL https://control.example.com/install-agent.sh | sudo bash -s -- \
