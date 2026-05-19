@@ -1,25 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { mode } from 'mode-watcher';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils';
-	import Mermaid from './Mermaid.svelte';
 
 	// Fenced code block. Two branches:
 	//
-	//   - language === 'mermaid' — author writes a (subset of) Mermaid
-	//     flowchart in the fence; we parse it and render via SvelteFlow
-	//     for nicer chrome (rounded nodes, animated edges, auto-routed
-	//     connectors). See src/lib/diagrams/parse.ts for the supported
-	//     subset. SvelteFlow is dynamic-imported inside the Mermaid
-	//     component so its bundle never ships on pages without diagrams.
+	//   - language === 'mermaid' renders as a diagram via mermaid.js.
+	//     Dynamic-imported on mount so the ~500KB bundle never ships
+	//     on pages without diagrams. Re-renders when the colour mode
+	//     flips so light/dark stays correct. Theme variables resolve
+	//     from the shadcn CSS tokens at render time, so the diagram
+	//     picks up whatever palette the rest of the docs is using.
 	//
-	//   - everything else — Shiki-highlight on mount. Dynamic-import:
-	//     zero added weight on initial paint, brief flash of
+	//   - everything else gets Shiki-highlighted on mount. Dynamic
+	//     import: zero added weight on initial paint, brief flash of
 	//     unhighlighted code on first render (acceptable for docs).
-	//
-	// The copy button is independent of highlighting and works
-	// regardless of whether Shiki has loaded.
 
 	type Props = {
 		content: string;
@@ -31,10 +28,21 @@
 	const isMermaid = $derived(language === 'mermaid');
 
 	let highlighted = $state<string | null>(null);
+	let mermaidSvg = $state<string | null>(null);
+	let mermaidError = $state<string | null>(null);
 	let copied = $state(false);
 
+	// Stable id per mounted component so mermaid.render's internal
+	// xlink:href targets don't collide when a page has more than one
+	// diagram. crypto.randomUUID isn't available SSR-side, so keep
+	// this client-only by deriving inside an effect.
+	let diagramId = $state('mermaid-pending');
+
 	onMount(() => {
-		if (isMermaid) return; // handled by <Mermaid />
+		if (isMermaid) {
+			diagramId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
+			return; // handled by the theme-reactive effect below
+		}
 		void (async () => {
 			try {
 				const { codeToHtml } = await import('shiki');
@@ -49,21 +57,105 @@
 		})();
 	});
 
+	// Resolves a `--token` from the document's computed style and
+	// wraps it as a valid CSS colour. shadcn stores hues as raw
+	// `H S% L%` triples, so we need to wrap them in hsl().
+	function token(name: string): string {
+		const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+		return v ? `hsl(${v})` : '';
+	}
+
+	$effect(() => {
+		if (!isMermaid || diagramId === 'mermaid-pending') return;
+		// Subscribe to the colour mode so a theme flip re-renders.
+		const isDark = mode.current === 'dark';
+		void (async () => {
+			try {
+				const mermaid = (await import('mermaid')).default;
+				mermaid.initialize({
+					startOnLoad: false,
+					theme: 'base',
+					securityLevel: 'strict',
+					fontFamily:
+						'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+					themeVariables: {
+						background: 'transparent',
+						primaryColor: token('--primary'),
+						primaryTextColor: token('--primary-foreground'),
+						primaryBorderColor: token('--primary'),
+						secondaryColor: token('--secondary'),
+						secondaryTextColor: token('--secondary-foreground'),
+						secondaryBorderColor: token('--border'),
+						tertiaryColor: token('--muted'),
+						tertiaryTextColor: token('--muted-foreground'),
+						tertiaryBorderColor: token('--border'),
+						mainBkg: token('--primary'),
+						lineColor: token('--foreground'),
+						textColor: token('--foreground'),
+						nodeBorder: token('--border'),
+						clusterBkg: token('--muted'),
+						clusterBorder: token('--border'),
+						edgeLabelBackground: token('--background'),
+						fontSize: '14px'
+					},
+					flowchart: {
+						curve: 'basis',
+						htmlLabels: true,
+						padding: 16,
+						nodeSpacing: 50,
+						rankSpacing: 60,
+						useMaxWidth: true
+					}
+				});
+				const { svg } = await mermaid.render(diagramId, content.trim());
+				mermaidSvg = svg;
+				mermaidError = null;
+				// Mark the effect dependency so reactivity picks up the
+				// theme change (mode.current was already read above).
+				void isDark;
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				mermaidError = msg;
+				console.warn('[CodeBlock] mermaid render failed', { err });
+			}
+		})();
+	});
+
 	async function copy() {
 		try {
 			await navigator.clipboard.writeText(content);
 			copied = true;
 			setTimeout(() => (copied = false), 1500);
 		} catch {
-			// Clipboard API can fail in cross-origin iframes / strict
-			// CSP envs. Silently no-op rather than crashing — the
-			// reader can still select+copy by hand.
+			// Clipboard API can fail in cross-origin iframes or under
+			// strict CSP. No-op rather than crash; readers can still
+			// select and copy by hand.
 		}
 	}
 </script>
 
 {#if isMermaid}
-	<Mermaid {content} />
+	<figure class="not-prose my-8">
+		{#if mermaidError}
+			<div
+				class="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
+			>
+				<p class="font-medium">Mermaid render failed</p>
+				<p class="mt-1 font-mono text-xs">{mermaidError}</p>
+				<pre class="mt-2 overflow-x-auto text-xs text-muted-foreground"><code
+						>{content}</code
+					></pre>
+			</div>
+		{:else if mermaidSvg}
+			<div class="mermaid-figure flex justify-center">
+				{@html mermaidSvg}
+			</div>
+		{:else}
+			<div class="flex h-32 items-center justify-center text-sm text-muted-foreground">
+				Rendering diagram…
+			</div>
+		{/if}
+	</figure>
 {:else}
 	<div class="not-prose group relative my-6">
 		<button
@@ -93,11 +185,29 @@
 {/if}
 
 <style>
+	/* Mermaid output polish. The library inlines most styling onto
+	   SVG elements via themeVariables, but a few global tweaks help
+	   it sit cleanly in prose:
+	   - Cap the rendered SVG width so wide flowcharts don't blow
+	     out the layout. mermaid's useMaxWidth:true does the inverse
+	     (scale up); this caps the upper bound.
+	   - Nudge font weight on node labels so they read as a heading
+	     rather than body text. */
+	:global(.mermaid-figure svg) {
+		max-width: 100%;
+		height: auto;
+	}
+	:global(.mermaid-figure .nodeLabel),
+	:global(.mermaid-figure .edgeLabel) {
+		font-weight: 500;
+	}
+	:global(.mermaid-figure .edgeLabel) {
+		font-size: 12px;
+	}
+
 	/* Shiki dual-theme output: with defaultColor:false, every span
 	   gets inline --shiki-light + --shiki-dark CSS variables. We pick
-	   which one to read based on the document's dark-mode class.
-	   Container chrome (padding, border, radius) is ours; per-token
-	   colors come from Shiki via the variables. */
+	   which one to read based on the document's dark-mode class. */
 	:global(.shiki) {
 		border-radius: var(--radius-md);
 		border: 1px solid var(--color-border);
