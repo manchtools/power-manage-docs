@@ -20,7 +20,26 @@ export default {
 						// Drop the literal backtick characters the plugin
 						// adds around inline <code>. Default is content: '`'.
 						'code::before': { content: 'none' },
-						'code::after': { content: 'none' }
+						'code::after': { content: 'none' },
+						// Give inline <code> a subtle chip background so it
+						// reads as a distinct token in flowing prose. The
+						// plugin's default is bold text on the page bg,
+						// which doesn't stand out against the body copy.
+						code: {
+							backgroundColor: 'var(--muted)',
+							padding: '0.125rem 0.375rem',
+							borderRadius: '0.25rem',
+							fontWeight: '500'
+						},
+						// Inside <pre> we don't want the chip — Shiki/the
+						// pre block already styles the whole region.
+						// Reset everything we set on `code`.
+						'pre code': {
+							backgroundColor: 'transparent',
+							padding: '0',
+							borderRadius: '0',
+							fontWeight: 'inherit'
+						}
 					}
 				}
 			}
