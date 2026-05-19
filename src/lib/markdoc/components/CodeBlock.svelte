@@ -57,12 +57,22 @@
 		})();
 	});
 
-	// Resolves a `--token` from the document's computed style and
-	// wraps it as a valid CSS colour. shadcn stores hues as raw
-	// `H S% L%` triples, so we need to wrap them in hsl().
+	// Resolves a shadcn `--token` to a colour mermaid can parse.
+	// The tokens in this project are oklch() values, which mermaid's
+	// colour parser doesn't accept. Trick: feed the raw value to a
+	// canvas2d fillStyle setter and read it back — the browser
+	// converts whatever colour syntax was supplied (oklch, hsl, hex,
+	// keyword) into a normalised `#rrggbb` or `rgba(...)` string.
 	function token(name: string): string {
-		const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-		return v ? `hsl(${v})` : '';
+		const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+		if (!raw) return '';
+		const ctx = document.createElement('canvas').getContext('2d');
+		if (!ctx) return raw;
+		// fillStyle setter silently rejects invalid colours and keeps
+		// the previous value, so a known-good fallback comes first.
+		ctx.fillStyle = '#000';
+		ctx.fillStyle = raw;
+		return ctx.fillStyle as string;
 	}
 
 	$effect(() => {
