@@ -1,6 +1,6 @@
 # Troubleshooting
 
-A long page on purpose. Hit Ctrl+F for the symptom you're seeing. Each section names the symptom, then explains what's actually happening, then lists the fix.
+A long page on purpose. Search ("Search docs…" in the top nav, or ⌘K) for the symptom you're seeing. Each section names the symptom, then explains what's actually happening, then lists the fix.
 
 ## Agent issues
 
