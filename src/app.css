@@ -6,6 +6,8 @@
 
 @import "@fontsource-variable/inter";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /* `data-active`, `data-open`, `data-closed`, `data-checked`,
@@ -160,82 +162,23 @@
   }
 }
 
-/* Markdoc-rendered content gets a `.prose` wrapper so we can scope
-   the typographic rules without leaking into the surrounding chrome
-   (sidebar, header, etc.). Approximates @tailwindcss/typography
-   without the dependency. */
+/* Markdoc-rendered content gets a `.prose` wrapper. Real typography
+   plugin handles the .prose / .not-prose selector hygiene — the
+   plugin's rules use `:where()` exclusions so `.not-prose` subtrees
+   are properly opted out without us having to maintain matching
+   override rules. */
 @layer components {
-  /* Anything inside a `.not-prose` subtree opts out of the
-     surrounding `.prose` styling. Our hand-rolled `.prose X` rules
-     match on plain descendant selectors (e.g. `.prose pre`), which
-     leak through a `.not-prose` boundary because that boundary
-     isn't part of the selector. `all: revert-layer` reverses every
-     declaration that came from this layer (.prose pre / h1 / ...)
-     without touching Tailwind utilities in @layer utilities — so
-     widgets like CodeBlock can still apply their own classes. */
-  .prose .not-prose,
-  .prose .not-prose :where(*) {
-    all: revert-layer;
-  }
-
   .prose {
-    @apply text-foreground leading-7 max-w-none;
+    @apply max-w-none;
   }
-  .prose h1 {
-    @apply text-3xl md:text-4xl font-bold tracking-tight mt-2 mb-4 scroll-mt-20;
+  /* Headings get scroll-mt so anchor jumps don't tuck them under
+     the sticky top-nav. The plugin doesn't ship this by default. */
+  .prose :where(h1, h2, h3, h4):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+    @apply scroll-mt-20;
   }
-  .prose h2 {
-    @apply text-2xl font-semibold tracking-tight mt-10 mb-3 pb-2 border-b border-border scroll-mt-20;
-  }
-  .prose h3 {
-    @apply text-xl font-semibold tracking-tight mt-8 mb-2 scroll-mt-20;
-  }
-  .prose h4 {
-    @apply text-lg font-semibold tracking-tight mt-6 mb-2 scroll-mt-20;
-  }
-  .prose p {
-    @apply my-4;
-  }
-  .prose a {
-    @apply text-primary underline underline-offset-4 hover:text-primary/80;
-  }
-  .prose strong {
-    @apply font-semibold;
-  }
-  .prose ul {
-    @apply my-4 ml-6 list-disc space-y-1;
-  }
-  .prose ol {
-    @apply my-4 ml-6 list-decimal space-y-1;
-  }
-  .prose li {
-    @apply leading-7;
-  }
-  .prose blockquote {
-    @apply my-6 border-l-4 border-border pl-4 italic text-muted-foreground;
-  }
-  .prose code {
-    @apply rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground;
-  }
-  .prose pre {
-    @apply my-6 overflow-x-auto rounded-lg border border-border bg-card p-4 text-sm leading-6;
-  }
-  .prose pre code {
-    @apply bg-transparent p-0 text-inherit;
-  }
-  .prose table {
-    @apply my-6 w-full border-collapse text-sm;
-  }
-  .prose th {
-    @apply border border-border px-3 py-2 text-left font-semibold;
-  }
-  .prose td {
-    @apply border border-border px-3 py-2;
-  }
-  .prose hr {
-    @apply my-8 border-border;
-  }
-  .prose kbd {
-    @apply rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground;
+  /* Map prose link colour to our primary token; the plugin's
+     default is theme-independent text-blue. */
+  .prose :where(a):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+    @apply text-primary underline-offset-4 hover:text-primary/80;
   }
 }

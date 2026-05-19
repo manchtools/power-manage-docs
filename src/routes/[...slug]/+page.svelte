@@ -15,10 +15,10 @@
 
 <div class="flex">
 	<article class="min-w-0 flex-1 px-6 py-12 xl:px-12">
-		<!-- Markdoc-compiled Svelte component renders here. Wrapping
-		     in .prose scopes the typographic styles defined in app.css
-		     so they only apply to authored content, not the chrome. -->
-		<div class="prose">
+		<!-- Markdoc-compiled Svelte component renders here.
+		     prose-neutral matches the shadcn neutral palette; the
+		     plugin's prose-invert variant flips it for dark mode. -->
+		<div class="prose prose-neutral dark:prose-invert max-w-none">
 			<ContentComponent />
 		</div>
 
