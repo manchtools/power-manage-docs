@@ -96,13 +96,14 @@ A worker example that does this for Splunk and Loki is on the [Roadmap](/operati
 
 ## "How do I decommission a device?"
 
-Three steps, in order:
+Two steps:
 
-1. **Revoke the agent's certificate** so it can no longer reach the gateway. Device-detail page → **Certificate** → **Revoke**. The fingerprint goes onto a deny-list the gateway checks on every handshake.
-2. **Uninstall the agent** from the host: `sudo apt remove power-manage-agent` (or distro equivalent). The agent's local state in `/var/lib/power-manage-agent/` survives if you want to dig through it; `--purge` removes it.
-3. **Delete the device record** in the web UI. This emits a `DeviceDeleted` event; projections drop the row, but the events table keeps the history. The audit log remembers the device existed.
+1. **Delete the device record** in the web UI. This emits a `DeviceDeleted` event. The projection row is dropped, the events table keeps the history (so the audit log remembers the device existed), and the control server stops enqueueing actions for it.
+2. **Uninstall the agent** on the host: `sudo apt remove power-manage-agent` (or distro equivalent). The agent's local state lives under `/var/lib/power-manage-agent/`; `--purge` removes it too.
 
-The order matters: revoke before delete, so even if the agent reconnects between steps 2 and 3, it can't.
+{% callout type="warn" title="Cert revocation isn't implemented yet" %}
+The agent's mTLS certificate stays valid until the CA rotates (default 1-year lifetime). The gateway does not currently check a revocation deny-list during the handshake. With no device record on the control plane the cert can't dispatch anything useful, but if you've stopped trusting the host itself (compromise, theft) and want the cert to stop working before its natural expiry, the only options today are CA rotation (re-issues every active agent's cert) or shutting down the gateway. A proper `RevokeCertificate` RPC is on the [Roadmap](/operations/roadmap).
+{% /callout %}
 
 ## "What happens if Postgres goes down?"
 
