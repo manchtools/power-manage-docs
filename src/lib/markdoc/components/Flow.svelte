@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { mode } from 'mode-watcher';
-	import { diagrams } from '$lib/diagrams';
+	import { diagrams, layout } from '$lib/diagrams';
 
-	// {% flow name="event-sourcing-write" %}
+	// {% flow name="event-sourcing-write" /%}
 	//
 	// SvelteFlow is purely client-side: it measures DOM rects during
 	// init and stores them in a Svelte store, neither of which exists
@@ -14,17 +14,22 @@
 	// — enable JavaScript to view)" instead of an SVG. Acceptable for
 	// supplementary visualisations; if a diagram becomes load-bearing
 	// for a concept, author it as an SVG and use {% callout %} text.
+	//
+	// Diagrams are rendered "static" — no panning, dragging, zooming
+	// or controls. This is by design: the doc page is the focus, the
+	// diagram is illustrative. Dagre handles positioning so the spec
+	// only lists nodes + edges (Mermaid-style authoring).
 
 	type Props = { name?: string };
 	const { name = '' }: Props = $props();
 
-	const config = $derived(name ? diagrams[name] : undefined);
-	const height = $derived(config?.height ?? 320);
+	const spec = $derived(name ? diagrams[name] : undefined);
+	// layout() is pure; computing it eagerly (even during SSR, where
+	// dagre runs but SvelteFlow doesn't) gives us the canvas height
+	// for the placeholder so prerender and hydration agree.
+	const computed = $derived(spec ? layout(spec) : null);
+	const height = $derived(computed?.height ?? 320);
 
-	// Dynamic import keeps SvelteFlow out of the SSR bundle. The
-	// `Loaded` state holds the resolved module so we can render
-	// imperatively only after both `browser === true` and the chunk
-	// has resolved.
 	type LoadedFlow = typeof import('@xyflow/svelte');
 	let mod = $state<LoadedFlow | null>(null);
 
@@ -40,7 +45,7 @@
 	});
 </script>
 
-{#if !config}
+{#if !spec || !computed}
 	<div
 		class="not-prose my-6 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
 	>
@@ -54,20 +59,23 @@
 		{#if browser && mod}
 			{@const SvelteFlow = mod.SvelteFlow}
 			{@const Background = mod.Background}
-			{@const Controls = mod.Controls}
 			<SvelteFlow
-				nodes={config.nodes}
-				edges={config.edges}
+				nodes={computed.nodes}
+				edges={computed.edges}
 				fitView
 				colorMode={mode.current === 'dark' ? 'dark' : 'light'}
 				proOptions={{ hideAttribution: true }}
 				nodesDraggable={false}
 				nodesConnectable={false}
+				elementsSelectable={false}
 				zoomOnScroll={false}
+				zoomOnPinch={false}
+				zoomOnDoubleClick={false}
 				panOnScroll={false}
+				panOnDrag={false}
+				preventScrolling={false}
 			>
 				<Background />
-				<Controls showLock={false} />
 			</SvelteFlow>
 		{:else}
 			<div class="flex h-full items-center justify-center text-sm text-muted-foreground">

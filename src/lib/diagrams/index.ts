@@ -1,157 +1,168 @@
 import { Position, type Node, type Edge } from '@xyflow/svelte';
+import dagre from '@dagrejs/dagre';
 
-// Diagram registry — every {% flow name="..." %} tag in Markdoc
-// looks up a config here by `name`. Keeping diagram definitions in
-// .ts (not inline in Markdoc) means: typed nodes/edges, autocomplete,
-// and the option to share node primitives across diagrams later.
+// Diagram registry. Author a diagram the way you'd write a Mermaid
+// flowchart — list the nodes by id + label + kind, list the edges
+// by [from, to], optionally pick a direction. Positions are computed
+// by dagre at render time, so adding/removing a node never means
+// re-tuning coordinates.
+//
+// To add a diagram:
+//
+//   'my-flow': {
+//     direction: 'LR',                                  // or 'TB'
+//     nodes: [
+//       { id: 'a', label: 'Client', kind: 'actor' },
+//       { id: 'b', label: 'Server', kind: 'service' },
+//       { id: 'c', label: 'DB',     kind: 'store'   }
+//     ],
+//     edges: [
+//       { from: 'a', to: 'b', label: 'request' },
+//       { from: 'b', to: 'c', animated: true }
+//     ]
+//   }
+//
+// …then reference it from any .md page with
+// {% flow name="my-flow" /%}.
 
-export type DiagramConfig = {
-	nodes: Node[];
-	edges: Edge[];
-	// Render height in px. SvelteFlow needs an explicit height
-	// because the parent is `display: block`, not a flex/grid cell.
-	height?: number;
+export type NodeKind = 'service' | 'store' | 'actor';
+
+export type SpecNode = {
+	id: string;
+	label: string;
+	kind: NodeKind;
 };
 
-// Shared visual vocabulary. Colours reference shadcn theme tokens so
-// both light and dark modes pick up the right palette automatically
-// — `colorMode` only flips the SvelteFlow background grid; the node
-// fills come from `hsl(var(--…))`.
-const STORE = 'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border: 1px solid hsl(var(--border));';
-const SERVICE = 'background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: 1px solid hsl(var(--border));';
-const ACTOR = 'background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border));';
+export type SpecEdge = {
+	from: string;
+	to: string;
+	label?: string;
+	animated?: boolean;
+	// 'step' produces orthogonal routing; default is the bezier
+	// curve. Use 'step' when an edge runs back to a node that's
+	// already topologically upstream — bezier overlaps the layout.
+	type?: 'bezier' | 'step';
+};
 
-export const diagrams: Record<string, DiagramConfig> = {
+export type DiagramSpec = {
+	direction?: 'LR' | 'TB';
+	nodes: SpecNode[];
+	edges: SpecEdge[];
+};
+
+// Fixed node dimensions keep dagre's layout deterministic across
+// re-renders and let us reserve the right amount of canvas height.
+// Adjust here if labels start clipping.
+const NODE_W = 180;
+const NODE_H = 60;
+const NODESEP = 50;
+const RANKSEP = 80;
+const PAD = 24;
+
+// Per-kind styling pulls from shadcn theme tokens so light/dark
+// modes track without any extra wiring — SvelteFlow's colorMode prop
+// only flips the background grid; node fills are CSS.
+const STYLES: Record<NodeKind, string> = {
+	service:
+		'background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;',
+	store:
+		'background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;',
+	actor:
+		'background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.3; text-align: center; white-space: pre-line;'
+};
+
+// layout runs dagre over the spec and produces SvelteFlow-shaped
+// nodes/edges plus the canvas height needed to fit them with a
+// margin on each side. Pure function — same spec in, same numbers
+// out, so SSR and client agree on the layout.
+export function layout(spec: DiagramSpec): { nodes: Node[]; edges: Edge[]; height: number } {
+	const direction = spec.direction ?? 'LR';
+	const g = new dagre.graphlib.Graph();
+	g.setGraph({ rankdir: direction, nodesep: NODESEP, ranksep: RANKSEP, marginx: PAD, marginy: PAD });
+	g.setDefaultEdgeLabel(() => ({}));
+
+	for (const n of spec.nodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
+	for (const e of spec.edges) g.setEdge(e.from, e.to);
+	dagre.layout(g);
+
+	const horizontal = direction === 'LR';
+	const sourceP = horizontal ? Position.Right : Position.Bottom;
+	const targetP = horizontal ? Position.Left : Position.Top;
+
+	const nodes: Node[] = spec.nodes.map((n) => {
+		const { x, y } = g.node(n.id);
+		return {
+			id: n.id,
+			// dagre returns the node *centre*; SvelteFlow expects the
+			// top-left corner of the bounding box.
+			position: { x: x - NODE_W / 2, y: y - NODE_H / 2 },
+			data: { label: n.label },
+			style: STYLES[n.kind],
+			sourcePosition: sourceP,
+			targetPosition: targetP,
+			width: NODE_W,
+			height: NODE_H,
+			draggable: false,
+			selectable: false,
+			connectable: false
+		};
+	});
+
+	const edges: Edge[] = spec.edges.map((e, i) => ({
+		id: `${e.from}->${e.to}#${i}`,
+		source: e.from,
+		target: e.to,
+		label: e.label,
+		animated: e.animated,
+		type: e.type === 'step' ? 'step' : undefined
+	}));
+
+	const graphLabel = g.graph();
+	const height = (graphLabel.height ?? 0) + PAD * 2;
+
+	return { nodes, edges, height };
+}
+
+export const diagrams: Record<string, DiagramSpec> = {
 	'event-sourcing-write': {
-		height: 360,
+		direction: 'LR',
 		nodes: [
-			{
-				id: 'client',
-				position: { x: 0, y: 140 },
-				data: { label: 'Client (web / CLI)' },
-				style: ACTOR,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'handler',
-				position: { x: 200, y: 140 },
-				data: { label: 'RPC handler\n(internal/api)' },
-				style: SERVICE,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'append',
-				position: { x: 420, y: 60 },
-				data: { label: 'AppendEvent\nWithVersion' },
-				style: SERVICE,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'events',
-				position: { x: 640, y: 60 },
-				data: { label: 'events\n(append-only log)' },
-				style: STORE,
-				sourcePosition: Position.Bottom,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'listener',
-				position: { x: 640, y: 220 },
-				data: { label: 'Projector listener\n(post-commit)' },
-				style: SERVICE,
-				sourcePosition: Position.Left,
-				targetPosition: Position.Top
-			},
-			{
-				id: 'projection',
-				position: { x: 420, y: 220 },
-				data: { label: '*_projection\n(read model)' },
-				style: STORE,
-				sourcePosition: Position.Left,
-				targetPosition: Position.Right
-			},
-			{
-				id: 'read',
-				position: { x: 200, y: 220 },
-				data: { label: 'Read query\n(handler)' },
-				style: SERVICE,
-				sourcePosition: Position.Left,
-				targetPosition: Position.Right
-			}
+			{ id: 'client', label: 'Client\n(web / CLI)', kind: 'actor' },
+			{ id: 'handler', label: 'RPC handler\n(internal/api)', kind: 'service' },
+			{ id: 'append', label: 'AppendEvent\nWithVersion', kind: 'service' },
+			{ id: 'events', label: 'events\n(append-only log)', kind: 'store' },
+			{ id: 'listener', label: 'Projector listener\n(post-commit)', kind: 'service' },
+			{ id: 'projection', label: '*_projection\n(read model)', kind: 'store' },
+			{ id: 'read', label: 'Read query\n(handler)', kind: 'service' }
 		],
 		edges: [
-			{ id: 'e1', source: 'client', target: 'handler', label: 'Connect-RPC' },
-			{ id: 'e2', source: 'handler', target: 'append' },
-			{ id: 'e3', source: 'append', target: 'events', label: 'INSERT' },
-			{ id: 'e4', source: 'events', target: 'listener', label: 'commit', animated: true },
-			{ id: 'e5', source: 'listener', target: 'projection', label: 'UPSERT' },
-			{ id: 'e6', source: 'projection', target: 'read', label: 'SELECT' },
-			{ id: 'e7', source: 'read', target: 'client', label: 'response' }
+			{ from: 'client', to: 'handler', label: 'Connect-RPC' },
+			{ from: 'handler', to: 'append' },
+			{ from: 'append', to: 'events', label: 'INSERT' },
+			{ from: 'events', to: 'listener', label: 'commit', animated: true },
+			{ from: 'listener', to: 'projection', label: 'UPSERT' },
+			{ from: 'projection', to: 'read', label: 'SELECT' },
+			{ from: 'read', to: 'client', label: 'response', type: 'step' }
 		]
 	},
 
 	'control-gateway-agent': {
-		height: 380,
+		direction: 'LR',
 		nodes: [
-			{
-				id: 'web',
-				position: { x: 0, y: 40 },
-				data: { label: 'Web / CLI\n(JWT)' },
-				style: ACTOR,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'control',
-				position: { x: 220, y: 40 },
-				data: { label: 'Control server\n(Connect-RPC)' },
-				style: SERVICE,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'pg',
-				position: { x: 220, y: 240 },
-				data: { label: 'PostgreSQL\nevents + projections' },
-				style: STORE,
-				sourcePosition: Position.Top,
-				targetPosition: Position.Top
-			},
-			{
-				id: 'valkey',
-				position: { x: 440, y: 240 },
-				data: { label: 'Valkey\nAsynq queues' },
-				style: STORE,
-				sourcePosition: Position.Top,
-				targetPosition: Position.Top
-			},
-			{
-				id: 'gateway',
-				position: { x: 440, y: 40 },
-				data: { label: 'Gateway\n(no DB)' },
-				style: SERVICE,
-				sourcePosition: Position.Right,
-				targetPosition: Position.Left
-			},
-			{
-				id: 'agent',
-				position: { x: 680, y: 40 },
-				data: { label: 'Agent\n(mTLS)' },
-				style: ACTOR,
-				sourcePosition: Position.Left,
-				targetPosition: Position.Left
-			}
+			{ id: 'web', label: 'Web / CLI\n(JWT)', kind: 'actor' },
+			{ id: 'control', label: 'Control server\n(Connect-RPC)', kind: 'service' },
+			{ id: 'pg', label: 'PostgreSQL\nevents + projections', kind: 'store' },
+			{ id: 'valkey', label: 'Valkey\nAsynq queues', kind: 'store' },
+			{ id: 'gateway', label: 'Gateway\n(no DB)', kind: 'service' },
+			{ id: 'agent', label: 'Agent\n(mTLS)', kind: 'actor' }
 		],
 		edges: [
-			{ id: 'a1', source: 'web', target: 'control', label: 'HTTPS + JWT' },
-			{ id: 'a2', source: 'control', target: 'pg', label: 'sqlc' },
-			{ id: 'a3', source: 'control', target: 'valkey', label: 'enqueue', animated: true },
-			{ id: 'a4', source: 'valkey', target: 'gateway', label: 'dequeue', animated: true },
-			{ id: 'a5', source: 'gateway', target: 'agent', label: 'bidi stream / mTLS', animated: true },
-			{ id: 'a6', source: 'gateway', target: 'control', label: 'InternalService\nproxy', type: 'step' }
+			{ from: 'web', to: 'control', label: 'HTTPS + JWT' },
+			{ from: 'control', to: 'pg', label: 'sqlc' },
+			{ from: 'control', to: 'valkey', label: 'enqueue', animated: true },
+			{ from: 'valkey', to: 'gateway', label: 'dequeue', animated: true },
+			{ from: 'gateway', to: 'agent', label: 'bidi stream / mTLS', animated: true },
+			{ from: 'gateway', to: 'control', label: 'InternalService proxy', type: 'step' }
 		]
 	}
 };
