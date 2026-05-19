@@ -29,6 +29,7 @@
 	const isMermaid = $derived(language === 'mermaid');
 
 	let highlighted = $state<string | null>(null);
+	let highlightError = $state<string | null>(null);
 	let mermaidSvg = $state<string | null>(null);
 	let mermaidError = $state<string | null>(null);
 	let copied = $state(false);
@@ -61,7 +62,12 @@
 					themes: { light: 'github-light', dark: 'github-dark' }
 				});
 			} catch (err) {
-				console.warn('[CodeBlock] highlight failed', { language, err });
+				// Surface the failure to the rendered DOM so silent
+				// regressions (CSP changes, missing language grammar,
+				// Shiki WASM init issues) don't pass as "unstyled code
+				// block, must be loading still."
+				highlightError = err instanceof Error ? err.message : String(err);
+				console.error('[CodeBlock] highlight failed', { language, err });
 			}
 		})();
 	});

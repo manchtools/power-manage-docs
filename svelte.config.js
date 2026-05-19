@@ -70,7 +70,12 @@ const config = {
 				// ignores 'unsafe-inline' automatically and only trusts
 				// nonced scripts. It matters during dev where Vite and
 				// SvelteKit inject un-nonced inline scripts.
-				'script-src': ['self', 'unsafe-inline'],
+				//
+				// 'wasm-unsafe-eval' lets Shiki instantiate its
+				// Oniguruma regex engine (shipped as onig.wasm). Without
+				// it the dynamic import of shiki throws on WASM compile
+				// and code blocks render without syntax highlighting.
+				'script-src': ['self', 'unsafe-inline', 'wasm-unsafe-eval'],
 				'style-src': ['self', 'unsafe-inline'],
 				'connect-src': ['self'],
 				'img-src': ['self', 'data:'],
