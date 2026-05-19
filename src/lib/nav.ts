@@ -92,6 +92,8 @@ export const nav: NavGroup[] = [
 	{
 		title: 'Operations',
 		items: [
+			{ title: 'Troubleshooting', href: '/operations/troubleshooting' },
+			{ title: 'FAQ', href: '/operations/faq' },
 			{ title: 'Roadmap', href: '/operations/roadmap' },
 			{ title: 'Adding screenshots', href: '/operations/screenshots' }
 		]
