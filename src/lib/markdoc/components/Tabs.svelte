@@ -40,11 +40,7 @@
 	let value = $state(untrack(() => initial ?? '') || untrack(() => labelList[0] ?? ''));
 </script>
 
-<!-- gap-0 overrides the primitive's default gap-2 (8px between
-     Tabs.List and Tabs.Content). The Markdoc body usually starts
-     with a code block / paragraph that already carries its own
-     top margin, so the extra flex gap reads as accidental space. -->
-<Tabs.Root bind:value class="gap-0">
+<Tabs.Root bind:value>
 	<Tabs.List>
 		{#each labelList as label (label)}
 			<Tabs.Trigger value={label}>{label}</Tabs.Trigger>
