@@ -2,7 +2,15 @@
 
 Power Manage is split into four runtime components plus a Postgres + Valkey backing store.
 
-{% flow name="control-gateway-agent" /%}
+```mermaid
+flowchart LR
+    Web[Web / CLI<br/>JWT] -->|HTTPS + JWT| Control[Control server<br/>Connect-RPC]
+    Control -->|sqlc| PG[(PostgreSQL<br/>events + projections)]
+    Control -.->|enqueue| Valkey[(Valkey<br/>Asynq queues)]
+    Valkey -.->|dequeue| Gateway[Gateway<br/>no DB]
+    Gateway -.->|bidi stream / mTLS| Agent[Agent<br/>mTLS]
+    Gateway -->|InternalService proxy| Control
+```
 
 ## Control server
 

@@ -2,7 +2,16 @@
 
 Every state-changing operation in Power Manage appends an immutable event to the `events` table. Read paths consult **projection tables** (`*_projection`) that are kept up to date by Go-side **projector listeners** that fire post-commit. The events table itself is the canonical audit log.
 
-{% flow name="event-sourcing-write" /%}
+```mermaid
+flowchart LR
+    Client[Client<br/>web / CLI] --> Handler[RPC handler<br/>internal/api]
+    Handler --> Append[AppendEvent<br/>WithVersion]
+    Append -->|INSERT| Events[(events<br/>append-only log)]
+    Events -.->|commit| Listener[Projector listener<br/>post-commit]
+    Listener -->|UPSERT| Proj[(*_projection<br/>read model)]
+    Proj -->|SELECT| Read[Read query<br/>handler]
+    Read -->|response| Client
+```
 
 ## Why not just mutate the projection directly?
 

@@ -1,21 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { mode } from 'mode-watcher';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils';
 
-	// Fenced code block. We DON'T highlight in the render pass —
-	// instead, the raw <pre><code> is shipped to the client and a
-	// Shiki dynamic import runs once on mount. Trade-off:
-	//   - Pro: zero added bundle weight on initial paint; Shiki only
-	//     loads when the page actually has code; works without JS
-	//     (degrades to unstyled-but-readable monospace).
-	//   - Con: a brief flash of unhighlighted code on first render.
-	//     Acceptable for docs; if it becomes annoying, switch to a
-	//     Vite plugin that highlights at build time.
+	// Fenced code block. Two branches:
 	//
-	// The copy button is independent of highlighting and works
-	// regardless of whether Shiki has loaded.
+	//   - language === 'mermaid' — render as a diagram via mermaid.js.
+	//     Dynamic-imported on mount so the ~500KB mermaid bundle never
+	//     ships unless the page actually has a diagram. Re-renders when
+	//     the colour mode flips so light/dark stays correct.
+	//
+	//   - everything else — Shiki-highlight on mount. Same dynamic-
+	//     import pattern: zero added weight on the initial paint, brief
+	//     flash of unhighlighted code on first render (acceptable for
+	//     docs; switch to build-time highlighting if it ever annoys).
+	//
+	// The copy button is independent of highlighting and works regardless
+	// of whether Shiki/mermaid has loaded — for mermaid fences we hide it
+	// because copying the DSL source out of a rendered diagram is rarely
+	// what the reader wants.
 
 	type Props = {
 		content: string;
@@ -24,23 +29,57 @@
 
 	const { content, language = 'text' }: Props = $props();
 
+	const isMermaid = $derived(language === 'mermaid');
+
 	let highlighted = $state<string | null>(null);
+	let mermaidSvg = $state<string | null>(null);
+	let mermaidError = $state<string | null>(null);
 	let copied = $state(false);
 
-	onMount(async () => {
-		try {
-			const { codeToHtml } = await import('shiki');
-			highlighted = await codeToHtml(content.trimEnd(), {
-				lang: language,
-				themes: { light: 'github-light', dark: 'github-dark' },
-				defaultColor: false
-			});
-		} catch (err) {
-			// Unknown language or shiki load failure — fall back to the
-			// plain <pre><code> already rendered. Log so a docs author
-			// notices in the dev console.
-			console.warn('[CodeBlock] highlight failed', { language, err });
-		}
+	// Stable id per mounted component so mermaid.render's xlink:href
+	// targets don't collide when a page has more than one diagram.
+	const diagramId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
+
+	onMount(() => {
+		if (isMermaid) return; // mermaid is handled by its own $effect (theme-reactive)
+		void (async () => {
+			try {
+				const { codeToHtml } = await import('shiki');
+				highlighted = await codeToHtml(content.trimEnd(), {
+					lang: language,
+					themes: { light: 'github-light', dark: 'github-dark' },
+					defaultColor: false
+				});
+			} catch (err) {
+				console.warn('[CodeBlock] highlight failed', { language, err });
+			}
+		})();
+	});
+
+	$effect(() => {
+		if (!isMermaid) return;
+		// Re-render when mode flips. mermaid is initialized once with
+		// the current theme — to switch themes we re-initialize and
+		// re-render. This is what mermaid.js's own docs recommend.
+		const theme = mode.current === 'dark' ? 'dark' : 'default';
+		void (async () => {
+			try {
+				const mermaid = (await import('mermaid')).default;
+				mermaid.initialize({
+					startOnLoad: false,
+					theme,
+					securityLevel: 'strict',
+					fontFamily: 'inherit'
+				});
+				const { svg } = await mermaid.render(diagramId, content.trim());
+				mermaidSvg = svg;
+				mermaidError = null;
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				mermaidError = msg;
+				console.warn('[CodeBlock] mermaid render failed', { err });
+			}
+		})();
 	});
 
 	async function copy() {
@@ -56,31 +95,50 @@
 	}
 </script>
 
-<div class="not-prose group relative my-6">
-	<button
-		type="button"
-		onclick={copy}
-		aria-label={copied ? 'Copied' : 'Copy code'}
-		class={cn(
-			'absolute right-2 top-2 z-10 inline-flex size-8 items-center justify-center rounded-md',
-			'bg-muted/80 text-muted-foreground opacity-0 backdrop-blur transition-opacity',
-			'hover:bg-muted hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100'
-		)}
-	>
-		{#if copied}
-			<Check class="size-4" />
+{#if isMermaid}
+	<div class="not-prose my-6 overflow-hidden rounded-lg border border-border bg-muted/20 p-4">
+		{#if mermaidError}
+			<div class="text-sm text-destructive">
+				Mermaid render failed: <code>{mermaidError}</code>
+			</div>
+			<pre class="mt-2 overflow-x-auto text-xs text-muted-foreground"><code>{content}</code></pre>
+		{:else if mermaidSvg}
+			<div class="flex justify-center [&_svg]:max-w-full [&_svg]:h-auto">
+				{@html mermaidSvg}
+			</div>
 		{:else}
-			<Copy class="size-4" />
+			<div class="flex h-32 items-center justify-center text-sm text-muted-foreground">
+				Rendering diagram…
+			</div>
 		{/if}
-	</button>
+	</div>
+{:else}
+	<div class="not-prose group relative my-6">
+		<button
+			type="button"
+			onclick={copy}
+			aria-label={copied ? 'Copied' : 'Copy code'}
+			class={cn(
+				'absolute right-2 top-2 z-10 inline-flex size-8 items-center justify-center rounded-md',
+				'bg-muted/80 text-muted-foreground opacity-0 backdrop-blur transition-opacity',
+				'hover:bg-muted hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100'
+			)}
+		>
+			{#if copied}
+				<Check class="size-4" />
+			{:else}
+				<Copy class="size-4" />
+			{/if}
+		</button>
 
-	{#if highlighted}
-		<!-- Shiki returns its own <pre>; .shiki class lets us scope theme rules if needed -->
-		{@html highlighted}
-	{:else}
-		<pre><code class="language-{language}">{content}</code></pre>
-	{/if}
-</div>
+		{#if highlighted}
+			<!-- Shiki returns its own <pre>; .shiki class lets us scope theme rules if needed -->
+			{@html highlighted}
+		{:else}
+			<pre><code class="language-{language}">{content}</code></pre>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	/* Shiki dual-theme output: with defaultColor:false, every span
