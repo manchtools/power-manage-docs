@@ -14,11 +14,14 @@
 	<TopNav />
 
 	<div class="container mx-auto flex w-full max-w-screen-2xl flex-1 px-4 lg:px-6">
-		<!-- Sidebar — desktop only. A mobile drawer for the same nav
-		     is a follow-up; for the initial cut the docs are
-		     readable without it (top-level pages link to subsections
-		     inside their content). -->
-		<aside class="hidden md:block w-64 shrink-0 border-r border-border">
+		<!-- Sidebar pinned in place via `sticky top-14`. The top-nav
+		     is sticky at the top of the viewport (h-14), so the
+		     sidebar lives directly below it and stays put while the
+		     main column scrolls. self-start prevents flex from
+		     stretching it to match content height. -->
+		<aside
+			class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 self-start border-r border-border md:block"
+		>
 			<Sidebar />
 		</aside>
 

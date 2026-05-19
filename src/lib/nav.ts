@@ -48,12 +48,34 @@ export const nav: NavGroup[] = [
 		title: 'Action reference',
 		items: [
 			{ title: 'Overview', href: '/action-reference' },
+			// Packages and updates
 			{ title: 'PACKAGE', href: '/action-reference/package' },
+			{ title: 'UPDATE', href: '/action-reference/update' },
+			{ title: 'REPOSITORY', href: '/action-reference/repository' },
+			{ title: 'DEB', href: '/action-reference/deb' },
+			{ title: 'RPM', href: '/action-reference/rpm' },
+			{ title: 'APP_IMAGE', href: '/action-reference/app-image' },
+			{ title: 'FLATPAK', href: '/action-reference/flatpak' },
+			// System
 			{ title: 'SHELL', href: '/action-reference/shell' },
-			{ title: 'FILE', href: '/action-reference/file' },
+			{ title: 'SCRIPT_RUN', href: '/action-reference/script-run' },
 			{ title: 'SERVICE', href: '/action-reference/service' },
-			{ title: 'LPS (password rotation)', href: '/action-reference/lps' },
-			{ title: 'ENCRYPTION (LUKS)', href: '/action-reference/encryption' }
+			{ title: 'FILE', href: '/action-reference/file' },
+			{ title: 'DIRECTORY', href: '/action-reference/directory' },
+			{ title: 'REBOOT', href: '/action-reference/reboot' },
+			{ title: 'SYNC', href: '/action-reference/sync' },
+			// Identity and access
+			{ title: 'USER', href: '/action-reference/user' },
+			{ title: 'GROUP', href: '/action-reference/group' },
+			{ title: 'SSH', href: '/action-reference/ssh' },
+			{ title: 'SSHD', href: '/action-reference/sshd' },
+			{ title: 'ADMIN_POLICY', href: '/action-reference/admin-policy' },
+			{ title: 'LPS', href: '/action-reference/lps', label: 'LPS (password rotation)' },
+			// Security and networking
+			{ title: 'ENCRYPTION', href: '/action-reference/encryption', label: 'ENCRYPTION (LUKS)' },
+			{ title: 'WIFI', href: '/action-reference/wifi' },
+			// Lifecycle
+			{ title: 'AGENT_UPDATE', href: '/action-reference/agent-update' }
 		]
 	},
 	{
