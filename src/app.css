@@ -2,27 +2,20 @@
 
 @import "tw-animate-css";
 
+@import "shadcn-svelte/tailwind.css";
+
+@import "@fontsource-variable/inter";
+
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn-svelte's installed components write classes like
-   data-active:bg-background. Tailwind v4's built-in data-* shorthand
-   targets attribute presence ([data-active]), but bits-ui v2 emits
-   data-state="active" / data-state="open" instead. Without these
-   custom variants the active-state styling never fires, which makes
-   tabs look stuck, dialogs lose their open transitions, command
-   palette items don't highlight, etc.
-
-   The list mirrors the data-state values bits-ui actually emits and
-   that shadcn-svelte's components rely on. Add new ones here if a
-   future component pulls in a different state name. */
-@custom-variant data-active (&[data-state="active"]);
-@custom-variant data-open (&[data-state="open"]);
-@custom-variant data-closed (&[data-state="closed"]);
+/* `data-active`, `data-open`, `data-closed`, `data-checked`,
+   `data-disabled`, and the orientation variants are now provided by
+   `@import "shadcn-svelte/tailwind.css"` above. Keep the
+   `data-selected` declaration here though — the official file
+   ships it commented out, but the installed Command component still
+   writes `data-selected:bg-muted` for keyboard-highlighted items.
+   Drop this line once shadcn-svelte un-comments theirs upstream. */
 @custom-variant data-selected (&[data-selected]);
-@custom-variant data-disabled (&[data-disabled]);
-@custom-variant data-checked (&[data-state="checked"]);
-@custom-variant data-indeterminate (&[data-state="indeterminate"]);
-@custom-variant data-pressed (&[data-state="on"]);
 
 /* Theme tokens mirrored from web/src/app.css so the docs site and
    the product UI feel visually identical. Keep them in lock-step —
@@ -55,6 +48,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
 }
 
 .dark {
@@ -84,6 +82,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
 }
 
 @theme inline {
@@ -117,6 +120,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: 'Inter Variable', sans-serif;
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 @layer base {
@@ -142,6 +154,9 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background-color: var(--muted-foreground);
+  }
+	html {
+		@apply font-sans;
   }
 }
 

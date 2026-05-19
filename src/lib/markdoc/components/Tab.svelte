@@ -13,6 +13,6 @@
 	const { label, children }: Props = $props();
 </script>
 
-<Tabs.Content value={label} class="prose-sm [&_p:first-child]:mt-0 [&_p:last-child]:mb-0">
+<Tabs.Content value={label}>
 	{@render children?.()}
 </Tabs.Content>

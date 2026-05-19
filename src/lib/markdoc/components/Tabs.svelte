@@ -40,7 +40,7 @@
 	let value = $state(untrack(() => initial ?? '') || untrack(() => labelList[0] ?? ''));
 </script>
 
-<Tabs.Root bind:value class="not-prose my-6">
+<Tabs.Root bind:value>
 	<Tabs.List>
 		{#each labelList as label (label)}
 			<Tabs.Trigger value={label}>{label}</Tabs.Trigger>
