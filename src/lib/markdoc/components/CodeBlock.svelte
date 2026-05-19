@@ -206,7 +206,10 @@
 		{/if}
 	</figure>
 {:else}
-	<div class="not-prose group relative my-6">
+	<!-- Bare wrapper: the typography plugin's .prose pre rule supplies
+	     the border / padding / background / margin. We add nothing
+	     beyond positioning the absolute copy button. -->
+	<div class="group relative">
 		<Button
 			variant="ghost"
 			size="icon-sm"
@@ -225,7 +228,9 @@
 		</Button>
 
 		{#if highlighted}
-			<!-- Shiki returns its own <pre>; .shiki class lets us scope theme rules if needed -->
+			<!-- Shiki returns its own <pre>; the typography plugin's
+			     .prose pre rule styles the outer chrome and the .shiki
+			     span colours below handle dual-theme token colours. -->
 			{@html highlighted}
 		{:else}
 			<pre><code class="language-{language}">{content}</code></pre>
@@ -265,18 +270,12 @@
 	}
 
 	/* Shiki dual-theme output: with defaultColor:false, every span
-	   gets inline --shiki-light + --shiki-dark CSS variables. We pick
-	   which one to read based on the document's dark-mode class. */
-	:global(.shiki) {
-		border-radius: var(--radius-md);
-		border: 1px solid var(--color-border);
-		padding: 1rem;
-		font-size: 0.875rem;
-		line-height: 1.5rem;
-		overflow-x: auto;
-		color: var(--shiki-light);
-		background-color: var(--shiki-light-bg);
-	}
+	   carries inline --shiki-light + --shiki-dark CSS variables, but
+	   nothing reads them. These two rules pick the right one based on
+	   the document's dark-mode class. All other styling (border,
+	   padding, background of the pre itself) belongs to the typography
+	   plugin's .prose pre rule and we deliberately don't touch it. */
+	:global(.shiki),
 	:global(.shiki span) {
 		color: var(--shiki-light);
 		background-color: var(--shiki-light-bg);
