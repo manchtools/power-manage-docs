@@ -9,6 +9,7 @@ The public docs site for [Power Manage](https://github.com/manchtools/power-mana
 - **Tailwind CSS 4** (`@tailwindcss/vite`)
 - **shadcn-svelte** components (`bits-ui` as the headless primitive layer)
 - **Shiki** for syntax highlighting (lazy-loaded on the client)
+- **mermaid** for diagrams in `mermaid` code fences, themed via shadcn tokens
 - **Pagefind** for full-text search (built into the static output at `build/pagefind/`)
 - **`svelte-adapter-bun`** for the runtime
 - **`mode-watcher`** for dark mode
@@ -35,10 +36,11 @@ Drop a Markdown file under `src/content/<group>/<slug>.md`, then add an entry to
 
 Markdoc tags:
 
-- `{% callout type="info\|warn\|danger\|success" title="..." %}` for highlighted blocks
-- `{% tabs %} {% tab label="apt" %} ... {% /tab %} {% /tabs %}` for tabbed content
+- `{% callout type="info|warn|danger|success" title="..." %}` for highlighted blocks
+- `{% tabs initial="apt" %} {% tab label="apt" %} ... {% /tab %} {% /tabs %}` for tabbed content
+- `{% screenshot src="dashboard.png" dark="dashboard-dark.png" alt="..." caption="..." /%}` for screenshots. See [Adding screenshots](src/content/operations/screenshots.md) for the workflow.
 - Code fences (```` ```ts ````) get Shiki highlighting and a copy button
-- Code fences with `mermaid` get rendered as a Svelte Flow diagram
+- Code fences with `mermaid` render as a mermaid diagram themed via shadcn tokens
 
 Headings auto-generate anchors. The right-side TOC is built from the DOM at render time, so there's no separate index to maintain.
 
@@ -59,7 +61,8 @@ src/
 │   ├── get-started/
 │   ├── concepts/
 │   ├── action-reference/
-│   └── security/
+│   ├── security/
+│   └── operations/
 ├── lib/
 │   ├── content.ts                   slug → loader map (via import.meta.glob)
 │   ├── nav.ts                       editorial sidebar order
@@ -72,13 +75,17 @@ src/
 │   │   ├── prev-next.svelte
 │   │   └── ui/                      shadcn-svelte components
 │   └── markdoc/
-│       ├── config.ts                tags + node overrides
-│       └── components/              Callout, CodeBlock, Tabs, Tab, …
+│       ├── tags.svelte              tag registry (Callout, Tabs, Tab, Screenshot)
+│       ├── nodes.svelte             node overrides (Heading, Link, Fence)
+│       └── components/              Callout, CodeBlock, Tabs, Tab, Screenshot, …
 └── routes/
     ├── +layout.svelte               top-nav + sidebar shell
     ├── +layout.ts                   prerender = true
     ├── +page.svelte                 landing hero
     └── [...slug]/+page.{ts,svelte}  dynamic content route
+
+static/
+└── screenshots/                     PNG / WebP for {% screenshot %} tag
 ```
 
 ## Conventions
@@ -95,4 +102,4 @@ Patterns mirror `web/` where it makes sense:
 
 ## License
 
-MIT. The docs content itself (everything under `src/content/`) is Power Manage project documentation — same license as the project.
+MIT. The docs content under `src/content/` is Power Manage project documentation under the same license as the project.

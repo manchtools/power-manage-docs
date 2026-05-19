@@ -1,6 +1,6 @@
 # Threat model
 
-There are eight trust boundaries. Each one is documented and tested.
+Eight trust boundaries. The list below is what each one is, then what it actually buys you when something on the other side gets compromised.
 
 ## Boundaries
 
@@ -13,13 +13,16 @@ There are eight trust boundaries. Each one is documented and tested.
 7. **Control to and from Asynq / Valkey.** Every task payload is HMAC-signed with `PM_TASK_SIGNING_KEY`. The consumer verifies before handing off to the agent stream.
 8. **Control to Postgres.** sqlc-generated queries. Secrets at rest go through AES-GCM with `CONTROL_ENCRYPTION_KEY`.
 
-## What each boundary buys you
+## What stays safe when something gets compromised
 
-The layers are stacked so no single compromise hands an attacker arbitrary action execution:
+The layers are stacked so no single compromise gives an attacker arbitrary action execution.
 
-- A compromised **Valkey** can't forge a dispatch. The HMAC envelope catches it before the gateway forwards.
-- A compromised **gateway** can't forge a dispatch the agent will run. The CA signature on the action stops at the agent's verifier.
-- A compromised **OIDC provider** can't pin a session to an attacker-controlled redirect. The server-side allowlist refuses.
-- A leaked **registration token** is single-use and short-lived. The cert it provisions is identity-bound and rotated at 80% of its lifetime.
+A compromised **Valkey** can't forge a dispatch. The HMAC envelope catches it before the gateway forwards.
+
+A compromised **gateway** can't forge a dispatch the agent will run. The CA signature on the action stops at the agent's verifier.
+
+A compromised **OIDC provider** can't pin a session to an attacker-controlled redirect URL. The server-side allowlist refuses.
+
+A leaked **registration token** is single-use and short-lived. The certificate it provisions is identity-bound and rotated at 80% of its lifetime.
 
 See [mTLS and signed actions](/security/mtls) and [Asynq task signing](/security/task-signing) for the cryptographic details.

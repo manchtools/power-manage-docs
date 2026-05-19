@@ -29,6 +29,7 @@ export const nav: NavGroup[] = [
 		items: [
 			{ title: 'Introduction', href: '/' },
 			{ title: 'Installation', href: '/get-started/installation' },
+			{ title: 'The web UI', href: '/get-started/web-ui' },
 			{ title: 'Quick start', href: '/get-started/quick-start' }
 		]
 	},
@@ -37,8 +38,10 @@ export const nav: NavGroup[] = [
 		items: [
 			{ title: 'Architecture', href: '/concepts/architecture' },
 			{ title: 'Event sourcing', href: '/concepts/event-sourcing' },
-			{ title: 'RBAC + scopes', href: '/concepts/rbac' },
-			{ title: 'Dynamic device groups', href: '/concepts/dynamic-groups' }
+			{ title: 'RBAC and scopes', href: '/concepts/rbac' },
+			{ title: 'Dynamic device groups', href: '/concepts/dynamic-groups' },
+			{ title: 'Maintenance windows', href: '/concepts/maintenance-windows' },
+			{ title: 'Compliance', href: '/concepts/compliance' }
 		]
 	},
 	{
@@ -57,8 +60,17 @@ export const nav: NavGroup[] = [
 		title: 'Security',
 		items: [
 			{ title: 'Threat model', href: '/security/threat-model' },
-			{ title: 'mTLS + signed actions', href: '/security/mtls' },
-			{ title: 'Asynq task signing', href: '/security/task-signing' }
+			{ title: 'mTLS and signed actions', href: '/security/mtls' },
+			{ title: 'Asynq task signing', href: '/security/task-signing' },
+			{ title: 'Remote terminal access', href: '/security/terminal-access' },
+			{ title: 'Audit log', href: '/security/audit-log' }
+		]
+	},
+	{
+		title: 'Operations',
+		items: [
+			{ title: 'Roadmap', href: '/operations/roadmap' },
+			{ title: 'Adding screenshots', href: '/operations/screenshots' }
 		]
 	}
 ];

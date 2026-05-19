@@ -15,4 +15,5 @@
 	export { default as Callout } from './components/Callout.svelte';
 	export { default as Tabs } from './components/Tabs.svelte';
 	export { default as Tab } from './components/Tab.svelte';
+	export { default as Screenshot } from './components/Screenshot.svelte';
 </script>
