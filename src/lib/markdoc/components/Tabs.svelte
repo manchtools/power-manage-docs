@@ -58,7 +58,7 @@
 			{#each registered as label (label)}
 				<Tabs.Trigger
 					value={label}
-					class="rounded-none border-0 border-r border-transparent px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground data-active:bg-background data-active:text-foreground data-active:shadow-none"
+					class="relative rounded-none border-0 bg-transparent px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-active:bg-background data-active:text-foreground data-active:shadow-none data-active:after:absolute data-active:after:inset-x-0 data-active:after:-bottom-px data-active:after:h-0.5 data-active:after:bg-primary"
 				>
 					{label}
 				</Tabs.Trigger>
