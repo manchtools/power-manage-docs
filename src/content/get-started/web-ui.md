@@ -5,7 +5,7 @@ The Power Manage server doesn't ship with a web UI. It exposes a Connect-RPC API
 If you brought the stack up and went looking for a sign-in page on `control.example.com`, that's why there isn't one.
 
 {% callout type="info" title="Where to find it" %}
-The hosted web UI lives at **https://app.power-manage.manchtools.com**. Open it, enter your control-server domain (`control.example.com`), and sign in with the admin credentials from setup.
+The hosted web UI lives at **{{WEB_UI_URL}}**. Open it, enter your control-server domain (`control.example.com`), and sign in with the admin credentials from setup.
 {% /callout %}
 
 ## The trust model
@@ -38,10 +38,10 @@ That's it. RPCs, file uploads, event subscriptions, the terminal WebSocket: all 
 
 ## CORS and your control server
 
-Your control server needs to allow the web UI's origin on its CORS allowlist. The default config covers `https://app.power-manage.manchtools.com`. If you've built your own client on a different origin, add it via `CONTROL_CORS_ALLOWED_ORIGINS` in `.env`:
+Your control server needs to allow the web UI's origin on its CORS allowlist. The default config covers `{{WEB_UI_URL}}`. If you've built your own client on a different origin, add it via `CONTROL_CORS_ALLOWED_ORIGINS` in `.env`:
 
 ```bash
-CONTROL_CORS_ALLOWED_ORIGINS=https://app.power-manage.manchtools.com,https://ui.example.com
+CONTROL_CORS_ALLOWED_ORIGINS={{WEB_UI_URL}},https://ui.example.com
 ```
 
 If sign-in fails with a network error and the browser console reports a CORS rejection, this is the setting to check.

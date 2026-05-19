@@ -5,7 +5,7 @@ You have a control server up and one agent enrolled. Time to make something happ
 If you haven't gotten that far yet, [Installation](/get-started/installation) is the page you want. If the stack is up but no agent is talking to it, follow the enrolment block at the bottom of that page first.
 
 {% callout type="info" title="Sign in via the hosted UI" %}
-The server doesn't bundle a web UI. Sign in at **https://app.power-manage.manchtools.com** and point it at your control-server domain. Every RPC the UI makes goes straight from your browser to your server. See [The web UI](/get-started/web-ui) for the full trust model.
+The server doesn't bundle a web UI. Sign in at **{{WEB_UI_URL}}** and point it at your control-server domain. Every RPC the UI makes goes straight from your browser to your server. See [The web UI](/get-started/web-ui) for the full trust model.
 {% /callout %}
 
 ## The mental model

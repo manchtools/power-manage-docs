@@ -24,6 +24,23 @@ bun run dev
 
 Dev server runs at `http://localhost:5173`. Hot reload covers content: save any `.md` under `src/content/` and the page rebuilds.
 
+## Build-time configuration
+
+Variables that get baked into the content at build time. Set them via env vars before `bun run build`.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PUBLIC_WEB_UI_URL` | `https://app.power-manage.manchtools.com` | Hosted web-UI URL. Replaces every `{{WEB_UI_URL}}` token in markdown sources. |
+| `BASE_PATH` | empty | Path prefix when the docs are hosted under a subpath (e.g. `/docs`). |
+
+Example:
+
+```bash
+PUBLIC_WEB_UI_URL=https://app.example.com bun run build
+```
+
+Tokens are pure string replace — no AST work, no need to escape anything as long as the value doesn't contain Markdoc-significant characters (URLs don't). The replacement happens in a preprocessor before Markdoc sees the file (see `svelte.config.js`).
+
 ## Authoring content
 
 Drop a Markdown file under `src/content/<group>/<slug>.md`, then add an entry to the matching group in `src/lib/nav.ts`. The file system → URL mapping is automatic:

@@ -3,7 +3,7 @@
 Power Manage deploys as a Compose stack. Six containers: Traefik, Postgres, Valkey (with RediSearch), the control server, the gateway, and the indexer. A `setup.sh` helper generates the cert chain, secrets, and `valkey.conf` so you don't have to assemble them by hand.
 
 {% callout type="warn" title="No web UI is bundled" %}
-The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **https://app.power-manage.manchtools.com**. Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
+The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **{{WEB_UI_URL}}**. Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
 {% /callout %}
 
 ## Prerequisites
@@ -74,7 +74,7 @@ For SSO-only deployments, set `CONTROL_PASSWORD_AUTH_ENABLED=false` *after* you'
 docker compose up -d
 ```
 
-Traefik usually has certificates in under a minute. Once they're issued, sign in: open the web UI at **https://app.power-manage.manchtools.com**, point it at your control-server domain (`control.example.com`), and use the admin credentials from setup. The first sign-in is the only time the bootstrap admin uses its password; afterwards you should add a real SSO provider and treat the bootstrap account as break-glass.
+Traefik usually has certificates in under a minute. Once they're issued, sign in: open the web UI at **{{WEB_UI_URL}}**, point it at your control-server domain (`control.example.com`), and use the admin credentials from setup. The first sign-in is the only time the bootstrap admin uses its password; afterwards you should add a real SSO provider and treat the bootstrap account as break-glass.
 
 For details on how the hosted UI talks to your server (and what it does *not* see), read [The web UI](/get-started/web-ui).
 
