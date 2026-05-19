@@ -115,23 +115,9 @@
 		}
 	}
 
-	// Pagefind reports URLs based on the prerendered file paths
-	// (e.g. /concepts/compliance.html, /index.html). SvelteKit's
-	// routes use trailingSlash: 'never' (no .html, no trailing slash,
-	// '/' for the index). Strip the extension before navigating so
-	// goto() lands on a real route.
-	function normalizeUrl(url: string): string {
-		let u = url;
-		if (u.endsWith('/index.html')) u = u.slice(0, -'index.html'.length);
-		else if (u.endsWith('.html')) u = u.slice(0, -'.html'.length);
-		if (u === '' || u === '/') return '/';
-		if (u.endsWith('/')) u = u.slice(0, -1);
-		return u;
-	}
-
 	function pick(url: string) {
 		open = false;
-		void goto(normalizeUrl(url));
+		void goto(url);
 	}
 </script>
 

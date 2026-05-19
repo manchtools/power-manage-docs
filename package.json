@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build && pagefind --site build/prerendered --output-path build/client/pagefind",
+		"build": "vite build && pagefind --site build/prerendered --output-path build/client/pagefind && bun run scripts/strip-pagefind-html.ts",
 		"preview": "bun run build/index.js",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
