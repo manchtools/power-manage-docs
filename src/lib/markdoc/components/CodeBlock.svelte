@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { mode } from 'mode-watcher';
+	import { Button } from '$lib/components/ui/button';
 	import Copy from '@lucide/svelte/icons/copy';
 	import Check from '@lucide/svelte/icons/check';
 	import { cn } from '$lib/utils';
@@ -206,14 +207,14 @@
 	</figure>
 {:else}
 	<div class="not-prose group relative my-6">
-		<button
-			type="button"
+		<Button
+			variant="ghost"
+			size="icon-sm"
 			onclick={copy}
 			aria-label={copied ? 'Copied' : 'Copy code'}
 			class={cn(
-				'absolute right-2 top-2 z-10 inline-flex size-8 items-center justify-center rounded-md',
-				'bg-muted/80 text-muted-foreground opacity-0 backdrop-blur transition-opacity',
-				'hover:bg-muted hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100'
+				'absolute right-2 top-2 z-10 bg-muted/80 backdrop-blur',
+				'opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100'
 			)}
 		>
 			{#if copied}
@@ -221,7 +222,7 @@
 			{:else}
 				<Copy class="size-4" />
 			{/if}
-		</button>
+		</Button>
 
 		{#if highlighted}
 			<!-- Shiki returns its own <pre>; .shiki class lets us scope theme rules if needed -->

@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
 	import { setContext } from 'svelte';
+	import * as Tabs from '$lib/components/ui/tabs';
 
 	// {% tabs %}
 	//   {% tab label="apt" %} ... {% /tab %}
 	//   {% tab label="dnf" %} ... {% /tab %}
 	// {% /tabs %}
 	//
-	// Tabs auto-discover their children by name via context — no
-	// need for the author to list labels on the parent. An
-	// `initial` attribute on {% tabs %} selects the initially-open
-	// tab; without it the first child wins.
+	// Markdoc-friendly authoring on top of shadcn-svelte's <Tabs>.
+	// Children register themselves by label via context, the parent
+	// builds the trigger row from that registry, and the panels
+	// (Tabs.Content from each child) render below.
 	//
-	// (Why not `default`? svelte-markdoc-preprocess introspects the
-	// $props() destructure for attribute names, and JS reserves
-	// `default` as a destructuring rename target, so we'd have to
-	// alias to `{ default: foo }` — which the preprocessor's
-	// key===value heuristic doesn't pick up. `initial` is plain.)
+	// `initial` selects the open tab on mount; if not set, the first
+	// registered tab wins. `default` is reserved by JS so we use
+	// `initial` to avoid the destructure-rename heuristic problem in
+	// svelte-markdoc-preprocess (it only picks up props whose
+	// destructure name matches the type key).
 
 	type Props = {
 		initial?: string;
@@ -26,65 +26,34 @@
 	const { initial, children }: Props = $props();
 
 	type TabsCtx = {
-		registered: { label: string }[];
-		active: string;
 		register: (label: string) => void;
-		select: (label: string) => void;
 	};
 
-	let registered = $state<{ label: string }[]>([]);
-	// `initial` is a one-shot default — it's set by the Markdoc {%
-	// tabs default="…" %} attribute once at parse time and never
-	// changes after mount. Capturing only its initial value (and
-	// not tracking subsequent assignments) is intentional; the
-	// untrack() makes the intent explicit so svelte-check doesn't
-	// warn about state_referenced_locally.
-	let active = $state<string>('');
+	let registered = $state<string[]>([]);
+	// `initial` is a one-shot default supplied via the Markdoc
+	// attribute at parse time and never mutated after. Initialising
+	// `value` from it inside an $effect keeps the relationship
+	// readable and silences the state_referenced_locally lint that
+	// flags 'capturing only the initial value of a prop'.
+	let value = $state('');
 	$effect.pre(() => {
-		if (!active && initial) active = initial;
+		if (!value && initial) value = initial;
 	});
 
-	const ctx: TabsCtx = {
-		get registered() {
-			return registered;
-		},
-		get active() {
-			return active;
-		},
+	setContext<TabsCtx>('docs:tabs', {
 		register(label) {
-			if (registered.find((t) => t.label === label)) return;
-			registered = [...registered, { label }];
-			if (!active) active = label;
-		},
-		select(label) {
-			active = label;
+			if (registered.includes(label)) return;
+			registered = [...registered, label];
+			if (!value) value = label;
 		}
-	};
-
-	setContext('docs:tabs', ctx);
+	});
 </script>
 
-<div class="not-prose my-6 overflow-hidden rounded-lg border border-border">
-	<!-- Tab list. Renders after children mount via context — this
-	     means the list is one render late on the very first paint;
-	     acceptable trade-off vs forcing authors to pre-declare labels. -->
-	<div role="tablist" class="flex border-b border-border bg-muted/40">
-		{#each registered as t (t.label)}
-			<button
-				type="button"
-				role="tab"
-				aria-selected={active === t.label}
-				class={cn(
-					'px-4 py-2 text-sm font-medium transition-colors',
-					active === t.label
-						? 'bg-background text-foreground'
-						: 'text-muted-foreground hover:text-foreground'
-				)}
-				onclick={() => ctx.select(t.label)}
-			>
-				{t.label}
-			</button>
+<Tabs.Root bind:value class="not-prose my-6">
+	<Tabs.List>
+		{#each registered as label (label)}
+			<Tabs.Trigger value={label}>{label}</Tabs.Trigger>
 		{/each}
-	</div>
-	<div class="p-4">{@render children?.()}</div>
-</div>
+	</Tabs.List>
+	{@render children?.()}
+</Tabs.Root>

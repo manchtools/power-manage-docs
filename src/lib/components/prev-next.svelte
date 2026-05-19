@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
+	import { Button } from '$lib/components/ui/button';
 	import { flatNav } from '$lib/nav';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -11,8 +12,13 @@
 	//
 	// If the current path isn't in the nav list (e.g. a draft page
 	// the author hasn't wired up yet), both prev and next are
-	// undefined and the component renders nothing rather than showing
-	// confusing links to unrelated pages.
+	// undefined and the component renders nothing rather than
+	// showing links to unrelated pages.
+	//
+	// Rendered as Button variant="outline" rather than raw anchors so
+	// hover / focus / disabled states track the rest of the docs
+	// chrome. The two-line label (eyebrow + title) lives inside the
+	// button via Tailwind utilities.
 
 	type Props = {
 		currentHref: string;
@@ -31,31 +37,41 @@
 		aria-label="Previous / next page"
 	>
 		{#if prev}
-			<a
+			<Button
+				variant="outline"
 				href={base + prev.href}
-				class="group flex flex-1 items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-accent/40"
+				class="group h-auto flex-1 justify-start gap-3 px-4 py-3"
 			>
-				<ChevronLeft class="size-5 text-muted-foreground transition-transform group-hover:-translate-x-0.5" />
-				<div class="flex flex-col">
-					<span class="text-xs uppercase tracking-wide text-muted-foreground">Previous</span>
+				<ChevronLeft
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5"
+				/>
+				<span class="flex flex-col items-start">
+					<span class="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+						Previous
+					</span>
 					<span class="font-medium">{prev.title}</span>
-				</div>
-			</a>
+				</span>
+			</Button>
 		{:else}
 			<div class="flex-1"></div>
 		{/if}
 
 		{#if next}
-			<a
+			<Button
+				variant="outline"
 				href={base + next.href}
-				class="group flex flex-1 items-center justify-end gap-3 rounded-lg border border-border p-4 text-right transition-colors hover:bg-accent/40"
+				class="group h-auto flex-1 justify-end gap-3 px-4 py-3"
 			>
-				<div class="flex flex-col">
-					<span class="text-xs uppercase tracking-wide text-muted-foreground">Next</span>
+				<span class="flex flex-col items-end">
+					<span class="text-xs font-normal uppercase tracking-wide text-muted-foreground">
+						Next
+					</span>
 					<span class="font-medium">{next.title}</span>
-				</div>
-				<ChevronRight class="size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-			</a>
+				</span>
+				<ChevronRight
+					class="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+				/>
+			</Button>
 		{:else}
 			<div class="flex-1"></div>
 		{/if}

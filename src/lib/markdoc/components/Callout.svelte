@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Alert from '$lib/components/ui/alert';
 	import { cn } from '$lib/utils';
 	import Info from '@lucide/svelte/icons/info';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
@@ -7,10 +8,13 @@
 
 	// {% callout type="info|warn|danger|success" title="..." %} ... {% /callout %}
 	//
-	// The variant table is intentionally narrow — keep callout usage
-	// editorially consistent. Don't add new types unless the
-	// information class genuinely doesn't fit the four below; a fifth
-	// variant tends to dilute the signal of the existing ones.
+	// Built on shadcn-svelte's <Alert>. The primitive provides
+	// structure (grid layout, role="alert", title/description slots,
+	// border + radius + padding); we add the variant-specific colour
+	// scheme on top because shadcn ships only default / destructive.
+	//
+	// Keep the variant table narrow on purpose — a fifth variant
+	// dilutes the signal of the existing four.
 
 	type Variant = 'info' | 'warn' | 'danger' | 'success';
 
@@ -22,7 +26,7 @@
 
 	const { type = 'info', title, children }: Props = $props();
 
-	const variantStyles: Record<Variant, string> = {
+	const variantClasses: Record<Variant, string> = {
 		info: 'border-blue-500/30 bg-blue-500/5 text-blue-900 dark:text-blue-100',
 		warn: 'border-amber-500/40 bg-amber-500/5 text-amber-900 dark:text-amber-100',
 		danger: 'border-destructive/40 bg-destructive/5 text-destructive dark:text-red-100',
@@ -40,22 +44,12 @@
 	);
 </script>
 
-<aside
-	class={cn(
-		'not-prose my-6 rounded-lg border-l-4 p-4',
-		variantStyles[type]
-	)}
-	role="note"
->
-	<div class="flex items-start gap-3">
-		<Icon class="mt-1 size-5 shrink-0" />
-		<div class="min-w-0 flex-1">
-			{#if title}
-				<p class="mt-0 mb-1 font-semibold">{title}</p>
-			{/if}
-			<div class="prose-sm [&_p]:my-1 [&_p:last-child]:mb-0">
-				{@render children?.()}
-			</div>
-		</div>
-	</div>
-</aside>
+<Alert.Root class={cn('not-prose my-6 border-l-4 px-4 py-3', variantClasses[type])}>
+	<Icon />
+	{#if title}
+		<Alert.Title class="font-semibold">{title}</Alert.Title>
+	{/if}
+	<Alert.Description class="text-current [&_p]:my-1 [&_p:last-child]:mb-0">
+		{@render children?.()}
+	</Alert.Description>
+</Alert.Root>
