@@ -48,7 +48,7 @@ The web UI's **Operations** → **Dead queue** view surfaces the same envelopes 
 
 Two modes are supported.
 
-**Drain-and-cut** (simpler, brief outage). Pause new work, wait for all queues to drain, update `.env` on all three services, restart. Total outage is whatever your slowest queue takes to clear — usually under a minute.
+**Drain-and-cut** (simpler, brief outage). Pause new work, wait for all queues to drain, update `.env` on all three services, restart. Total outage is whatever your slowest queue takes to clear, usually under a minute.
 
 **Overlap rotation** (zero downtime, requires the secondary-key env var). The verifier accepts two keys at once. The producer signs with only the primary:
 
@@ -65,7 +65,7 @@ The overlap window only needs to be longer than your longest task queue's reside
 - Compliance-driven scheduled rotation (annual is a typical interval).
 - After a Valkey instance is replaced with one whose authentication you can't audit.
 
-You don't rotate after a routine config change, an unrelated incident, or "just in case". The key is symmetric and shared; rotation is operationally non-trivial. Treat it like rotating a database password — meaningful, deliberate, infrequent.
+You don't rotate after a routine config change, an unrelated incident, or "just in case". The key is symmetric and shared; rotation is operationally non-trivial. Treat it the way you'd treat rotating a database password: meaningful, deliberate, infrequent.
 
 ## What this doesn't protect
 
