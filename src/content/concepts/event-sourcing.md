@@ -2,6 +2,8 @@
 
 Every state-changing operation in Power Manage appends an immutable event to the `events` table. Read paths consult **projection tables** (`*_projection`) that are kept up to date by Go-side **projector listeners** that fire post-commit. The events table itself is the canonical audit log.
 
+{% flow name="event-sourcing-write" /%}
+
 ## Why not just mutate the projection directly?
 
 Mutating the projection directly would buy ~5ms of write latency but cost us:

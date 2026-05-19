@@ -2,30 +2,7 @@
 
 Power Manage is split into four runtime components plus a Postgres + Valkey backing store.
 
-```
-       Web UI / CLI                  Agents
-         (JWT)                       (mTLS)
-            │                          │
-            ▼                          ▼
-    ┌────────────────┐          ┌────────────┐
-    │ Control server │          │  Gateway   │
-    │  (Connect-RPC) │◄────────►│  (mTLS bidi│
-    │   :8081 / TLS  │  proxy   │   stream)  │
-    └────────┬───────┘  mTLS    └─────┬──────┘
-             │                        │
-             ▼                        ▼
-       ┌──────────┐              ┌─────────┐
-       │ Postgres │◄─── Asynq ───┤ Valkey  │
-       │  (events │              │ (task   │
-       │   store) │              │  queue) │
-       └────┬─────┘              └─────────┘
-            │
-            ▼
-       ┌──────────┐
-       │  Indexer │
-       │ (search) │
-       └──────────┘
-```
+{% flow name="control-gateway-agent" /%}
 
 ## Control server
 
