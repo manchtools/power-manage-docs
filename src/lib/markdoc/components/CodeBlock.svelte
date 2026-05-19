@@ -9,15 +9,15 @@
 	// Fenced code block. Two branches:
 	//
 	//   - language === 'mermaid' renders as a diagram via mermaid.js.
-	//     Dynamic-imported on first paint so the ~500KB bundle never
-	//     ships on pages without diagrams. Re-renders when the colour
-	//     mode flips so light/dark stays correct.
+	//     Dynamic-imported on mount so the ~500KB bundle never ships
+	//     on pages without diagrams. Re-renders when the colour mode
+	//     flips so light/dark stays correct. Theme variables resolve
+	//     from the shadcn CSS tokens at render time, so the diagram
+	//     picks up whatever palette the rest of the docs is using.
 	//
-	//   - everything else gets Shiki-highlighted. Picks a single theme
-	//     (github-light or github-dark) based on mode.current at
-	//     render time, so the inline `color:` and `background-color:`
-	//     Shiki emits on each span just work without any CSS-variable
-	//     juggling. Re-renders on mode flip the same way Mermaid does.
+	//   - everything else gets Shiki-highlighted on mount. Dynamic
+	//     import: zero added weight on initial paint, brief flash of
+	//     unhighlighted code on first render (acceptable for docs).
 
 	type Props = {
 		content: string;
@@ -42,24 +42,15 @@
 	onMount(() => {
 		if (isMermaid) {
 			diagramId = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
+			return; // handled by the theme-reactive effect below
 		}
-	});
-
-	// Highlight in a theme-reactive effect. Reading mode.current makes
-	// the effect re-run on every light/dark flip, so Shiki re-renders
-	// the code with the matching theme. Single-theme output means
-	// Shiki sets inline `color:` and `background-color:` directly on
-	// each span/pre — no CSS-variable indirection, no override risk
-	// from the typography plugin's .prose pre defaults.
-	$effect(() => {
-		if (isMermaid) return;
-		const theme = mode.current === 'dark' ? 'github-dark' : 'github-light';
 		void (async () => {
 			try {
 				const { codeToHtml } = await import('shiki');
 				highlighted = await codeToHtml(content.trimEnd(), {
 					lang: language,
-					theme
+					themes: { light: 'github-light', dark: 'github-dark' },
+					defaultColor: false
 				});
 			} catch (err) {
 				console.warn('[CodeBlock] highlight failed', { language, err });
@@ -278,4 +269,20 @@
 		fill: var(--background) !important;
 	}
 
+	/* Shiki dual-theme output: with defaultColor:false, every span
+	   carries inline --shiki-light + --shiki-dark CSS variables, but
+	   nothing reads them. These two rules pick the right one based on
+	   the document's dark-mode class. All other styling (border,
+	   padding, background of the pre itself) belongs to the typography
+	   plugin's .prose pre rule and we deliberately don't touch it. */
+	:global(.shiki),
+	:global(.shiki span) {
+		color: var(--shiki-light);
+		background-color: var(--shiki-light-bg);
+	}
+	:global(html.dark .shiki),
+	:global(html.dark .shiki span) {
+		color: var(--shiki-dark);
+		background-color: var(--shiki-dark-bg);
+	}
 </style>
