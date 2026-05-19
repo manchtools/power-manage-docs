@@ -4,6 +4,26 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* shadcn-svelte's installed components write classes like
+   data-active:bg-background. Tailwind v4's built-in data-* shorthand
+   targets attribute presence ([data-active]), but bits-ui v2 emits
+   data-state="active" / data-state="open" instead. Without these
+   custom variants the active-state styling never fires, which makes
+   tabs look stuck, dialogs lose their open transitions, command
+   palette items don't highlight, etc.
+
+   The list mirrors the data-state values bits-ui actually emits and
+   that shadcn-svelte's components rely on. Add new ones here if a
+   future component pulls in a different state name. */
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-selected (&[data-selected]);
+@custom-variant data-disabled (&[data-disabled]);
+@custom-variant data-checked (&[data-state="checked"]);
+@custom-variant data-indeterminate (&[data-state="indeterminate"]);
+@custom-variant data-pressed (&[data-state="on"]);
+
 /* Theme tokens mirrored from web/src/app.css so the docs site and
    the product UI feel visually identical. Keep them in lock-step —
    if the product palette shifts, mirror the change here. */
