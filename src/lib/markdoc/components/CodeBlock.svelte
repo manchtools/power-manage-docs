@@ -292,17 +292,20 @@
 	   This is straight from the official Shiki guide:
 	   https://shiki.style/guide/dual-themes */
 
-	/* Tint the pre's light-mode background. github-light ships #fff
-	   which has no contrast against the page background. var(--muted)
-	   is shadcn's neutral surface token, so the code block sits as a
-	   distinct surface against the prose without looking jarring.
-	   !important beats Shiki's inline style="background-color:#fff". */
+	/* Tint the pre background with var(--muted) in BOTH modes so it
+	   matches the inline <code> chip in both light and dark. Without
+	   this, dark mode would fall back to Shiki's github-dark bg
+	   (#24292e) which is a different shade than --muted's dark value.
+	   !important beats Shiki's inline style="background-color:..."
+	   on the pre. */
 	:global(.shiki) {
 		background-color: var(--muted) !important;
 	}
+	/* Swap to the dark theme's token colours when html.dark is on.
+	   Background is intentionally NOT set here — the rule above
+	   covers both modes for the pre. */
 	:global(html.dark .shiki),
 	:global(html.dark .shiki span) {
 		color: var(--shiki-dark) !important;
-		background-color: var(--shiki-dark-bg) !important;
 	}
 </style>
