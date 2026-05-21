@@ -74,4 +74,4 @@ Pruning the table breaks projector replay, so don't drop rows. If retention matt
 2. Keep a Postgres snapshot at retention boundary (yearly is typical).
 3. Trust the SIEM for queries older than the snapshot horizon.
 
-The control server's `doctor` subcommand (landing in 2026.06) will include a retention-report tool to estimate the cost of a given retention horizon.
+A retention-report tool to estimate the cost of a given retention horizon is on the [Roadmap](/operations/roadmap) — the form (CLI subcommand, internal RPC, or dashboard widget) hasn't been decided yet.

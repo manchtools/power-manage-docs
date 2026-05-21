@@ -55,5 +55,5 @@ desired_state: PRESENT
 - The pre-shared key only matters for the very first rotation on a device. After that the agent uses its own managed passphrase. Don't reuse the PSK across many devices; it gets you owned-keyslot ownership and that's it.
 - TPM enrolment is best-effort. If the device has no TPM, `device_bound_key_type=TPM` falls back to passphrase-only and logs a warning to the audit log. The action doesn't fail.
 - Rotating breaks any external tools that have a saved LUKS passphrase. If you have a separate recovery key in a keyslot, it survives rotation. The managed slot is the only one that gets rewritten.
-- The current managed passphrase is retrievable through the web UI's device-detail page under **Encryption** for users with the `ReadEncryptionPassphrase` permission. Every access is audit-logged.
+- The current managed passphrase is retrievable through the web UI's device-detail page under **Encryption** for users with the `GetDeviceLuksKeys` permission (RPC: `GetDeviceLuksKeys`). Every access is audit-logged.
 - `desired_state: ABSENT` removes the agent's local state but does *not* unenroll the managed keyslot. Use `cryptsetup luksRemoveKey` manually if you need to fully decommission.

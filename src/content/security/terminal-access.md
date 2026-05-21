@@ -55,7 +55,7 @@ Four RBAC permissions cover the terminal lifecycle:
 
 A scoped `StartTerminal:assigned` variant restricts you to devices you've been assigned. Use it for support engineers who shouldn't see the whole fleet.
 
-The 2026.06 milestone introduces two preset roles, `TerminalAdminLimited` and `TerminalAdminFull`, that bundle these permissions with the right scopes. Until that lands you assemble them yourself.
+Build the role from those permissions yourself via `CreateRole` (or the web UI's **Roles** → **Create role**). There are no preset terminal-admin roles seeded by default — the granularity is intentional, since "can start a session" and "can kill someone else's session" usually belong to different operators.
 
 ## What's recorded
 

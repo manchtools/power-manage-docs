@@ -4,7 +4,7 @@ A long page on purpose. Search ("Search docs…" in the top nav, or ⌘K) for th
 
 ## Agent issues
 
-### `pm-enroll` says "registration token rejected"
+### `power-manage-agent enroll` says "registration token rejected"
 
 Three things to check, in order:
 
@@ -31,7 +31,7 @@ A clean TLS handshake plus a redirect to the SNI passthrough is what you want. C
 | TLS handshake fails | `GATEWAY_DOMAIN` in `.env` doesn't match the actual public DNS name |
 | Connection succeeds but mTLS fails | Agent cert was signed by a CA the gateway doesn't trust (usually means the gateway has been redeployed without the same CA bundle) |
 
-For the mTLS case, the gateway's logs show `tls: client certificate signed by unknown authority`. Re-mount the CA bundle volume or unenrol + re-enrol the agent (single-use registration token, then `pm-enroll` again) so its cert is signed by the current CA.
+For the mTLS case, the gateway's logs show `tls: client certificate signed by unknown authority`. Re-mount the CA bundle volume or unenrol + re-enrol the agent (single-use registration token, then `power-manage-agent enroll` again) so its cert is signed by the current CA.
 
 ### Agent shows "offline" in the UI but the process is running
 

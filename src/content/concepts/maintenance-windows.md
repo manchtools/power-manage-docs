@@ -2,7 +2,7 @@
 
 A maintenance window is a time range, attached to a device group, during which actions assigned to that group are allowed to run. Outside the window, the agent queues the dispatch and runs it when the window opens.
 
-Windows are evaluated in the **device's local timezone**, not the operator's and not UTC. A "weeknights, 2 AM – 4 AM" window means 2 AM local on each device, so a fleet spread across timezones converges across its night.
+Windows are evaluated in the **device-local timezone**, not the operator's and not UTC. A "weeknights, 2 AM – 4 AM" window means 2 AM local on each device, so a fleet spread across timezones converges across its night.
 
 ## Why use them
 
@@ -23,7 +23,7 @@ You can have multiple windows on the same group. The union opens execution; outs
 
 ## How the agent enforces it
 
-When the gateway dispatches an assignment, the payload includes the action *and* the windows that apply (the group's plus any inherited from parent groups). The agent's `runDueActions()` loop checks the windows against the device's `time.Now()` in the configured local timezone and either runs the action or schedules a re-check at the next window edge.
+When the gateway dispatches an assignment, the payload includes the action *and* the windows that apply (the group's plus any inherited from parent groups). The agent's `runDueActions()` loop checks the windows against the device-local clock and either runs the action or schedules a re-check at the next window edge.
 
 There is no clock-skew tolerance: if the device's local time is wrong, windows misfire. The agent's offline scheduler caches windows so they keep working across disconnects.
 

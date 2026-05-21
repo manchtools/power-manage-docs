@@ -62,7 +62,7 @@ Optional toggles you may want to know about:
 | `CONTROL_ENCRYPTION_KEY_REQUIRED` | `true` | Fail-closed if `CONTROL_ENCRYPTION_KEY` is missing. Set to `false` to allow plaintext secrets in dev. |
 | `CONTROL_PASSWORD_AUTH_ENABLED` | `true` | When `false`, password sign-in is disabled fleet-wide and only SSO works. |
 | `CONTROL_SSH_ACCESS_FOR_ALL` | `false` | Auto-create `SSH` actions so every user can SSH to every device they have access to. |
-| `DYNAMIC_GROUP_EVAL_INTERVAL` | `5m` | How often dynamic device groups recompute their membership. |
+| `DYNAMIC_GROUP_EVAL_INTERVAL` | `1h` | How often dynamic device groups recompute their membership. |
 
 {% callout type="info" title="Passwords vs SSO" %}
 For SSO-only deployments, set `CONTROL_PASSWORD_AUTH_ENABLED=false` *after* you've added at least one OIDC identity provider. Otherwise you'll lock yourself out: the bootstrap admin can't sign in if password auth is off and no SSO is configured.
@@ -91,26 +91,15 @@ The stack runs six containers:
 
 On any Linux endpoint:
 
-{% tabs labels="curl, manual" initial="curl" %}
-{% tab label="curl" %}
-```bash
-curl -sSL https://control.example.com/install-agent.sh | sudo bash -s -- \
-  --gateway https://gateway.example.com \
-  --token <enrolment-token-from-web-UI>
-```
-{% /tab %}
-{% tab label="manual" %}
 ```bash
 sudo dpkg -i power-manage-agent_2026.06.0_amd64.deb
-sudo pm-enroll \
-  --gateway https://gateway.example.com \
-  --token <enrolment-token-from-web-UI>
 sudo systemctl enable --now power-manage-agent
+sudo power-manage-agent enroll \
+  -server https://control.example.com \
+  -token <enrolment-token-from-web-UI>
 ```
-{% /tab %}
-{% /tabs %}
 
-The agent registers through its local enrolment socket at `/run/pm-agent/enroll.sock`, gets a CA-signed client certificate (1-year validity, auto-renews at 80% lifetime), and starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
+The `enroll` subcommand also accepts a single URI argument: `power-manage-agent enroll 'power-manage://control.example.com?token=<token>'`. Either form talks to the running agent's local enrolment socket at `/run/pm-agent/enroll.sock`, which forwards the CSR to the control server. The control server signs a client certificate (1-year validity, auto-renews at 80% lifetime), and the agent starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
 
 ## Health checks
 

@@ -38,10 +38,10 @@ That's it. RPCs, file uploads, event subscriptions, the terminal WebSocket: all 
 
 ## CORS and your control server
 
-Your control server needs to allow the web UI's origin on its CORS allowlist. The default config covers `{{WEB_UI_URL}}`. If you've built your own client on a different origin, add it via `CONTROL_CORS_ALLOWED_ORIGINS` in `.env`:
+Your control server needs to allow the web UI's origin on its CORS allowlist. The default config covers `{{WEB_UI_URL}}`. If you've built your own client on a different origin, add it via `CONTROL_CORS_ORIGINS` in `.env`:
 
 ```bash
-CONTROL_CORS_ALLOWED_ORIGINS={{WEB_UI_URL}},https://ui.example.com
+CONTROL_CORS_ORIGINS={{WEB_UI_URL}},https://ui.example.com
 ```
 
 If sign-in fails with a network error and the browser console reports a CORS rejection, this is the setting to check.
