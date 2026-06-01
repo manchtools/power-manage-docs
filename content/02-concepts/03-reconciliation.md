@@ -48,4 +48,4 @@ If an operator changes an assignment while the agent is offline, the agent won't
 
 ## Forcing an out-of-band tick
 
-The `SYNC` action triggers a reconciliation immediately rather than waiting for the next interval. Useful when you've just made a change in the UI and want to see it land without waiting up to 5 minutes. See [SYNC](/action-reference/sync).
+The `SYNC` action triggers a reconciliation immediately rather than waiting for the next interval. Useful when you've just made a change in the UI and want to see it land without waiting up to 5 minutes. See [SYNC](/action-reference/system/sync).

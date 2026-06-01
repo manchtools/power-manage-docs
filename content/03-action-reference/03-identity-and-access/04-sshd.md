@@ -5,7 +5,7 @@ title: SSHD
 
 Manages `sshd_config` through priority-ordered drop-in fragments under `/etc/ssh/sshd_config.d/`. Each `SSHD` action lays down one fragment with one or more directives. Multiple `SSHD` actions can coexist; ordering is controlled by `priority`.
 
-For "who can SSH at all", use [`SSH`](/action-reference/ssh). For "what `sshd` does globally", use this.
+For "who can SSH at all", use [`SSH`](/action-reference/identity-and-access/ssh). For "what `sshd` does globally", use this.
 
 ## Parameters
 

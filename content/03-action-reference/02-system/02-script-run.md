@@ -3,15 +3,15 @@ title: SCRIPT_RUN
 ---
 # SCRIPT_RUN
 
-Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/shell), different semantics: `SCRIPT_RUN` is not idempotent. It runs every time it's dispatched and always reports `changed=true`.
+Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/system/shell), different semantics: `SCRIPT_RUN` is not idempotent. It runs every time it's dispatched and always reports `changed=true`.
 
 Use `SCRIPT_RUN` for things you want captured in the audit log without writing a detection script first: diagnostics, ad-hoc reports, one-shot data collection.
 
-For idempotent shell work, use [`SHELL`](/action-reference/shell) with a `detection_script`.
+For idempotent shell work, use [`SHELL`](/action-reference/system/shell) with a `detection_script`.
 
 ## Parameters
 
-Identical to `SHELL`. See [the SHELL reference](/action-reference/shell) for the full list. The `detection_script` and `is_compliance` fields are accepted but ignored.
+Identical to `SHELL`. See [the SHELL reference](/action-reference/system/shell) for the full list. The `detection_script` and `is_compliance` fields are accepted but ignored.
 
 ## Example
 

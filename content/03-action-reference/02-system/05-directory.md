@@ -3,7 +3,7 @@ title: DIRECTORY
 ---
 # DIRECTORY
 
-Manages a directory: presence, ownership, and mode. The complement to [`FILE`](/action-reference/file) for when you need a directory but not specific contents inside it.
+Manages a directory: presence, ownership, and mode. The complement to [`FILE`](/action-reference/system/file) for when you need a directory but not specific contents inside it.
 
 ## Parameters
 
