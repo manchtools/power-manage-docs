@@ -1,11 +1,23 @@
 <script lang="ts">
 	import '../app.css';
 	import { ModeWatcher } from 'mode-watcher';
+	import { afterNavigate } from '$app/navigation';
 	import TopNav from '$lib/components/top-nav.svelte';
 	import Sidebar from '$lib/components/sidebar.svelte';
 
 	type Props = { children?: import('svelte').Snippet };
 	const { children }: Props = $props();
+
+	// `main` is the internal scroll container in the fixed-viewport
+	// layout below, so SvelteKit's default scroll-to-top-of-window
+	// after navigation is a no-op for us. afterNavigate scrolls the
+	// main container itself, which is what the user actually sees —
+	// otherwise clicking the Prev/Next buttons (or any sidebar link)
+	// at the bottom of a long page lands the next page mid-scroll.
+	let mainEl = $state<HTMLElement | null>(null);
+	afterNavigate(() => {
+		mainEl?.scrollTo({ top: 0, behavior: 'instant' });
+	});
 </script>
 
 <ModeWatcher />
@@ -33,7 +45,7 @@
 		     render their content into this slot. The TOC sits inside
 		     the page-specific layout because the landing page doesn't
 		     have one. -->
-		<main class="min-w-0 flex-1 overflow-y-auto" data-pagefind-body>
+		<main bind:this={mainEl} class="min-w-0 flex-1 overflow-y-auto" data-pagefind-body>
 			{@render children?.()}
 		</main>
 	</div>

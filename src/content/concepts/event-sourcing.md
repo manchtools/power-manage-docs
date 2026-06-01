@@ -61,4 +61,4 @@ Decoder unit tests live in `internal/projectors/foo_test.go` with table-driven f
 
 `AppendEvent` auto-increments `stream_version` and retries internally on `23505` unique-constraint violations. `AppendEventWithVersion` takes a caller-supplied expected version; use it when the handler needs to assert nothing has touched the stream since it read the projection.
 
-[F-07](/security/threat-model) (the TOTP backup-code consume) is a worked example of using `AppendEventWithVersion` to race-protect a CQRS operation.
+The TOTP backup-code consume path is a worked example: the handler reads the projection to verify the code, then `AppendEventWithVersion` writes the consumed-event with the projection's version. If anything else touched the user stream in between, the append fails and the operation retries — the code can't be consumed twice by a concurrent caller.

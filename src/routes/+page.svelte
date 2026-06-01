@@ -55,7 +55,7 @@
 		</h1>
 		<p class="mt-6 text-lg leading-relaxed text-muted-foreground">
 			power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated
-			agents, an event-sourced audit log, OIDC and SCIM provisioning, and seventeen idempotent
+			agents, an event-sourced audit log, OIDC and SCIM provisioning, and twenty-three idempotent
 			action types covering packages, services, files, and LUKS rotation.
 		</p>
 		<div class="mt-8 flex flex-wrap gap-3">

@@ -10,31 +10,29 @@ The hosted web UI lives at **{{WEB_UI_URL}}**. Open it, enter your control-serve
 
 ## The trust model
 
-The web UI is a thin client. The host that serves you the SPA doesn't see your fleet's data.
+The web UI is a thin client. The host that serves you the SPA never sees your fleet's data or the JWT that authenticates you against your control server.
 
-The web host serves static files plus a small proxy for two things browsers refuse to do directly: OIDC callbacks, and asset rewriting for proxied avatars and screenshots. Everything else runs entirely in your browser. The JWT that authenticates you is issued by your control server, stored in your browser, and the web host never receives it. Database, event store, projections, action dispatches, agent traffic: all on your infrastructure.
+After sign-in, every RPC the UI makes — listing devices, dispatching actions, opening a terminal WebSocket, subscribing to events — goes **directly** from your browser to your control server. The JWT lives in your browser, is sent on those requests as a Bearer token, and never transits the web host. Database, event store, projections, action dispatches, agent traffic: all on your infrastructure.
 
-The web UI is a managed service. It's not open-source and not shipped for self-hosting. If you need an on-premise client (compliance, custom workflows, integration with internal tooling), build your own against the Connect-RPC API. Proto definitions in [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk) are the stable contract and generated TypeScript / Go clients ship from the same set.
+**The one exception is the OIDC sign-in flow.** The OAuth provider's redirect lands on the web host (because the host you brought up at `control.example.com` isn't where the OIDC `redirect_uri` is configured — see "OIDC redirect" below). For the duration of that single redirect, the OAuth `code` + `state` briefly transit the web host before the UI exchanges them with your control server. If you don't trust the web host to not log that code during its short transit, the only mitigation is to run your own UI — see the next paragraph.
+
+The web UI is a managed service. It's not open-source and not shipped for self-hosting today. If you need a fully on-premise client (regulated compliance regime, your own integration tooling, or simply wanting to fully control the OIDC redirect path), build your own against the Connect-RPC API. Proto definitions in [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk) are the stable contract and generated TypeScript / Go clients ship from the same set.
 
 ## Why a separate UI?
 
-Decoupled release cadence. The Connect-RPC surface is the stable contract; the UI iterates faster than the protocol changes. A UI bugfix doesn't require a server upgrade.
+The honest answer is sustainability. Keeping the UI as a managed service is what makes it possible to add paid features down the line and license a standalone build to companies that need full on-premise. The project's commitment: if it stops being actively maintained, the UI gets released under an open-source license alongside the server.
 
-Smaller server footprint. Operators who only want the API (CLI-only deployments, automation, integrations) don't carry a frontend build pipeline they aren't using.
-
-One UI, many servers. The same hosted UI connects to dev, staging, and production by changing the URL field on the sign-in screen. Support staff jumping between tenants don't need to remember three different bookmarks.
-
-Static hosting. The UI is a SPA. Static-plus-tiny-proxy is much cheaper and more available than hosting a stateful application server.
+Beyond the business angle, the technical side is real too: the Connect-RPC surface is the stable contract; the UI can iterate faster than the protocol because operators don't have to upgrade their server stack to get UI fixes. Operators who only want the API (CLI-only deployments, automation pipelines, integrations) don't carry a frontend build they aren't using.
 
 ## What the host actually proxies
 
 Two things.
 
-**OIDC redirect.** Identity providers don't always handle fragment-based callbacks well, so the OIDC redirect lands on the web host and the code gets forwarded to your control server. Your provider's `redirect_uri` allowlist needs the web host, not your control server.
+**OIDC redirect.** Most identity providers want a fixed allowlisted `redirect_uri` they trust ahead of time. The web host is the one well-known address that every operator's SPA shares, so the provider's callback lands here and the UI forwards the code to whichever control server the operator is signed into. The JWT exchange itself happens browser↔control; the web host only sees the OAuth code for the milliseconds between provider redirect and UI handoff.
 
-**Asset rewriting** for avatars and screenshots referenced by external URL, so the SPA doesn't have to do CORS preflights against arbitrary user-provided origins.
+**Asset rewriting** for image URLs that the UI displays (avatars, screenshots referenced by an external URL in audit events). The rewrite serves them through the web host's origin so the SPA doesn't trigger mixed-content warnings on third-party origins.
 
-That's it. RPCs, file uploads, event subscriptions, the terminal WebSocket: all of those connect from your browser to your control server with no intermediary.
+That's it. RPCs, event subscriptions, the terminal WebSocket: all of those connect from your browser to your control server with no intermediary.
 
 ## CORS and your control server
 
