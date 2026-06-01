@@ -17,7 +17,7 @@ flowchart LR
 
 ## Control server
 
-The control server is the only thing that **writes** to Postgres — every state change goes through its `AppendEvent` path. The indexer reads Postgres read-only as part of its drift-reconciliation loop (see below); the gateway and agent never touch Postgres at all.
+The control server is the only thing that **writes** to Postgres. Every state change goes through its `AppendEvent` path. The indexer reads Postgres read-only as part of its drift-reconciliation loop (see below); the gateway and agent never touch Postgres at all.
 
 It runs on `:8081` and hosts:
 
@@ -36,7 +36,7 @@ Multi-gateway topology is supported via Redis self-registration: each gateway pu
 
 ## Indexer
 
-The indexer is a stateless service that drains search-related events off Asynq and writes RediSearch indexes into Redis. It also runs a periodic reconciliation against Postgres (default every 1h, configurable) to repair drift if a write got lost — for that reconciliation pass it reads Postgres directly (read-only).
+The indexer is a stateless service that drains search-related events off Asynq and writes RediSearch indexes into Redis. It also runs a periodic reconciliation against Postgres (default every 1h, configurable) to repair drift if a write got lost. For that reconciliation pass it reads Postgres directly (read-only).
 
 Always run at least one indexer instance. Listing pages in the web UI (devices, actions, action sets, users, audit events, …) are search-backed; without an indexer, search returns nothing and those lists go blank. Scale to several instances if your search QPS gets serious.
 

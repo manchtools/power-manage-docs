@@ -27,7 +27,7 @@ Three different ways an action can run:
 
 **Reconciliation tick.** The default. The agent's loop notices the assignment, runs the action, reports. No-op on converged devices.
 
-**Schedule.** A cron expression or fixed interval attached to the assignment. Independent of the reconciliation tick — the action runs at the scheduled time even on devices that just reconciled. The offline scheduler keeps schedules firing while the agent is disconnected.
+**Schedule.** A cron expression or fixed interval attached to the assignment. Independent of the reconciliation tick: the action runs at the scheduled time even on devices that just reconciled. The offline scheduler keeps schedules firing while the agent is disconnected.
 
 **Instant.** Dispatched immediately over the agent's stream, bypassing the tick. `SYNC` and `REBOOT` work this way when dispatched from a device-detail page in the UI.
 

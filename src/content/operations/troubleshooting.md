@@ -74,7 +74,7 @@ The agent self-heals package manager locks before every package operation. If yo
 Three layers:
 
 1. **TOTP enabled but not entered.** If the account has TOTP, the password is only step 1. The sign-in form should show the TOTP prompt after the password; if it doesn't, the JS is broken (browser console will tell you). Try an incognito window in case it's a cached bundle.
-2. **Bootstrap admin password forgotten.** The bootstrap admin's credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and are written to the database on first boot only. Changing them in `.env` later does nothing — the user record already exists with the original (hashed) password. Another admin can reset it: web UI **Users** → user-detail → **Reset password**, which calls the `UpdateUserPassword` RPC. If you don't have another admin, recover the password from a Postgres backup or rebuild the bootstrap admin row directly via `psql`.
+2. **Bootstrap admin password forgotten.** The bootstrap admin's credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and are written to the database on first boot only. Changing them in `.env` later does nothing. The user record already exists with the original (hashed) password. Another admin can reset it: web UI **Users** → user-detail → **Reset password**, which calls the `UpdateUserPassword` RPC. If you don't have another admin, recover the password from a Postgres backup or rebuild the bootstrap admin row directly via `psql`.
 3. **CONTROL_PASSWORD_AUTH_ENABLED is false.** If you disabled password auth for SSO-only mode and your SSO provider isn't working, password fall-back is also blocked. Flip the env var back to `true`, restart the control container, sign in, then fix SSO.
 
 ### OIDC sign-in redirects to a CORS error
@@ -87,7 +87,7 @@ Set the IdP's `redirect_uri` to `https://app.power-manage.manchtools.com/auth/ca
 
 The SCIM bearer token is bcrypt-hashed at rest. If you copied it from the web UI when you created the provider, that was the only time it's visible. Once you save, it can't be retrieved.
 
-To fix, call `RotateSCIMToken` — in the UI: **Identity providers** → **SCIM** tab → **Rotate token** on the provider. A new token displays once. Copy it, then update the IdP's SCIM config with the new value.
+To fix, call `RotateSCIMToken` (in the UI: **Identity providers** → **SCIM** tab → **Rotate token** on the provider). A new token displays once. Copy it, then update the IdP's SCIM config with the new value.
 
 If the rotation also doesn't work, the IdP is rate-limited at the SCIM endpoint (10 requests/minute per slug). Wait a minute and retry.
 
@@ -129,7 +129,7 @@ Check the device's execution log for the action that immediately precedes the co
 
 ### Containers won't start: "permission denied" on the data volume
 
-Postgres and Valkey write to bind-mounted volumes. The container user ID needs write access to the host paths. The `setup.sh` script handles this; if you skipped it or moved the volumes, set the ownership manually:
+Postgres and Redis write to bind-mounted volumes. The container user ID needs write access to the host paths. The `setup.sh` script handles this; if you skipped it or moved the volumes, set the ownership manually:
 
 ```bash
 sudo chown -R 999:999 ./deploy/data/postgres
@@ -157,7 +157,7 @@ docker compose logs traefik --since=5m | grep -i acme
 
 ### Control container exits with "encryption key required"
 
-`CONTROL_ENCRYPTION_KEY_REQUIRED=true` (the default) means the control server refuses to boot without a valid 64-hex-char `CONTROL_ENCRYPTION_KEY`. The default is intentional — encrypted secrets at rest is on by default, fail-closed.
+`CONTROL_ENCRYPTION_KEY_REQUIRED=true` (the default) means the control server refuses to boot without a valid 64-hex-char `CONTROL_ENCRYPTION_KEY`. The default is intentional. Encrypted secrets at rest is on by default, fail-closed.
 
 For dev environments where you genuinely don't want at-rest encryption, set `CONTROL_ENCRYPTION_KEY_REQUIRED=false` in `.env`. Do not do this in prod.
 
@@ -191,7 +191,7 @@ docker compose exec valkey valkey-cli FT._LIST
 docker compose exec valkey valkey-cli FT.INFO devices_idx
 ```
 
-`last_indexing_finished_time` on the index shows when it was last rebuilt. The `RebuildSearchIndex` RPC on the control server triggers a forced rebuild — the web UI exposes it under **Settings** → **Search** for any user with the `RebuildSearchIndex` permission.
+`last_indexing_finished_time` on the index shows when it was last rebuilt. The `RebuildSearchIndex` RPC on the control server triggers a forced rebuild. The web UI exposes it under **Settings** → **Search** for any user with the `RebuildSearchIndex` permission.
 
 ## Diagnostic commands cheat-sheet
 
@@ -208,7 +208,7 @@ docker compose exec postgres psql -U powermanage -d powermanage -c '\dt'
 docker compose exec postgres psql -U powermanage -d powermanage \
     -c "select stream_type, count(*) from events group by 1 order by 2 desc limit 10"
 
-# Valkey / Asynq queue depth
+# Redis / Asynq queue depth
 docker compose exec valkey valkey-cli INFO keyspace
 docker compose exec valkey valkey-cli KEYS 'asynq:queues:*' | head
 

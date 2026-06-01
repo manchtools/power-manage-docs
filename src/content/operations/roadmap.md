@@ -34,7 +34,7 @@ The remote terminal landed earlier; this phase ships its proper authorisation mo
 
 ### Phase 3: operability (week 8)
 
-- A health-check / diagnostic surface for the stack: certificate expiry, Postgres replication lag (if applicable), Valkey memory, Asynq dead queue, indexer drift, retention horizon. Form not yet decided (CLI subcommand vs. internal RPC vs. dashboard widget).
+- A health-check / diagnostic surface for the stack: certificate expiry, Postgres replication lag (if applicable), Redis memory, Asynq dead queue, indexer drift, retention horizon. Form not yet decided (CLI subcommand vs. internal RPC vs. dashboard widget).
 - `SECURITY.md` covering the threat model, trust boundaries, secret handling, and the rotation playbooks.
 - Five ADRs:
   - mTLS identity
@@ -60,7 +60,7 @@ Indicative, not committed:
 - **Group variables** with proper secret tainting. Lets you parameterise actions per group without hard-coding values into the action body.
 - **Native dashboards.** Per-fleet / per-group views combining inventory, compliance, and execution metrics. Without these you can already wire Grafana against the audit-log export, but the in-app version reduces the integration burden.
 - **Cryptographic checkpointing of the audit log.** Off-host hash chains and signed periodic anchors for stronger tamper-evidence than the schema-level append-only.
-- **Multi-region gateway topology.** Already partly supported via Valkey self-registration; the milestone makes it documented and tested.
+- **Multi-region gateway topology.** Already partly supported via Redis self-registration; the milestone makes it documented and tested.
 
 ## Where to follow along
 

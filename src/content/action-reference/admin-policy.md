@@ -58,6 +58,6 @@ desired_state: PRESENT
 ## Gotchas
 
 - `visudo -c` runs on the rendered file before install. If it fails, the policy doesn't land and the action errors. Useful guard against syntactically-bad CUSTOM configs.
-- The `LIMITED` template's deny list is the safety net. Don't rely on it as a security boundary; an interactive shell inside any allowed command can still escalate via tricks like `vi :!sh`. For genuine restricted shell access, pair this with a custom role that scopes `StartTerminal` to a small target set — see [Terminal access](/security/terminal-access).
+- The `LIMITED` template's deny list is the safety net. Don't rely on it as a security boundary; an interactive shell inside any allowed command can still escalate via tricks like `vi :!sh`. For genuine restricted shell access, pair this with a custom role that scopes `StartTerminal` to a small target set (see [Terminal access](/security/terminal-access)).
 - DOAS backend uses `/etc/doas.d/` (modern doas) or appends to `/etc/doas.conf` on older systems. The agent picks the right path based on the doas version it finds.
 - Group names are derived from the action ID and capped at 32 chars. Long action IDs get a stable hash-based truncation, so collisions don't happen even with very similar action names.

@@ -25,4 +25,4 @@ type: REBOOT
 - The 5-minute delay is fixed. Use `SHELL` with `shutdown -r +<n>` if you need a different timing.
 - The wall message is hard-coded. Customisation lands with the upcoming notification subsystem.
 - A reboot dispatched while the agent is offline runs as soon as the agent's offline scheduler ticks after reconnect. Set `expires_at` on the assignment if you don't want a stale reboot landing days later.
-- The action's signature is verified before the agent acts, so a compromised gateway or Valkey can't trigger a fleet-wide reboot.
+- The action's signature is verified before the agent acts, so a compromised gateway or Redis can't trigger a fleet-wide reboot.

@@ -34,7 +34,7 @@ Compose with `and`, `or`, `not`, and parentheses. An empty query matches every d
 | `labels.environment equals "production"` | every production device |
 | `device.os equals "linux" and labels.role in "web,api"` | Linux web and api hosts |
 | `not labels.role equals "deprecated"` | everything not flagged for removal |
-| (empty) | every registered device — what the **All Devices** seed group uses |
+| (empty) | every registered device (what the **All Devices** seed group uses)|
 
 {% callout type="info" title="All Devices" %}
 A built-in dynamic group called "All Devices" is seeded on first boot. Its query is empty, so it matches every registered device. Use it as the default target for fleet-wide actions.

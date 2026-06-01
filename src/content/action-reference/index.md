@@ -52,7 +52,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `AGENT_UPDATE` | Self-update the agent binary. SHA-256 verified, swap-and-restart. |
 
-Both `REBOOT` and `SYNC` ship as instant actions, signed over `(actionID, type, "{}")`. The agent verifies the signature before doing anything, so a compromised Valkey can't forge a fleet-wide reboot.
+Both `REBOOT` and `SYNC` ship as instant actions, signed over `(actionID, type, "{}")`. The agent verifies the signature before doing anything, so a compromised Redis can't forge a fleet-wide reboot.
 
 ## Conventions
 

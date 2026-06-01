@@ -26,8 +26,8 @@ sudo power-manage-agent tty disable
 flowchart LR
     Operator[Operator<br/>web UI] -->|StartTerminal RPC| Control[Control server]
     Control -->|sign session| Control
-    Control -->|enqueue| Valkey[(Valkey)]
-    Valkey -->|dispatch| Gateway[Gateway]
+    Control -->|enqueue| Redis[(Redis)]
+    Redis -->|dispatch| Gateway[Gateway]
     Gateway -->|WebSocket :8443| Agent[Agent]
     Agent -->|spawn pty| Shell[Local shell]
     Operator -.->|browser WebSocket| Gateway
@@ -55,7 +55,7 @@ Four RBAC permissions cover the terminal lifecycle:
 
 A scoped `StartTerminal:assigned` variant restricts you to devices you've been assigned. Use it for support engineers who shouldn't see the whole fleet.
 
-Build the role from those permissions yourself via `CreateRole` (or the web UI's **Roles** → **Create role**). There are no preset terminal-admin roles seeded by default — the granularity is intentional, since "can start a session" and "can kill someone else's session" usually belong to different operators.
+Build the role from those permissions yourself via `CreateRole` (or the web UI's **Roles** → **Create role**). There are no preset terminal-admin roles seeded by default. The granularity is intentional, since "can start a session" and "can kill someone else's session" usually belong to different operators.
 
 ## What's recorded
 

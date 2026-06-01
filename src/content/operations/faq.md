@@ -16,7 +16,7 @@ The agent depends on Linux-specific subsystems (systemd / OpenRC / runit / s6 fo
 
 ## "How do I rotate the encryption key?"
 
-`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, SCIM bearer tokens, LUKS keys, LPS passwords). There's no built-in rotation tooling yet — every encrypted column has to be decrypted with the old key and re-encrypted with the new one as a manual migration.
+`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, SCIM bearer tokens, LUKS keys, LPS passwords). There's no built-in rotation tooling yet; every encrypted column has to be decrypted with the old key and re-encrypted with the new one as a manual migration.
 
 The honest path today:
 
@@ -25,7 +25,7 @@ The honest path today:
 3. Update `CONTROL_ENCRYPTION_KEY` in `.env` to the new value.
 4. Restart the control container.
 
-This is tracked as a real CLI subcommand under the upcoming `SECURITY.md` ADR ([Roadmap](/operations/roadmap)) — until then, write the migration script per-deploy or operate as if the key is permanent.
+This is tracked as a real CLI subcommand under the upcoming `SECURITY.md` ADR ([Roadmap](/operations/roadmap)) (until then, write the migration script per-deploy or operate as if the key is permanent.
 
 For `PM_TASK_SIGNING_KEY` rotation see [Asynq task signing](/security/task-signing).
 
@@ -39,13 +39,13 @@ Three things to keep in sync:
 | `.env` | The encryption key in here is what unlocks the event store. Lose it and the backup is useless. |
 | CA bundle | If you back up the event store but lose the agent CA, every enrolled agent has to re-enrol. |
 
-Daily `pg_dump` + off-host storage of `.env` + the contents of `deploy/data/ca/` covers all three. The Valkey state (Asynq queues, RediSearch indexes) is regenerable from the event store and doesn't need backup.
+Daily `pg_dump` + off-host storage of `.env` + the contents of `deploy/data/ca/` covers all three. The Redis state (Asynq queues, RediSearch indexes) is regenerable from the event store and doesn't need backup.
 
 ## "Can I run multiple gateways?"
 
 Yes. The control server doesn't care which gateway an agent is connected to; agent → gateway routing is done by Traefik's SNI passthrough.
 
-Stand up additional gateway containers on the same `pm-internal` Docker network with unique hostnames. Each gateway self-registers in Valkey on boot, and the control server enqueues tasks per device. Traefik's `gateway` router doesn't load-balance; each gateway accepts whichever agents land on it.
+Stand up additional gateway containers on the same `pm-internal` Docker network with unique hostnames. Each gateway self-registers in Redis on boot, and the control server enqueues tasks per device. Traefik's `gateway` router doesn't load-balance; each gateway accepts whichever agents land on it.
 
 For high availability, run gateways on separate hosts behind a load balancer or DNS round-robin. Agent reconnects automatically when its current gateway drops.
 
@@ -98,18 +98,18 @@ Agents keep doing their current scheduled work using their offline cache. They r
 
 So: short outages (minutes) are invisible to most operators. Long outages (hours) lose any actions that were supposed to be scheduled during the window, but converged-state actions continue running on agents.
 
-## "What happens if Valkey goes down?"
+## "What happens if Redis goes down?"
 
 The Asynq queue and the RediSearch indexes are gone. Concretely:
 
 - **New action dispatches** fail at the enqueue step. The control server returns an error to the operator.
 - **Search** stops working. Listing devices/users/actions still works (those come from Postgres projections); free-text search doesn't.
-- **Already-in-flight tasks** are lost — Asynq is in-memory in Valkey. When Valkey comes back, the queue is empty.
-- **Agents' bidi streams** stay open (they don't talk to Valkey directly).
+- **Already-in-flight tasks** are lost. Asynq is in-memory in Redis. When Redis comes back, the queue is empty.
+- **Agents' bidi streams** stay open (they don't talk to Redis directly).
 
-When Valkey restarts, the search index needs to be rebuilt. The control server exposes the `RebuildSearchIndex` RPC for that; in the web UI it's **Settings** → **Search** → **Rebuild index** (available to users with the `RebuildSearchIndex` permission).
+When Redis restarts, the search index needs to be rebuilt. The control server exposes the `RebuildSearchIndex` RPC for that; in the web UI it's **Settings** → **Search** → **Rebuild index** (available to users with the `RebuildSearchIndex` permission).
 
-For HA, the Compose stack isn't the right shape. Switch to a Valkey replica setup with Sentinel or run on a managed Redis-compatible service.
+For HA, the Compose stack isn't the right shape. Switch to a Redis replica setup with Sentinel or run on a managed Redis-compatible service.
 
 ## "Action vs. compliance policy: which do I use when?"
 
@@ -117,7 +117,7 @@ For HA, the Compose stack isn't the right shape. Switch to a Valkey replica setu
 |---|---|
 | The agent to make the assertion true | Assignment, `REQUIRED` mode |
 | To know about drift but not fix it | Compliance policy |
-| To know AND have the agent fix it | Both — assignment + policy with the same check |
+| To know AND have the agent fix it | Both, assignment + policy with the same check |
 
 The line is "make it so" vs. "tell me about it". See [Compliance](/concepts/compliance) for the full split.
 
@@ -135,4 +135,4 @@ Treat the bootstrap admin (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) as break-glass
 
 ## "Where do I file bugs?"
 
-[`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) for the server stack, `power-manage-agent` for agent issues, `power-manage-sdk` for proto / SDK questions. Include the server version (logged on container startup — `docker compose logs control --since=24h | grep '"starting control server"'`), a reproducer, and any relevant logs.
+[`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) for the server stack, `power-manage-agent` for agent issues, `power-manage-sdk` for proto / SDK questions. Include the server version (logged on container startup with `docker compose logs control --since=24h | grep '"starting control server"'`), a reproducer, and any relevant logs.

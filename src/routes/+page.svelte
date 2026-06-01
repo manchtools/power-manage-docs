@@ -42,7 +42,7 @@
 </script>
 
 <svelte:head>
-	<title>power-manage — Documentation</title>
+	<title>power-manage · Documentation</title>
 </svelte:head>
 
 <div class="px-6 py-12 lg:py-16 xl:px-12">

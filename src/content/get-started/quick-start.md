@@ -34,7 +34,7 @@ Five steps. About two minutes if you already know your way around the UI.
 
 ### 1. Tag your devices
 
-Open **Devices**, click into the agent you enrolled, and add a label. Convention is `key:value`. For this example, `environment:production`. Labels feed the dynamic-group query language alongside the device's inventory fields (`device.os`, `device.kernel`, `device.hostname`, …) and group membership — see [Dynamic groups](/concepts/dynamic-groups) for the full grammar.
+Open **Devices**, click into the agent you enrolled, and add a label. Convention is `key:value`. For this example, `environment:production`. Labels feed the dynamic-group query language alongside the device's inventory fields (`device.os`, `device.kernel`, `device.hostname`, …) and group membership. See [Dynamic groups](/concepts/dynamic-groups) for the full grammar.
 
 ### 2. Create the dynamic group
 
@@ -69,7 +69,7 @@ Open the `Install curl` action (still on the **Actions** page) and use the **Ass
 | Target | device group `production` |
 | Mode | `REQUIRED` |
 
-Save. On the next [reconciliation tick](/concepts/reconciliation) (default 5 minutes) every production agent picks up the dispatch. The same Assign flow is on the detail page for an action set, definition, or compliance policy — assignments are always created *from* whatever's being assigned.
+Save. On the next [reconciliation tick](/concepts/reconciliation) (default 5 minutes) every production agent picks up the dispatch. The same Assign flow is on the detail page for an action set, definition, or compliance policy. Assignments are always created *from* whatever's being assigned.
 
 ### 5. Watch it land
 

@@ -18,7 +18,7 @@ flowchart LR
 | Enrolment | The agent generates a key, sends a CSR through the local `enroll.sock` Unix socket gated by a single-use registration token. The control server signs a cert valid for **1 year**. |
 | Steady state | The agent presents the cert on every gateway connection. The gateway verifies the chain and the SPIFFE SAN. |
 | Renewal | At **80% of cert lifetime** (~292 days in), the agent calls `RenewCertificate` over its existing mTLS connection. The control server validates the fingerprint, issues a new cert, returns it. |
-| Revocation | Not implemented yet. The agent CA is the only revocation lever — rotate it to invalidate every issued cert at once. A `RevokeCertificate` RPC with a per-fingerprint gateway deny-list is on the [Roadmap](/operations/roadmap). |
+| Revocation | Not implemented yet. The agent CA is the only revocation lever; rotate it to invalidate every issued cert at once. A `RevokeCertificate` RPC with a per-fingerprint gateway deny-list is on the [Roadmap](/operations/roadmap). |
 
 The CA roots used to sign agent certs are separate from the gateway's server cert and from the control server's HTTPS cert. The 2026.06 milestone is finishing **CA role separation** so the agent CA, the inter-service CA, and the HTTPS CA are independently rotatable.
 
@@ -38,7 +38,7 @@ For every dispatch arriving over the bidirectional stream:
 
 1. **TLS handshake.** Gateway cert chain and hostname.
 2. **Stream identity.** The agent confirms the gateway is presenting a cert with the `gateway` SPIFFE class.
-3. **Envelope HMAC.** The Asynq task-signing key check (see [Asynq task signing](/security/task-signing)) catches Valkey tampering before the gateway forwards anything.
+3. **Envelope HMAC.** The Asynq task-signing key check (see [Asynq task signing](/security/task-signing)) catches Redis tampering before the gateway forwards anything.
 4. **Action signature.** The per-action RSA signature.
 5. **Action-type sanity.** The payload deserialises into the expected proto schema and passes inline validation.
 

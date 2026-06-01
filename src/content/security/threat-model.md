@@ -10,14 +10,14 @@ Eight trust boundaries. The list below is what each one is, then what it actuall
 4. **Agent to gateway.** mTLS with `RequireAndVerifyClientCert` and a SPIFFE peer-class SAN check.
 5. **Agent enrolment.** Local Unix socket `/run/pm-agent/enroll.sock`. Registration-token gated and rate limited.
 6. **Gateway to control InternalService.** Internal mTLS proxy for credential-bearing operations (LUKS keys, LPS passwords).
-7. **Control to and from Asynq / Valkey.** Every task payload is HMAC-signed with `PM_TASK_SIGNING_KEY`. The consumer verifies before handing off to the agent stream.
+7. **Control to and from Asynq / Redis.** Every task payload is HMAC-signed with `PM_TASK_SIGNING_KEY`. The consumer verifies before handing off to the agent stream.
 8. **Control to Postgres.** sqlc-generated queries. Secrets at rest go through AES-GCM with `CONTROL_ENCRYPTION_KEY`.
 
 ## What stays safe when something gets compromised
 
 The layers are stacked so no single compromise gives an attacker arbitrary action execution.
 
-A compromised **Valkey** can't forge a dispatch. The HMAC envelope catches it before the gateway forwards.
+A compromised **Redis** can't forge a dispatch. The HMAC envelope catches it before the gateway forwards.
 
 A compromised **gateway** can't forge a dispatch the agent will run. The CA signature on the action stops at the agent's verifier.
 

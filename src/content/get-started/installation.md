@@ -1,6 +1,6 @@
 # Installation
 
-power-manage deploys as a Compose stack. Six containers: Traefik, Postgres, Valkey (with RediSearch), the control server, the gateway, and the indexer. A `setup.sh` helper generates the cert chain, secrets, and `valkey.conf` so you don't have to assemble them by hand.
+power-manage deploys as a Compose stack. Six containers: Traefik, Postgres, Redis (with RediSearch), the control server, the gateway, and the indexer. A `setup.sh` helper generates the cert chain, secrets, and `valkey.conf` so you don't have to assemble them by hand.
 
 {% callout type="warn" title="No web UI is bundled" %}
 The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **{{WEB_UI_URL}}**. Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
@@ -25,7 +25,7 @@ cd power-manage-server/deploy
 ./setup.sh
 ```
 
-`setup.sh` prompts you through the required configuration on a fresh install and writes everything to `.env`. Re-running it is safe — any non-placeholder `.env` value is kept silently (to rotate a value, edit `.env` directly and re-run), and you'll be asked before regenerating any certificate under `deploy/certs/`. The rendered `valkey.conf` is always rewritten from the current `.env`, so a password change there picks up on next run.
+`setup.sh` prompts you through the required configuration on a fresh install and writes everything to `.env`. Re-running it is safe. Any non-placeholder `.env` value is kept silently; to rotate a value, edit `.env` directly and re-run. You'll be asked before regenerating any certificate under `deploy/certs/`. The rendered `valkey.conf` is always rewritten from the current `.env`, so a password change there picks up on next run.
 
 ## What goes in `.env`
 
@@ -42,7 +42,7 @@ ACME_EMAIL=ops@example.com
 POSTGRES_PASSWORD=<64 hex chars>
 INDEXER_POSTGRES_PASSWORD=<64 hex chars>
 
-# Valkey + Asynq HMAC
+# Redis + Asynq HMAC
 VALKEY_PASSWORD=<64 hex chars>
 PM_TASK_SIGNING_KEY=<64 hex chars>
 
@@ -85,11 +85,11 @@ The stack runs six containers:
 - **Redis** runs the Asynq task queue, the search indexes (RediSearch), and short-lived auth state.
 - **Control** serves the Connect-RPC API on `:8081` and the internal mTLS-protected `InternalService` on `:8082`.
 - **Gateway** terminates agent mTLS, runs the bidirectional Connect-RPC stream on `:8080`, and exposes the terminal WebSocket on `:8443`.
-- **Indexer** consumes events off Valkey and writes RediSearch indexes. Stateless. Run more than one if you want.
+- **Indexer** consumes events off Redis and writes RediSearch indexes. Stateless. Run more than one if you want.
 
 ## Enrolling your first agent
 
-The agent ships as a single `install.sh` published with every release. It downloads the binary, sets up the systemd unit, and enrols against the control server — all in one step. There's no `.deb` or `.rpm` package today; the curl pipe is the only supported install path.
+The agent ships as a single `install.sh` published with every release. It downloads the binary, sets up the systemd unit, and enrols against the control server in one step. There's no `.deb` or `.rpm` package today; the curl pipe is the only supported install path.
 
 On any Linux endpoint, generate an enrolment token from the web UI (**Devices** → **Enrolment tokens** → **Create token**) and then:
 
