@@ -8,7 +8,7 @@ The server stack does not include a web UI. It exposes a Connect-RPC API only. T
 
 ## Prerequisites
 
-- A Linux host with Docker 24+ or Podman 4.5+ and the Compose plugin
+- Docker 24+ or Podman 4.5+ and the Compose plugin
 - Two DNS names pointing at the host: one for the web UI (`control.example.com`), one for the agent gateway (`gateway.example.com`). If you plan to use the remote terminal, a third name (`tty.example.com`) too.
 - TCP port 443 reachable from the public internet (Traefik handles Let's Encrypt; the gateway uses SNI-based TCP passthrough)
 - `openssl` and `bash` on the host
@@ -25,7 +25,7 @@ cd power-manage-server/deploy
 ./setup.sh
 ```
 
-`setup.sh` prompts you through the required configuration and writes everything to `.env`. Re-running it is safe; existing values stay put unless you opt to regenerate them.
+`setup.sh` prompts you through the required configuration on a fresh install and writes everything to `.env`. Re-running it is safe — any non-placeholder `.env` value is kept silently (to rotate a value, edit `.env` directly and re-run), and you'll be asked before regenerating any certificate under `deploy/certs/`. The rendered `valkey.conf` is always rewritten from the current `.env`, so a password change there picks up on next run.
 
 ## What goes in `.env`
 
