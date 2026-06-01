@@ -82,24 +82,51 @@ The stack runs six containers:
 
 - **Traefik** terminates TLS and routes traffic. SNI-based TCP passthrough sends agent mTLS straight to the gateway.
 - **Postgres** holds the event store and projections.
-- **Valkey** runs the Asynq task queue, the search indexes (RediSearch), and short-lived auth state.
+- **Redis** runs the Asynq task queue, the search indexes (RediSearch), and short-lived auth state.
 - **Control** serves the Connect-RPC API on `:8081` and the internal mTLS-protected `InternalService` on `:8082`.
 - **Gateway** terminates agent mTLS, runs the bidirectional Connect-RPC stream on `:8080`, and exposes the terminal WebSocket on `:8443`.
 - **Indexer** consumes events off Valkey and writes RediSearch indexes. Stateless. Run more than one if you want.
 
 ## Enrolling your first agent
 
-On any Linux endpoint:
+The agent ships as a single `install.sh` published with every release. It downloads the binary, sets up the systemd unit, and enrols against the control server — all in one step. There's no `.deb` or `.rpm` package today; the curl pipe is the only supported install path.
+
+On any Linux endpoint, generate an enrolment token from the web UI (**Devices** → **Enrolment tokens** → **Create token**) and then:
 
 ```bash
-sudo dpkg -i power-manage-agent_2026.06.0_amd64.deb
-sudo systemctl enable --now power-manage-agent
-sudo power-manage-agent enroll \
-  -server https://control.example.com \
-  -token <enrolment-token-from-web-UI>
+curl -fsSL https://github.com/manchtools/power-manage-agent/releases/latest/download/install.sh \
+  | sudo bash -s -- \
+    -s https://control.example.com \
+    -t <enrolment-token-from-web-UI>
 ```
 
-The `enroll` subcommand also accepts a single URI argument: `power-manage-agent enroll 'power-manage://control.example.com?token=<token>'`. Either form talks to the running agent's local enrolment socket at `/run/pm-agent/enroll.sock`, which forwards the CSR to the control server. The control server signs a client certificate (1-year validity, auto-renews at 80% lifetime), and the agent starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
+Use `--pre` to install the latest release candidate instead of the stable release.
+
+Useful flags (`--help` for the full list):
+
+| Flag | Default | What it does |
+|---|---|---|
+| `-s, --server URL` | — | Control-server URL the agent enrols against |
+| `-t, --token TOKEN` | — | Registration token from the web UI |
+| `--pre` | off | Install the latest prerelease instead of stable |
+| `-v, --version VERSION` | `latest` | Pin to a specific release tag (e.g. `v2026.06`) |
+| `-d, --data-dir DIR` | `/var/lib/power-manage` | Override the agent's data directory |
+| `--skip-download` | off | Use the binary already on disk at `-b` instead of fetching |
+| `--uninstall` | — | Remove the agent and its config |
+
+The install script registers the agent through a local enrolment socket at `/run/pm-agent/enroll.sock`. The control server signs a client certificate (1-year validity, auto-renews at 80% lifetime), and the agent starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
+
+### Re-enrolling an existing install
+
+If you ever need to swap to a different control server or refresh credentials after a CA rotation, the binary itself accepts an `enroll` subcommand:
+
+```bash
+sudo power-manage-agent enroll \
+  -server https://control.example.com \
+  -token <fresh-token>
+```
+
+Or the equivalent URI form: `power-manage-agent enroll 'power-manage://control.example.com?token=<token>'`. Both go through the same enrolment socket the install script uses, just without re-downloading the binary.
 
 ## Health checks
 
