@@ -1,6 +1,6 @@
 # Action reference
 
-The agent supports 23 action types grouped by what they manage. Where it makes sense, an action carries a desired state (`PRESENT` or `ABSENT`) so re-dispatching it against an already-converged device is a no-op. An assignment can also use `UNINSTALL` mode to force `ABSENT` on the action without rewriting it — see [Assignment modes](/concepts/assignments).
+The agent supports 23 action types grouped by what they manage. Where it makes sense, an action carries a desired state (`PRESENT` or `ABSENT`) so re-dispatching it against an already-converged device is a no-op. An assignment can also use `UNINSTALL` mode to force `ABSENT` on the action without rewriting the action itself.
 
 ## Packages and updates
 
