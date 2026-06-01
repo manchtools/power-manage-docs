@@ -1,122 +1,92 @@
 # power-manage Documentation
 
-The public docs site for [power-manage](https://github.com/manchtools/power-manage-server). SvelteKit 2 and Svelte 5 with Markdoc for content. Stack mirrors `web/`.
+Source for the public docs site at
+[docs.power-manage.manchtools.com](https://docs.power-manage.manchtools.com).
 
-## Stack
+This repo holds only **content + assets**. The rendering engine is
+[open-docs](https://github.com/manchtools/open-docs), shipped as a
+container image — bring up `compose.yml` and you get a searchable,
+themed docs site.
 
-- **SvelteKit 2** (Svelte 5, runes)
-- **Markdoc** for content (via `svelte-markdoc-preprocess`)
-- **Tailwind CSS 4** (`@tailwindcss/vite`)
-- **shadcn-svelte** components (`bits-ui` as the headless primitive layer)
-- **Shiki** for syntax highlighting (lazy-loaded on the client)
-- **mermaid** for diagrams in `mermaid` code fences, themed via shadcn tokens
-- **Pagefind** for full-text search (built into the static output at `build/pagefind/`)
-- **`svelte-adapter-bun`** for the runtime
-- **`mode-watcher`** for dark mode
-- **Lucide** icons
-
-## Development
-
-```bash
-bun install
-bun run dev
-```
-
-Dev server runs at `http://localhost:5173`. Hot reload covers content: save any `.md` under `src/content/` and the page rebuilds.
-
-## Build-time configuration
-
-Variables that get baked into the content at build time. Set them via env vars before `bun run build`.
-
-| Variable | Default | What it does |
-|---|---|---|
-| `PUBLIC_WEB_UI_URL` | `https://app.power-manage.manchtools.com` | Hosted web-UI URL. Replaces every `{{WEB_UI_URL}}` token in markdown sources. |
-| `BASE_PATH` | empty | Path prefix when the docs are hosted under a subpath (e.g. `/docs`). |
-
-Example:
-
-```bash
-PUBLIC_WEB_UI_URL=https://app.example.com bun run build
-```
-
-Tokens are pure string replace — no AST work, no need to escape anything as long as the value doesn't contain Markdoc-significant characters (URLs don't). The replacement happens in a preprocessor before Markdoc sees the file (see `svelte.config.js`).
-
-## Authoring content
-
-Drop a Markdown file under `src/content/<group>/<slug>.md`, then add an entry to the matching group in `src/lib/nav.ts`. The file system → URL mapping is automatic:
-
-| File path | URL |
-|---|---|
-| `src/content/get-started/installation.md` | `/get-started/installation` |
-| `src/content/foo/index.md` | `/foo` |
-| `src/content/concepts/architecture.md` | `/concepts/architecture` |
-
-Markdoc tags:
-
-- `{% callout type="info|warn|danger|success" title="..." %}` for highlighted blocks
-- `{% tabs initial="apt" %} {% tab label="apt" %} ... {% /tab %} {% /tabs %}` for tabbed content
-- `{% screenshot src="dashboard.png" dark="dashboard-dark.png" alt="..." caption="..." /%}` for screenshots. See [Adding screenshots](src/content/operations/screenshots.md) for the workflow.
-- Code fences (```` ```ts ````) get Shiki highlighting and a copy button
-- Code fences with `mermaid` render as a mermaid diagram themed via shadcn tokens
-
-Headings auto-generate anchors. The right-side TOC is built from the DOM at render time, so there's no separate index to maintain.
-
-## Build
-
-```bash
-bun run build
-```
-
-Produces `build/` (static + SvelteKit prerendered HTML) and `build/pagefind/` (the search index).
-
-## Project layout
+## Layout
 
 ```
-src/
-├── app.css                          shadcn theme tokens + .prose styles
-├── content/                         the .md files
-│   ├── get-started/
-│   ├── concepts/
-│   ├── action-reference/
-│   ├── security/
-│   └── operations/
-├── lib/
-│   ├── content.ts                   slug → loader map (via import.meta.glob)
-│   ├── nav.ts                       editorial sidebar order
-│   ├── utils.ts                     cn() + WithElementRef
-│   ├── components/
-│   │   ├── sidebar.svelte
-│   │   ├── top-nav.svelte
-│   │   ├── theme-toggle.svelte
-│   │   ├── toc.svelte
-│   │   ├── prev-next.svelte
-│   │   └── ui/                      shadcn-svelte components
-│   └── markdoc/
-│       ├── tags.svelte              tag registry (Callout, Tabs, Tab, Screenshot)
-│       ├── nodes.svelte             node overrides (Heading, Link, Fence)
-│       └── components/              Callout, CodeBlock, Tabs, Tab, Screenshot, …
-└── routes/
-    ├── +layout.svelte               top-nav + sidebar shell
-    ├── +layout.ts                   prerender = true
-    ├── +page.svelte                 landing hero
-    └── [...slug]/+page.{ts,svelte}  dynamic content route
-
-static/
-└── screenshots/                     PNG / WebP for {% screenshot %} tag
+content/                         markdown source
+  theme.css                      power-manage fuchsia brand overrides
+  01-get-started/                ← group order from NN- prefix
+    01-installation.md           ← page order from NN- prefix
+    02-web-ui.md
+    03-quick-start.md
+  02-concepts/...
+  03-action-reference/
+    index.md                     ← "Overview"
+    01-package.md ... 23-agent-update.md
+  04-security/...
+  05-operations/...
+static/                          favicons, OG card, screenshots
+compose.yml                      runtime composition (open-docs:latest)
 ```
 
-## Conventions
+The sidebar is derived entirely from the folder tree (numeric
+prefixes set order; frontmatter `title:` / `label:` set the displayed
+text). There is no nav config file to maintain.
 
-Patterns mirror `web/` where it makes sense:
+## Run locally
 
-- `cn()` for class merging (`clsx` plus `tailwind-merge`)
-- `WithElementRef<T>` for shadcn-style `bind:ref` props
-- `mode-watcher` for the dark-mode toggle
-- Same Tailwind tokens. Copy any visual change between `web/src/app.css` and `docs/src/app.css` in lock-step.
-- `@lucide/svelte/icons/*` for icons
-- CSP wired in `svelte.config.js` via `kit.csp.directives`
-- Defensive headers in `src/hooks.server.ts`
+```sh
+docker compose up
+# → http://localhost:3000
+```
+
+The container builds the site at start (~30s) with the mounted
+content baked in. Re-run `docker compose up -d --force-recreate`
+after editing markdown.
+
+## Authoring
+
+### Frontmatter
+
+```markdown
+---
+title: PACKAGE                   # full page heading override
+label: LPS (password rotation)   # short sidebar label override (optional)
+order: 2                         # within-group sort (optional; the NN- prefix sets it by default)
+---
+```
+
+### Markdoc tags
+
+Available out of the box from open-docs:
+
+- `{% callout type="info|warn|danger" title="…" %} … {% /callout %}`
+- `{% screenshot src="dashboard.png" alt="…" /%}`
+- `{% tabs %} {% tab title="…" %} … {% /tab %} {% /tabs %}`
+- `{% steps %} {% step %} … {% /step %} {% /steps %}`
+- `{% cards %} {% card title="…" href="…" %} … {% /card %} {% /cards %}`
+- `{% accordions %} {% accordion title="…" %} … {% /accordion %} {% /accordions %}`
+- `{% filetree %}…{% /filetree %}`
+- `{% badge variant="…" %}…{% /badge %}`
+- `{% embed src="…" /%}`
+
+### Tokens
+
+`{{WEB_UI_URL}}` in markdown resolves to the value of
+`PUBLIC_TOKEN_WEB_UI_URL` set in `compose.yml` (currently
+`https://app.power-manage.manchtools.com`). Add new tokens by setting
+more `PUBLIC_TOKEN_*` env vars in the compose service.
+
+### Screenshots
+
+Drop new shots into `static/screenshots/` and reference them with
+`{% screenshot src="my-shot.png" alt="..." /%}`. The tag prefixes
+`/screenshots/` automatically.
+
+## Deploying
+
+In production, run the same `compose.yml` behind a reverse proxy and
+expose port 3000 over TLS. The container is fully stateless — restart
+to rebuild.
 
 ## License
 
-MIT. The docs content under `src/content/` is power-manage project documentation under the same license as the project.
+[MIT](./LICENSE) — same as open-docs and the rest of power-manage.

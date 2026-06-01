@@ -1,0 +1,36 @@
+# power-manage docs — runtime composition.
+#
+# The repo holds only content + assets; the rendering engine is the
+# open-docs container. Bring the container up and it builds the site
+# at startup (~30s) with the mounted markdown baked in.
+#
+# Production deploy: replace the host-network port mapping with your
+# reverse-proxy (Traefik / Caddy) wiring. Everything else stays the
+# same.
+
+services:
+  docs:
+    image: ghcr.io/manchtools/open-docs:latest
+    container_name: power-manage-docs
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./content:/content:ro
+      - ./static:/static:ro
+    environment:
+      # Site chrome — these are baked into the build at container
+      # start. Edit and `docker compose up -d --force-recreate` to
+      # republish.
+      PUBLIC_BRAND_NAME: "power-manage"
+      PUBLIC_BRAND_TAGLINE: "docs"
+      PUBLIC_SITE_TITLE: "power-manage · Documentation"
+      PUBLIC_SITE_DESCRIPTION: "power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated agents, an event-sourced audit log, OIDC and SCIM provisioning, and twenty-three idempotent action types."
+      PUBLIC_REPO_URL: "https://github.com/manchtools/power-manage-docs"
+      PUBLIC_THEME_COLOR: "#D946EF"
+
+      # Token substitution in markdown: {{WEB_UI_URL}} resolves to
+      # whatever PUBLIC_TOKEN_WEB_UI_URL is set to at build time. The
+      # default points at the hosted web app; override in your
+      # deployment if you're shipping docs for a self-hosted instance.
+      PUBLIC_TOKEN_WEB_UI_URL: "https://app.power-manage.manchtools.com"

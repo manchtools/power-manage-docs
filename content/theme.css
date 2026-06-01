@@ -1,0 +1,27 @@
+/* power-manage docs theme overrides.
+   Tailwind / shadcn ships a neutral-grey palette by default; we
+   swap --primary, --ring, and a few sidebar/chart slots to the
+   brand fuchsia (#D946EF) so links, focus rings, and the landing
+   cards all pick up the brand color without a fork. */
+
+:root {
+	--primary: oklch(0.69 0.27 332.78);
+	--primary-foreground: oklch(0.985 0 0);
+	--ring: oklch(0.69 0.27 332.78);
+	--sidebar-primary: oklch(0.69 0.27 332.78);
+	--sidebar-primary-foreground: oklch(0.985 0 0);
+	--sidebar-ring: oklch(0.69 0.27 332.78);
+	--chart-1: oklch(0.69 0.27 332.78);
+	--chart-2: oklch(0.74 0.18 332.78);
+}
+
+.dark {
+	--primary: oklch(0.78 0.22 332.78);
+	--primary-foreground: oklch(0.145 0 0);
+	--ring: oklch(0.78 0.22 332.78);
+	--sidebar-primary: oklch(0.78 0.22 332.78);
+	--sidebar-primary-foreground: oklch(0.145 0 0);
+	--sidebar-ring: oklch(0.78 0.22 332.78);
+	--chart-1: oklch(0.78 0.22 332.78);
+	--chart-2: oklch(0.84 0.16 332.78);
+}
