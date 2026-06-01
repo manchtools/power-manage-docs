@@ -25,7 +25,7 @@
 	}
 </script>
 
-<ScrollArea class="h-[calc(100vh-3.5rem)] py-6 pr-2">
+<ScrollArea class="h-full py-6 pr-2">
 	<nav class="space-y-6 px-4 text-sm">
 		{#each nav as group (group.title)}
 			<div>

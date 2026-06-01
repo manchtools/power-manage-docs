@@ -61,7 +61,7 @@
 
 {#if headings.length > 1}
 	<aside class="hidden xl:block w-56 shrink-0 py-6">
-		<div class="sticky top-20 max-h-[calc(100vh-6rem)] overflow-auto pr-2 text-sm">
+		<div class="sticky top-6 max-h-[calc(100%-3rem)] overflow-auto pr-2 text-sm">
 			<p class="mb-2 font-semibold text-foreground/90">On this page</p>
 			<ul class="space-y-1 border-l border-border">
 				{#each headings as h (h.id)}

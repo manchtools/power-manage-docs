@@ -10,18 +10,22 @@
 
 <ModeWatcher />
 
-<div class="flex min-h-screen flex-col">
+<!-- Fixed-viewport layout. The outer container is exactly the
+     viewport height; the middle row owns the remaining vertical
+     space (viewport − topnav − footer). Sidebar and main each
+     scroll internally inside that row.
+
+     Why not document scroll: with the previous min-h-screen layout,
+     the sidebar's h-[calc(100vh-3.5rem)] forced the row to fill the
+     viewport minus the top-nav, and the footer then sat just past
+     the fold — producing an unwanted ~70px page scroll on short
+     pages. Internal scroll keeps the footer at the bottom of the
+     viewport and removes the duplicate h-calc in Sidebar. -->
+<div class="flex h-screen flex-col">
 	<TopNav />
 
-	<div class="container mx-auto flex w-full max-w-screen-2xl flex-1 px-4 lg:px-6">
-		<!-- Sidebar pinned in place via `sticky top-14`. The top-nav
-		     is sticky at the top of the viewport (h-14), so the
-		     sidebar lives directly below it and stays put while the
-		     main column scrolls. self-start prevents flex from
-		     stretching it to match content height. -->
-		<aside
-			class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 self-start border-r border-border md:block"
-		>
+	<div class="container mx-auto flex w-full max-w-screen-2xl flex-1 overflow-hidden px-4 lg:px-6">
+		<aside class="hidden h-full w-64 shrink-0 border-r border-border md:block">
 			<Sidebar />
 		</aside>
 
@@ -29,7 +33,7 @@
 		     render their content into this slot. The TOC sits inside
 		     the page-specific layout because the landing page doesn't
 		     have one. -->
-		<main class="min-w-0 flex-1" data-pagefind-body>
+		<main class="min-w-0 flex-1 overflow-y-auto" data-pagefind-body>
 			{@render children?.()}
 		</main>
 	</div>
