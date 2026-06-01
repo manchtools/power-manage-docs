@@ -23,10 +23,27 @@
 	function isActive(href: string): boolean {
 		return pathname === href;
 	}
+
+	// Auto-scroll the active link into view when the route changes.
+	// Without this, clicking a link in a long sidebar can land on a
+	// page whose nav entry is below the fold — the highlight is
+	// invisible until the user scrolls the sidebar manually. The
+	// nearest scrollable ancestor is the bits-ui ScrollArea viewport,
+	// which scrollIntoView resolves correctly. `block: 'nearest'`
+	// only scrolls when the element is actually out of view, so
+	// already-visible entries don't get re-positioned needlessly.
+	let navEl = $state<HTMLElement | null>(null);
+	$effect(() => {
+		// Track pathname so the effect re-runs on every route change.
+		pathname;
+		if (!navEl) return;
+		const active = navEl.querySelector<HTMLElement>('[data-active="true"]');
+		active?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+	});
 </script>
 
 <ScrollArea class="h-full py-6 pr-2">
-	<nav class="space-y-6 px-4 text-sm">
+	<nav bind:this={navEl} class="space-y-6 px-4 text-sm">
 		{#each nav as group (group.title)}
 			<div>
 				<h3 class="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -37,6 +54,7 @@
 						<li>
 							<a
 								href={base + item.href}
+								data-active={isActive(item.href)}
 								class={cn(
 									'block rounded-md px-2 py-1.5 transition-colors',
 									isActive(item.href)
