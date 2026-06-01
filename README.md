@@ -1,6 +1,6 @@
-# Power Manage Documentation
+# power-manage Documentation
 
-The public docs site for [Power Manage](https://github.com/manchtools/power-manage-server). SvelteKit 2 and Svelte 5 with Markdoc for content. Stack mirrors `web/`.
+The public docs site for [power-manage](https://github.com/manchtools/power-manage-server). SvelteKit 2 and Svelte 5 with Markdoc for content. Stack mirrors `web/`.
 
 ## Stack
 
@@ -119,4 +119,4 @@ Patterns mirror `web/` where it makes sense:
 
 ## License
 
-MIT. The docs content under `src/content/` is Power Manage project documentation under the same license as the project.
+MIT. The docs content under `src/content/` is power-manage project documentation under the same license as the project.

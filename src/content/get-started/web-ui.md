@@ -1,6 +1,6 @@
 # The web UI
 
-The Power Manage server doesn't ship with a web UI. It exposes a Connect-RPC API. The UI is a separate hosted service you point at your control server.
+The power-manage server doesn't ship with a web UI. It exposes a Connect-RPC API. The UI is a separate hosted service you point at your control server.
 
 If you brought the stack up and went looking for a sign-in page on `control.example.com`, that's why there isn't one.
 

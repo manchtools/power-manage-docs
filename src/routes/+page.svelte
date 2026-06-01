@@ -42,7 +42,7 @@
 </script>
 
 <svelte:head>
-	<title>Power Manage — Documentation</title>
+	<title>power-manage — Documentation</title>
 </svelte:head>
 
 <div class="px-6 py-12 lg:py-16 xl:px-12">
@@ -54,7 +54,7 @@
 			Linux fleet management,<br />declarative and audit-first
 		</h1>
 		<p class="mt-6 text-lg leading-relaxed text-muted-foreground">
-			Power Manage is an open-source platform for managing Linux endpoints. mTLS-authenticated
+			power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated
 			agents, an event-sourced audit log, OIDC and SCIM provisioning, and seventeen idempotent
 			action types covering packages, services, files, and LUKS rotation.
 		</p>

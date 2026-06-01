@@ -72,9 +72,9 @@ The full RPC surface (164 RPCs) is documented in the proto files at [`manchtools
 
 ## "How do I forward logs / events to my SIEM?"
 
-Power Manage does not ship a SIEM integration on the server side, and one isn't planned. The architectural split is:
+power-manage does not ship a SIEM integration on the server side, and one isn't planned. The architectural split is:
 
-- **Host-level events** (syslog, journald, file integrity, audit subsystem) are the **agent's** territory. Use the existing host tooling you already deploy via Power Manage (`filebeat`, `vector`, `fluent-bit`, `auditbeat`, whatever your SIEM vendor wants) to ship those off-host. The agent is the right place to install and configure these.
+- **Host-level events** (syslog, journald, file integrity, audit subsystem) are the **agent's** territory. Use the existing host tooling you already deploy via power-manage (`filebeat`, `vector`, `fluent-bit`, `auditbeat`, whatever your SIEM vendor wants) to ship those off-host. The agent is the right place to install and configure these.
 - **The audit log on the control server** is the events table in Postgres. The `ListAuditEvents` RPC exposes it for polling-style integrations if you want to write your own bridge, but it's unary (one call returns one page), not a stream. There's no planned server-side SIEM uploader to do this for you.
 
 For the host-tooling path, ship a `SHELL` or `FILE` action that drops the agent vendor's config and a `SERVICE` action that runs the daemon. Same as you'd manage any other system service.

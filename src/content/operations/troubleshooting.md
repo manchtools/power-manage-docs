@@ -79,7 +79,7 @@ Three layers:
 
 ### OIDC sign-in redirects to a CORS error
 
-The redirect URL configured on your IdP must point at the **web UI host**, not your control server. Power Manage's web UI handles the OIDC callback and forwards the code to your control server.
+The redirect URL configured on your IdP must point at the **web UI host**, not your control server. power-manage's web UI handles the OIDC callback and forwards the code to your control server.
 
 Set the IdP's `redirect_uri` to `https://app.power-manage.manchtools.com/auth/callback/<provider-slug>`. The slug is what you typed when you added the provider in the web UI.
 

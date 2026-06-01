@@ -41,7 +41,7 @@
 	<footer class="border-t border-border py-6 text-sm text-muted-foreground">
 		<div class="container mx-auto max-w-screen-2xl px-4 lg:px-6">
 			<p>
-				Power Manage docs — built with SvelteKit + Markdoc.
+				power-manage docs — built with SvelteKit + Markdoc.
 				<a
 					class="underline underline-offset-4 hover:text-foreground"
 					href="https://github.com/manchtools/power-manage-docs"

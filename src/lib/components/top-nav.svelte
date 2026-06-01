@@ -23,10 +23,10 @@
 		<a
 			href={base + '/'}
 			class="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
-			aria-label="Power Manage docs home"
+			aria-label="power-manage docs home"
 		>
 			<span class="inline-block size-6 rounded bg-primary"></span>
-			<span class="hidden sm:inline">Power Manage</span>
+			<span class="hidden sm:inline">power-manage</span>
 			<span class="hidden text-muted-foreground text-sm font-normal sm:inline">docs</span>
 		</a>
 
