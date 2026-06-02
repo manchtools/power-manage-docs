@@ -83,9 +83,25 @@ Drop new shots into `static/screenshots/` and reference them with
 
 ## Deploying
 
-In production, run the same `compose.yml` behind a reverse proxy and
-expose port 3000 over TLS. The container is fully stateless — restart
-to rebuild.
+`compose.prod.yml` drops the docs onto the power-manage Traefik that
+already runs the server stack. On the deploy host:
+
+```sh
+git clone https://github.com/manchtools/power-manage-docs.git
+cd power-manage-docs
+docker compose -f compose.prod.yml pull
+docker compose -f compose.prod.yml up -d
+```
+
+The container joins the `pm-internal` network (created by
+`server/deploy/compose.yml`) and Traefik picks it up by label —
+HTTPS-only on `power-manage.docs.manchtools.com`, Let's Encrypt
+certificate via the existing `letsencrypt` resolver. No host port is
+exposed; the only ingress is through Traefik.
+
+Updating content is a `git pull` plus
+`docker compose -f compose.prod.yml up -d --force-recreate`. The
+container is stateless — restart rebuilds.
 
 ## License
 

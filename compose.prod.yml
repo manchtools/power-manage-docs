@@ -1,0 +1,68 @@
+# power-manage docs — production deploy behind Traefik.
+#
+# Designed to drop in next to the power-manage server stack (which
+# already runs Traefik on the `pm-internal` network with the
+# `letsencrypt` cert resolver and `websecure` entrypoint).
+#
+# Usage on the deploy host:
+#
+#   git clone https://github.com/manchtools/power-manage-docs.git
+#   cd power-manage-docs
+#   docker compose -f compose.prod.yml pull
+#   docker compose -f compose.prod.yml up -d
+#
+# The container builds the site at start (~30s) with the mounted
+# markdown baked in, then serves on :3000 inside the pm-internal
+# network. Traefik picks it up by label and terminates TLS for
+# https://power-manage.docs.manchtools.com.
+#
+# No ports section — only Traefik talks to this container. Local
+# preview lives in compose.yml (port 3000 exposed on the host).
+#
+# Updating content: `git pull && docker compose -f compose.prod.yml \
+#   up -d --force-recreate` rebuilds with the new content.
+
+services:
+  docs:
+    image: ghcr.io/manchtools/open-docs:latest
+    container_name: power-manage-docs
+    restart: unless-stopped
+    volumes:
+      - ./content:/content:ro
+      - ./static:/static:ro
+    environment:
+      # Site chrome — baked in at container start. Edit and
+      # `up -d --force-recreate` to republish.
+      PUBLIC_BRAND_NAME: "power-manage"
+      PUBLIC_BRAND_TAGLINE: "docs"
+      PUBLIC_SITE_TITLE: "power-manage · Documentation"
+      PUBLIC_SITE_DESCRIPTION: "power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated agents, an event-sourced audit log, OIDC and SCIM provisioning, and twenty-three idempotent action types."
+      PUBLIC_REPO_URL: "https://github.com/manchtools/power-manage-docs"
+      PUBLIC_THEME_COLOR: "#D946EF"
+
+      # {{WEB_UI_URL}} in markdown → this hostname at build time.
+      PUBLIC_TOKEN_WEB_UI_URL: "https://app.power-manage.manchtools.com"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=pm-internal"
+      # Router: HTTPS-only on the websecure entrypoint, Let's
+      # Encrypt cert via the resolver the server stack already
+      # provisions.
+      - "traefik.http.routers.docs.rule=Host(`power-manage.docs.manchtools.com`)"
+      - "traefik.http.routers.docs.entrypoints=websecure"
+      - "traefik.http.routers.docs.tls.certresolver=letsencrypt"
+      # Mirror the X-Forwarded-Proto middleware control uses so the
+      # bun adapter knows requests originated over HTTPS when it
+      # generates absolute URLs.
+      - "traefik.http.routers.docs.middlewares=docs-headers"
+      - "traefik.http.middlewares.docs-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.services.docs.loadbalancer.server.port=3000"
+    networks:
+      - pm-internal
+
+networks:
+  # External: pm-internal is created and owned by the power-manage
+  # server stack (server/deploy/compose.yml). Docs joins it as a
+  # tenant so Traefik can route to us without a second proxy.
+  pm-internal:
+    external: true
