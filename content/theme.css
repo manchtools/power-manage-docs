@@ -6,10 +6,18 @@
    stay distinguishable from the indigo-primary product UI.
 
    Layered on top of the open-docs container's default tokens via
-   `import.meta.glob('/src/content/theme.css')` — overrides any token
-   the container's defaults set with the same name. */
+   `import.meta.glob('/src/content/theme.css')`.
 
-:root {
+   Selectors are compound (`:root:root` / `:root.dark`) on purpose to
+   bump specificity to (0,2,0). open-docs's own defaults land AFTER
+   theme.css in the bundled CSS — opposite of what
+   import.meta.glob's source-order suggests — so a plain `:root`
+   (0,1,0) loses on equal specificity. Doubling the selector wins
+   regardless of where Vite places the chunk. Upstream issue:
+   https://github.com/manchtools/open-docs — load theme.css after
+   app.css to make the workaround unnecessary. */
+
+:root:root {
 	/* surfaces — slate (identical to web) */
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.129 0.042 264.695);
@@ -68,7 +76,7 @@
 	--info-foreground: oklch(0.985 0 0);
 }
 
-.dark {
+:root.dark {
 	--background: oklch(0.129 0.042 264.695);
 	--foreground: oklch(0.984 0.003 247.858);
 	--card: oklch(0.208 0.042 265.755);
