@@ -1,27 +1,120 @@
-/* power-manage docs theme overrides.
-   Tailwind / shadcn ships a neutral-grey palette by default; we
-   swap --primary, --ring, and a few sidebar/chart slots to the
-   brand fuchsia (#D946EF) so links, focus rings, and the landing
-   cards all pick up the brand color without a fork. */
+/* power-manage docs — manchtools design system, fuchsia primary.
+
+   Mirrors manchtools-branding/global/open-secret-theme.css (the shared
+   slate-neutrals + brand-extension palette used by the web app and
+   every manchtools site) but swaps `--primary` to fuchsia so the docs
+   stay distinguishable from the indigo-primary product UI.
+
+   Layered on top of the open-docs container's default tokens via
+   `import.meta.glob('/src/content/theme.css')` — overrides any token
+   the container's defaults set with the same name. */
 
 :root {
-	--primary: oklch(0.69 0.27 332.78);
+	/* surfaces — slate (identical to web) */
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.129 0.042 264.695);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.129 0.042 264.695);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.129 0.042 264.695);
+
+	/* primary — Fuchsia #D946EF (the docs accent). brand-key
+	   below carries indigo so it's reachable from prose / callouts. */
+	--primary: oklch(0.667 0.258 322.1);
 	--primary-foreground: oklch(0.985 0 0);
-	--ring: oklch(0.69 0.27 332.78);
-	--sidebar-primary: oklch(0.69 0.27 332.78);
+
+	--secondary: oklch(0.968 0.007 247.896);
+	--secondary-foreground: oklch(0.208 0.042 265.755);
+	--muted: oklch(0.968 0.007 247.896);
+	--muted-foreground: oklch(0.554 0.046 257.417);
+
+	/* accent — faint fuchsia wash so hovers tint toward the docs brand */
+	--accent: oklch(0.962 0.024 322.1);
+	--accent-foreground: oklch(0.34 0.10 322);
+
+	--destructive: oklch(0.577 0.245 27.325);
+	--destructive-foreground: oklch(0.985 0 0);
+
+	--border: oklch(0.929 0.013 255.508);
+	--input: oklch(0.929 0.013 255.508);
+	--ring: oklch(0.667 0.258 322.1);
+
+	/* charts — fuchsia → violet → indigo → sky → teal (cool sweep) */
+	--chart-1: oklch(0.667 0.258 322.1);
+	--chart-2: oklch(0.606 0.214 293.4);
+	--chart-3: oklch(0.585 0.204 277.1);
+	--chart-4: oklch(0.685 0.149 233.9);
+	--chart-5: oklch(0.704 0.122 183.0);
+
+	/* sidebar */
+	--sidebar: oklch(0.984 0.003 247.858);
+	--sidebar-foreground: oklch(0.129 0.042 264.695);
+	--sidebar-primary: oklch(0.667 0.258 322.1);
 	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-ring: oklch(0.69 0.27 332.78);
-	--chart-1: oklch(0.69 0.27 332.78);
-	--chart-2: oklch(0.74 0.18 332.78);
+	--sidebar-accent: oklch(0.962 0.024 322.1);
+	--sidebar-accent-foreground: oklch(0.34 0.10 322);
+	--sidebar-border: oklch(0.929 0.013 255.508);
+	--sidebar-ring: oklch(0.667 0.258 322.1);
+
+	/* brand extensions — indigo as the inverse key, plus the standard
+	   semantic trio. Mirrors web's `--success` / `--warning` / `--info`. */
+	--brand-key: oklch(0.585 0.204 277.1); /* Indigo */
+	--brand-key-foreground: oklch(0.985 0 0);
+	--success: oklch(0.696 0.170 162.5);
+	--success-foreground: oklch(0.985 0 0);
+	--warning: oklch(0.828 0.162 84.4);
+	--warning-foreground: oklch(0.27 0.055 66);
+	--info: oklch(0.685 0.149 233.9);
+	--info-foreground: oklch(0.985 0 0);
 }
 
 .dark {
-	--primary: oklch(0.78 0.22 332.78);
-	--primary-foreground: oklch(0.145 0 0);
-	--ring: oklch(0.78 0.22 332.78);
-	--sidebar-primary: oklch(0.78 0.22 332.78);
-	--sidebar-primary-foreground: oklch(0.145 0 0);
-	--sidebar-ring: oklch(0.78 0.22 332.78);
-	--chart-1: oklch(0.78 0.22 332.78);
-	--chart-2: oklch(0.84 0.16 332.78);
+	--background: oklch(0.129 0.042 264.695);
+	--foreground: oklch(0.984 0.003 247.858);
+	--card: oklch(0.208 0.042 265.755);
+	--card-foreground: oklch(0.984 0.003 247.858);
+	--popover: oklch(0.208 0.042 265.755);
+	--popover-foreground: oklch(0.984 0.003 247.858);
+
+	--primary: oklch(0.747 0.207 321.9); /* Fuchsia, brighter for dark */
+	--primary-foreground: oklch(0.27 0.10 322);
+
+	--secondary: oklch(0.279 0.041 260.031);
+	--secondary-foreground: oklch(0.984 0.003 247.858);
+	--muted: oklch(0.279 0.041 260.031);
+	--muted-foreground: oklch(0.704 0.04 256.788);
+
+	--accent: oklch(0.31 0.062 322.0);
+	--accent-foreground: oklch(0.93 0.03 322.0);
+
+	--destructive: oklch(0.704 0.191 22.216);
+	--destructive-foreground: oklch(0.985 0 0);
+
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 15%);
+	--ring: oklch(0.747 0.207 321.9);
+
+	--chart-1: oklch(0.747 0.207 321.9);
+	--chart-2: oklch(0.681 0.196 293.0);
+	--chart-3: oklch(0.673 0.182 276.9);
+	--chart-4: oklch(0.723 0.142 233.0);
+	--chart-5: oklch(0.742 0.120 183.0);
+
+	--sidebar: oklch(0.208 0.042 265.755);
+	--sidebar-foreground: oklch(0.984 0.003 247.858);
+	--sidebar-primary: oklch(0.747 0.207 321.9);
+	--sidebar-primary-foreground: oklch(0.27 0.10 322);
+	--sidebar-accent: oklch(0.31 0.062 322.0);
+	--sidebar-accent-foreground: oklch(0.93 0.03 322.0);
+	--sidebar-border: oklch(1 0 0 / 10%);
+	--sidebar-ring: oklch(0.747 0.207 321.9);
+
+	--brand-key: oklch(0.673 0.182 276.9); /* Indigo-400 */
+	--brand-key-foreground: oklch(0.21 0.05 277.1);
+	--success: oklch(0.723 0.170 162.0);
+	--success-foreground: oklch(0.18 0.04 165);
+	--warning: oklch(0.852 0.160 85.0);
+	--warning-foreground: oklch(0.27 0.06 70);
+	--info: oklch(0.723 0.142 233.0);
+	--info-foreground: oklch(0.18 0.04 240);
 }
