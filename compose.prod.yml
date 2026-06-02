@@ -1,26 +1,32 @@
 # power-manage docs — production deploy behind Traefik.
 #
-# Designed to drop in next to the power-manage server stack (which
-# already runs Traefik on the `pm-internal` network with the
-# `letsencrypt` cert resolver and `websecure` entrypoint).
+# Designed to drop in next to the power-manage server stack: shares
+# its Traefik (`letsencrypt` cert resolver, `websecure` entrypoint),
+# but lives on its OWN network so the docs container can't reach
+# postgres / valkey / control / gateway and they can't reach back.
+# Clean separation; only Traefik bridges the two stacks.
 #
-# Usage on the deploy host:
+# One-time setup on the deploy host:
 #
+#   # 1. Clone the repo
 #   git clone https://github.com/manchtools/power-manage-docs.git
 #   cd power-manage-docs
-#   docker compose -f compose.prod.yml pull
+#
+#   # 2. Bring up the docs container (creates the
+#   #    `power-manage-docs` network as a side-effect).
 #   docker compose -f compose.prod.yml up -d
 #
-# The container builds the site at start (~30s) with the mounted
-# markdown baked in, then serves on :3000 inside the pm-internal
-# network. Traefik picks it up by label and terminates TLS for
-# https://power-manage.docs.manchtools.com.
+#   # 3. Wire Traefik into the docs network so it can route to us.
+#   #    One-time — the connection persists across `docs` restarts.
+#   docker network connect power-manage-docs pm-traefik
 #
-# No ports section — only Traefik talks to this container. Local
-# preview lives in compose.yml (port 3000 exposed on the host).
+# If you later recreate the Traefik container (rare), re-run step 3,
+# OR add `power-manage-docs` to the traefik service's networks list
+# in server/deploy/compose.yml + declare it as external there for a
+# durable wiring.
 #
 # Updating content: `git pull && docker compose -f compose.prod.yml \
-#   up -d --force-recreate` rebuilds with the new content.
+#   up -d --force-recreate`.
 
 services:
   docs:
@@ -44,7 +50,11 @@ services:
       PUBLIC_TOKEN_WEB_UI_URL: "https://app.power-manage.manchtools.com"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=pm-internal"
+      # Tell Traefik which network to use to reach this container.
+      # Traefik is multi-homed (pm-internal + power-manage-docs);
+      # pinning the network prevents accidental routing via the wrong
+      # interface if the topology changes later.
+      - "traefik.docker.network=power-manage-docs"
       # Router: HTTPS-only on the websecure entrypoint, Let's
       # Encrypt cert via the resolver the server stack already
       # provisions.
@@ -58,11 +68,16 @@ services:
       - "traefik.http.middlewares.docs-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
       - "traefik.http.services.docs.loadbalancer.server.port=3000"
     networks:
-      - pm-internal
+      - docs
 
 networks:
-  # External: pm-internal is created and owned by the power-manage
-  # server stack (server/deploy/compose.yml). Docs joins it as a
-  # tenant so Traefik can route to us without a second proxy.
-  pm-internal:
-    external: true
+  # Compose creates and owns this network. `name:` forces a stable
+  # name (no `<project>_` prefix), so `docker network connect
+  # power-manage-docs pm-traefik` works without guesswork.
+  #
+  # Power-manage server stack lives on `pm-internal` and is NOT
+  # attached here, so docs can't reach postgres / valkey / control /
+  # gateway. Only Traefik (multi-homed) bridges the boundary.
+  docs:
+    name: power-manage-docs
+    driver: bridge

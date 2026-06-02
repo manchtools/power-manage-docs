@@ -83,25 +83,40 @@ Drop new shots into `static/screenshots/` and reference them with
 
 ## Deploying
 
-`compose.prod.yml` drops the docs onto the power-manage Traefik that
-already runs the server stack. On the deploy host:
+`compose.prod.yml` reuses the power-manage Traefik that already runs
+the server stack, but on its **own** network — docs and the server
+workloads can't reach each other; only Traefik bridges them.
+
+One-time setup on the deploy host:
 
 ```sh
+# 1. Clone the docs repo
 git clone https://github.com/manchtools/power-manage-docs.git
 cd power-manage-docs
-docker compose -f compose.prod.yml pull
+
+# 2. Bring up the docs container (creates the `power-manage-docs`
+#    network as a side-effect of `docker compose up`).
 docker compose -f compose.prod.yml up -d
+
+# 3. Wire Traefik into the docs network so it can route to us.
+#    Persists across docs restarts; only needs re-running if Traefik
+#    itself is recreated.
+docker network connect power-manage-docs pm-traefik
 ```
 
-The container joins the `pm-internal` network (created by
-`server/deploy/compose.yml`) and Traefik picks it up by label —
-HTTPS-only on `power-manage.docs.manchtools.com`, Let's Encrypt
-certificate via the existing `letsencrypt` resolver. No host port is
-exposed; the only ingress is through Traefik.
+Traefik picks the container up by label and serves HTTPS at
+`power-manage.docs.manchtools.com` via the existing `letsencrypt`
+resolver. No host port is exposed; the only ingress is through
+Traefik.
 
 Updating content is a `git pull` plus
 `docker compose -f compose.prod.yml up -d --force-recreate`. The
 container is stateless — restart rebuilds.
+
+If you recreate Traefik often, make the wiring durable by adding
+`power-manage-docs` to the `traefik` service's `networks:` list in
+`server/deploy/compose.yml` (and declaring it as `external: true`
+there).
 
 ## License
 
