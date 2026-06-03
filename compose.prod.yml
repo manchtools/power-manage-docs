@@ -33,14 +33,6 @@ services:
     image: ghcr.io/manchtools/open-docs:latest
     container_name: power-manage-docs
     restart: unless-stopped
-    # Vite's build phase peaks around 1–1.5 GB when computing gzip
-    # sizes for the bundled assets. Without this cap the kernel OOM
-    # killer reaps the process mid-build (exit 137 at "computing gzip
-    # size") on memory-constrained hosts. 2 GB leaves headroom for
-    # the build, then the Bun runtime falls back to ~100–200 MB.
-    # Lower this if your host can't spare it, raise it if your docset
-    # is much larger.
-    mem_limit: 2g
     volumes:
       - ./content:/content:ro
       - ./static:/static:ro
