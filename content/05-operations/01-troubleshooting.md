@@ -11,7 +11,7 @@ A long page on purpose. Search ("Search docs…" in the top nav, or ⌘K) for th
 
 Three things to check, in order:
 
-1. **Token has been used already.** Enrolment tokens are single-use. The web UI's **Devices** → **Enrolment tokens** page (backed by `ListTokens`) shows the consumed status; `CreateToken` generates a new one.
+1. **Token has been used already.** By default, enrolment tokens are single-use. The web UI's **Devices** → **Enrolment tokens** page (backed by `ListTokens`) shows the consumed status; `CreateToken` generates a new one.
 2. **Token expired.** Default lifetime is 24 hours. The token list shows expiry; expired tokens stay visible for audit but don't enrol.
 3. **Rate-limited.** The control server caps enrolment at 5 attempts per minute per IP. If you've been retrying a broken setup, wait a minute.
 
@@ -38,7 +38,7 @@ For the mTLS case, the gateway's logs show `tls: client certificate signed by un
 
 ### Agent shows "offline" in the UI but the process is running
 
-The agent process can be up and still not registered as online. The "online" signal is a heartbeat over the bidi gateway stream; if the stream broke, the agent retries indefinitely with exponential backoff (capped at 60s).
+The agent process can be up and still not registered as online. The "online" signal is a heartbeat over the bidi gateway stream; if the stream broke, the agent retries indefinitely with exponential backoff (capped at 5m).
 
 ```bash
 # On the agent host:
@@ -177,13 +177,6 @@ grep -E '^(INDEXER_)?POSTGRES_PASSWORD=' .env
 If `INDEXER_POSTGRES_PASSWORD=` (empty), regenerate via `./setup.sh` or set it manually to a fresh 64-hex value, then restart the indexer container.
 
 ## Search
-
-### Search returns no results for known terms
-
-Two failure modes:
-
-1. **Pagefind index isn't built.** Pagefind runs at docs build time, not at runtime. If you deployed the docs without running `bun run build`, there's no index. Re-build.
-2. **Search query is shorter than the minimum.** Pagefind's minimum query length is 2 characters by default. One-letter queries return nothing.
 
 ### RediSearch returns stale data
 
