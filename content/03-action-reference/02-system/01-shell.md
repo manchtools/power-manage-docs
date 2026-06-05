@@ -11,7 +11,7 @@ For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same paramet
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `script` | string | no | — | The remediation script body. Max 1 MB. |
+| `script` | string | conditional | — | The remediation script body. Max 1 MB. At least one of `script` or `detection_script` is required — both server-side validation and the web form reject a SHELL action with neither set. |
 | `interpreter` | string | no | `/bin/sh` | Path to the interpreter to invoke. Max 255 chars. |
 | `run_as_root` | bool | no | `false` | Execute under sudo / doas. |
 | `working_directory` | string | no | `$HOME` | Absolute path to `cd` into before running. Must start with `/`. |

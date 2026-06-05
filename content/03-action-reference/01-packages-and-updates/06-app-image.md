@@ -3,7 +3,7 @@ title: APP_IMAGE
 ---
 # APP_IMAGE
 
-Installs an AppImage binary with system integration. AppImages are portable, single-file Linux app bundles. The agent downloads the AppImage, verifies its SHA-256, marks it executable, and creates desktop integration (.desktop file, icon extraction) when the AppImage embeds metadata.
+Installs an AppImage binary. AppImages are portable, single-file Linux app bundles. The agent downloads the AppImage, optionally verifies its SHA-256, marks it executable (mode 0755), and places it at `install_path`. That's it — there is **no automatic `.desktop` file creation, icon extraction, or menu integration** today; if you want that, ship the AppImage with a companion `FILE` action that drops the `.desktop` entry.
 
 Default install location is `/opt/appimages/`.
 

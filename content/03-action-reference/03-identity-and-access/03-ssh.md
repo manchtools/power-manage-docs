@@ -42,4 +42,4 @@ desired_state: PRESENT
 - The corresponding `authorized_keys` for each user has to be managed separately. Use `USER` with `ssh_authorized_keys` for that.
 - Multiple `SSH` actions can coexist on a device. Each gets its own group + drop-in, so policies stack.
 - Re-naming the action creates a new group and a new drop-in. The agent doesn't garbage-collect the old one automatically; remove the old action with `desired_state: ABSENT` first.
-- `allow_password: true` is rarely the right answer. If you must enable it, scope it with an `SSHD` action carrying a `Match Address` directive to constrain source IPs.
+- `allow_password: true` is rarely the right answer. SSHD's drop-in writer emits each directive as a single `key value` line; it can't express a multi-line `Match` block today, so you can't currently scope password auth to a source-IP range from inside power-manage. If you need that, drop a hand-rolled `sshd_config.d/` fragment via a `FILE` action.

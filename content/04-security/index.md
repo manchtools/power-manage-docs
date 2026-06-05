@@ -12,3 +12,4 @@ The cryptographic backbone:
 - [**Asynq task signing**](/security/task-signing) — HMAC envelope on every queued task between control and gateway.
 - [**Remote terminal access**](/security/terminal-access) — operator → device shell, audit-logged.
 - [**Audit log**](/security/audit-log) — what gets recorded, and how to read it.
+- [**CA rotation**](/security/ca-rotation) — the deploy-time procedure for swapping the root CA.

@@ -46,5 +46,5 @@ desired_state: PRESENT
 
 - Directives are written verbatim. The agent doesn't validate syntax. A malformed value lands in the file and the `sshd` reload fails. The action reports the failure.
 - `priority` is auto-assigned by the server based on action creation order. Manual reordering means editing the priority in the web UI, which triggers a re-write of the fragment with the new number.
-- Drop-in files override `sshd_config` only for directives `sshd` recognises as overridable (most `Match`-able directives). Some directives (`Subsystem`, certain log settings) take only the first occurrence; check your `sshd` version.
-- A `Match` block can't be split across fragments. Put all conditional directives in one `SSHD` action.
+- Drop-in files override `sshd_config` only for directives `sshd` recognises as overridable. Some directives (`Subsystem`, certain log settings) take only the first occurrence; check your `sshd` version.
+- **No `Match` block support today.** Each entry in `directives[]` becomes a single `key value` line. A `Match` directive on its own line — without sub-directives on the lines that follow — isn't valid sshd_config. If you need a conditional block (`Match Address`, `Match User`, etc.) drop a raw file with the `FILE` action instead; expanding `SSHD` to model `Match` blocks is parked in the action-extensions backlog.

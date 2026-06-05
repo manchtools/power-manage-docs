@@ -3,7 +3,7 @@ title: WIFI
 ---
 # WIFI
 
-Manages a wireless network profile. Default backend is NetworkManager; ConnMan, wpa_supplicant, and iwd are also supported. Two auth modes: pre-shared key (WPA2 / WPA3-Personal) and EAP-TLS (enterprise 802.1X with client certs).
+Manages a wireless network profile. **NetworkManager is the only backend implemented today.** ConnMan, wpa_supplicant, and iwd are reserved enum values in the proto so the action can grow other backends without a rename, but selecting one of them fails the action with `ErrBackendNotSupported`. Two auth modes: pre-shared key (WPA2 / WPA3-Personal) and EAP-TLS (enterprise 802.1X with client certs).
 
 ## Parameters
 
@@ -19,7 +19,7 @@ Manages a wireless network profile. Default backend is NetworkManager; ConnMan, 
 | `auto_connect` | bool | no | `false` | Auto-connect when in range. |
 | `hidden` | bool | no | `false` | The network broadcasts no SSID (hidden network). |
 | `priority` | int32 | no | `0` | Connection priority. Higher wins when multiple known networks are visible. -1 to 999. |
-| `backend` | enum | no | `NETWORKMANAGER` | `NETWORKMANAGER`, `CONNMAN`, `WPA_SUPPLICANT`, or `IWD`. |
+| `backend` | enum | no | `NETWORKMANAGER` | `NETWORKMANAGER` (default and the only working value). `CONNMAN`, `WPA_SUPPLICANT`, and `IWD` are reserved enum slots; selecting one fails the action. |
 
 ## Idempotency
 

@@ -72,7 +72,7 @@ Open the `Install curl` action (still on the **Actions** page) and use the **Ass
 | Target | device group `production` |
 | Mode | `REQUIRED` |
 
-Save. On the next [reconciliation tick](/concepts/reconciliation) (default 5 minutes) every production agent picks up the dispatch. The same Assign flow is on the detail page for an action set, definition, or compliance policy. Assignments are always created *from* whatever's being assigned.
+Save. On the next [reconciliation tick](/concepts/reconciliation) (default 30 minutes) every production agent picks up the dispatch. If you don't want to wait, dispatch a `SYNC` from the device-detail page to force an immediate tick. The same Assign flow is on the detail page for an action set, definition, or compliance policy. Assignments are always created *from* whatever's being assigned.
 
 ### Step 5. Watch it land
 

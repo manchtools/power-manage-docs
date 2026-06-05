@@ -124,7 +124,7 @@ Most commonly the failure is an action-signing key mismatch, an agent that's gon
 
 ### Compliance policies report "evaluating" indefinitely
 
-Compliance evaluation happens during the agent's reconciliation tick. If a device shows `evaluating` for more than a few ticks (15+ minutes by default), the agent is either offline (see the agent-offline section above) or stuck on an action upstream in the same set.
+Compliance evaluation happens during the agent's reconciliation tick. If a device shows `evaluating` for more than a few ticks (an hour or more on the default 30-minute interval), the agent is either offline (see the agent-offline section above) or stuck on an action upstream in the same set.
 
 Check the device's execution log for the action that immediately precedes the compliance evaluation; if it's also stuck, fix that first. Compliance is downstream of the actions it depends on.
 
@@ -178,7 +178,9 @@ If `INDEXER_POSTGRES_PASSWORD=` (empty), regenerate via `./setup.sh` or set it m
 
 ## Search
 
-### RediSearch returns stale data
+### Search returns stale data
+
+> The compose stack uses `redis/redis-stack-server` (RediSearch) today; the 2026.07 valkey-search cutover ([roadmap](/operations/roadmap)) replaces it with valkey-search behind the same RPC surface. The diagnostic commands change name; the troubleshooting flow does not.
 
 The indexer reconciles against Postgres on a schedule. If a recent change isn't appearing in search:
 

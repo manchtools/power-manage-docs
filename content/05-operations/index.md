@@ -10,4 +10,4 @@ Day-2 reference:
 - [**Troubleshooting**](/operations/troubleshooting) — common failure modes and how to triage them.
 - [**FAQ**](/operations/faq) — frequently-asked questions about the platform.
 - [**Roadmap**](/operations/roadmap) — what's shipped this release, what's coming next, and what's deferred.
-- [**Adding screenshots**](/operations/screenshots) — conventions for capturing and naming UI shots.
+- [**Action failure modes**](/operations/failure-modes) — which action types are safe to "misconfigure to learn" and which can leave a device worse off.

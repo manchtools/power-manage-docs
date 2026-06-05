@@ -14,3 +14,7 @@ How power-manage works under the hood:
 - [**Dynamic device groups**](/concepts/dynamic-groups) — the query language that drives assignment targeting.
 - [**Maintenance windows**](/concepts/maintenance-windows) — when actions are allowed to actually run.
 - [**Compliance**](/concepts/compliance) — detection-only SHELL actions that flag drift without remediating it.
+- [**Device inventory**](/concepts/device-inventory) — what the agent reports about each device, baseline + osquery layered.
+- [**Log collection**](/concepts/log-collection) — on-demand journalctl queries dispatched from the UI.
+- [**osquery**](/concepts/osquery) — opt-in integration for richer inventory and ad-hoc SQL queries.
+- [**Action architecture**](/concepts/action-architecture) — why actions aren't 1:1 with shell programs, and how the SDK substrate makes them pluggable.

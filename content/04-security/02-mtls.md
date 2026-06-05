@@ -23,15 +23,16 @@ flowchart LR
 | Renewal | At **80% of cert lifetime** (~292 days in), the agent calls `RenewCertificate` over its existing mTLS connection. The control server validates the fingerprint, issues a new cert, returns it. |
 | Revocation | Not implemented yet. The agent CA is the only revocation lever; rotate it to invalidate every issued cert at once. A `RevokeCertificate` RPC with a per-fingerprint gateway deny-list is on the [Roadmap](/operations/roadmap). |
 
-The CA roots used to sign agent certs are separate from the gateway's server cert and from the control server's HTTPS cert. The 2026.06 milestone is finishing **CA role separation** so the agent CA, the inter-service CA, and the HTTPS CA are independently rotatable.
+Today there is **one** CA root in play, configured through `CONTROL_CA_CERT` / `CONTROL_CA_KEY`. The same CA signs the agent client certs *and* the gateway / control server certs used for the inter-service `InternalService` mTLS. The HTTPS cert on the Traefik edge is independent (your own issuer or Let's Encrypt) — that part is genuinely separate, but the "agent CA vs inter-service CA" split is *not* currently a thing in the code. Splitting them is a future improvement, not an in-flight 2026.06 deliverable.
 
 ## Signed actions
 
-On top of mTLS, every dispatched action carries an RSA signature over `(actionID, type, paramsJSON)`. The agent verifies it before executing. That means:
+On top of mTLS, every dispatched action carries a signature over `SHA256("<actionID>:<actionType>:<base64(paramsJSON)>")`. The agent verifies it before executing. Algorithm is **ECDSA or RSA-PKCS#1v1.5 with SHA-256**, picked from the CA key's public-key type; Ed25519 is explicitly refused by the verifier. That means:
 
 - A compromised gateway can't forge a dispatch the agent will run. The agent rejects anything unsigned or tampered with.
 - Action-payload integrity is end-to-end (control → agent), not hop-by-hop.
-- Instant actions (`REBOOT`, `SYNC`) are signed over `actionID || type || "{}"`. The same verifier covers parameterless actions.
+- Instant actions (`REBOOT`, `SYNC`) are signed too, with canonical params `{}`. The same verifier covers parameterless actions.
+- **Terminal session start is *not* an action and is *not* signed.** It rides the agent's stream as a separate event. The agent's local TTY enable flag is what gates it — see [Remote terminal access](/security/terminal-access).
 
 If the signature doesn't verify, the agent records an `ExecutionFailed` event with the verification error and drops the dispatch. The event ends up in the audit log, so a forgery attempt leaves a trace.
 
@@ -49,6 +50,6 @@ A failure at any layer ends the dispatch and emits an event. No silent drops.
 
 ## Trust-bundle reloads
 
-The control CA's certs are loaded from disk when the control container boots. Today, picking up a new bundle requires `docker compose restart control gateway` so both processes re-read the on-disk material. Agents stay authenticated under their existing certificates until their next renewal (driven by the agent itself at 80% lifetime), so the restart isn't disruptive to the fleet.
+The control CA's certs are loaded from disk when the control container boots. `SetTrustBundle` accepts a PEM with multiple CA certs in it, which is the mechanism behind the documented [root CA rotation](/security/ca-rotation) flow. Picking up a new bundle requires `docker compose restart control gateway` so both processes re-read the on-disk material. Agents stay authenticated under their existing certificates until their next renewal (driven by the agent itself at 80% lifetime), so the restart isn't disruptive to the fleet.
 
-A live trust-bundle reload (without restart) and an admin-initiated force-renew are tracked as part of the CA rotation playbook in the upcoming `SECURITY.md` ADR landing in 2026.06.
+There is **no SIGHUP-style live reload and no admin-initiated `ForceRenewCertificate` RPC today.** Agents drive their own renewal at 80% of cert lifetime. If you want to force-rotate everyone before then, rotating the CA root is the path — every cert chains to the new root after their next renewal.

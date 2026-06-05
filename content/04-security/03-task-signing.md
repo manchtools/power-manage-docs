@@ -51,7 +51,7 @@ Dead-letter envelopes sit in Valkey under the `asynq:dead:*` keys. `docker compo
 
 Today there's one supported mode: drain-and-cut. Pause new work, wait for all Asynq queues to drain, update `PM_TASK_SIGNING_KEY` in `.env` for all three services (control, gateway, indexer), restart the containers. Total outage is whatever your slowest queue takes to clear (usually under a minute).
 
-A zero-downtime overlap mode (verifier accepting two keys at once, producer signing with one) is not yet implemented. It's tracked under the 2026.06 milestone alongside the rest of the secret rotation playbook.
+A zero-downtime overlap mode (verifier accepting two keys at once, producer signing with one) is **deliberately not** implemented — the signer code carries an explicit comment that says so. The reason is simple: an "accept either" verifier widens the trust window for the duration of the rotation, and the queues drain fast enough that drain-and-cut is the correct trade-off. Don't expect this to change unless the queue-drain time grows past "minutes" for someone.
 
 ## When to rotate
 

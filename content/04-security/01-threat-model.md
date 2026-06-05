@@ -22,7 +22,7 @@ The layers are stacked so no single compromise gives an attacker arbitrary actio
 
 A compromised **Redis** can't forge a dispatch. The HMAC envelope catches it before the gateway forwards.
 
-A compromised **gateway** can't forge a dispatch the agent will run. The CA signature on the action stops at the agent's verifier.
+A compromised **gateway** can't forge a dispatch the agent will run. The CA-signed action signature (ECDSA or RSA, verified by the agent) stops at the agent's verifier. Terminal session start is the documented exception — see [Remote terminal access](/security/terminal-access).
 
 A compromised **OIDC provider** can't pin a session to an attacker-controlled redirect URL. The server-side allowlist refuses.
 

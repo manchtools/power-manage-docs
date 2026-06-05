@@ -27,4 +27,4 @@ type: SYNC
 
 - `SYNC` doesn't pause for the maintenance window. The actions it triggers respect their own windows, so dispatching `SYNC` outside one isn't dangerous; anything window-gated stays queued.
 - A flood of `SYNC` to the same device coalesces. The agent treats them as a single tick rather than queuing each.
-- This is the action you reach for when an operator wants to see their change land *now* rather than within the next 5 minutes. Use it sparingly: chronic SYNC defeats reconciliation's batching properties.
+- This is the action you reach for when an operator wants to see their change land *now* rather than within the next reconciliation interval (default 30 minutes). Use it sparingly: chronic SYNC defeats reconciliation's batching properties.

@@ -9,7 +9,7 @@ Windows are evaluated in the **device-local timezone**, not the operator's and n
 
 ## Why use them
 
-Without windows, every assignment fires on its [reconciliation tick](/concepts/reconciliation) (default 5 minutes). That's fine for small idempotent actions. For things that hurt when they go wrong (package updates, kernel patches, services that restart on config change) you want them firing when nobody is on the box. Windows give you that without per-device scheduling.
+Without windows, every assignment fires on its [reconciliation tick](/concepts/reconciliation) (default 30 minutes). That's fine for small idempotent actions. For things that hurt when they go wrong (package updates, kernel patches, services that restart on config change) you want them firing when nobody is on the box. Windows give you that without per-device scheduling.
 
 ## Defining a window
 
@@ -38,6 +38,6 @@ Compliance evaluation runs continuously regardless of windows. The remediation a
 
 ## Combining with reconciliation
 
-Cheap idempotent work and expensive work usually want different cadences. Cheap actions (file content, user presence, sshd config) reconcile continuously, costing a few hundred milliseconds per tick on a converged device. Expensive actions (package upgrades, service restarts) belong in an assignment with a maintenance window so they run once per night, not every five minutes.
+Cheap idempotent work and expensive work usually want different cadences. Cheap actions (file content, user presence, sshd config) reconcile continuously, costing a few hundred milliseconds per tick on a converged device. Expensive actions (package upgrades, service restarts) belong in an assignment with a maintenance window so they run once per night, not every reconciliation tick.
 
 That split keeps drift on the cheap layer tight without paying for the expensive layer all day.

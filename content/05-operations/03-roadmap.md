@@ -3,70 +3,66 @@ title: Roadmap
 ---
 # Roadmap
 
-The current milestone is **2026.06**. The list below is what's in flight; what comes after lives further down.
+What's shipping in the current release, what's tracked for the next one, and what's deliberately *not* on the list yet. Everything below maps to a tracked issue in `manchtools/power-manage-server` — items without one are aspirations and stay off this page until they have a tracker.
 
-This page reflects the milestone tracker as of mid-May 2026. The canonical source is `ROADMAP-2026.06.md` in the server repo. If anything here drifts from that file, trust the repo.
+Treat this page as a snapshot. The canonical source for *commitment* is the server repo's `ROADMAP-<release>.md` and the milestone tracker; the canonical source for *what already shipped* is the changelog and `git log`.
 
-## In scope for 2026.06
+## 2026.06 — released as rc2
 
-### Phase 0: hardening (weeks 1–2)
-
-- Proto v1 consolidation. Removing the last of the v1alpha experimental fields.
-- Peer-class mTLS hardening: SPIFFE SANs enforced on every inter-service connection, not just agent-to-gateway.
-- Handler refactor: per-handler files, consistent error mapping, removed god-handlers.
-- Inline action validation: every action's parameters validate at the API boundary, not just inside the agent.
-- CA role separation: the agent CA, inter-service CA, and HTTPS CA become independently rotatable.
-
-### Phase 1: fleet ergonomics (weeks 3–4)
-
-- **`UNINSTALL` assignment mode plumbed through the agent.** The mode exists in the proto enum already alongside `REQUIRED` / `AVAILABLE` / `EXCLUDED`; the 2026.06 work finishes the agent-side wiring so the agent forces `desired_state: ABSENT` for any action under an UNINSTALL assignment. Replaces the current "set state to ABSENT and re-assign" dance.
-- **Serial action-set execution.** Action sets execute in declared order with abort-on-first-failure (configurable). Today's behaviour is parallel with no ordering guarantee.
-- **One-shot scheduled dispatch.** Delayed Asynq tasks let you say "run this at 03:00 tomorrow" without standing up a recurring schedule.
-- **Per-group maintenance windows.** See [Maintenance windows](/concepts/maintenance-windows). Already partially landed; the milestone finishes the device-local timezone enforcement.
-
-### Phase 2: terminal admin model (weeks 5–7)
-
-The remote terminal landed earlier; this phase ships its proper authorisation model.
-
-- `TerminalAdminLimited` and `TerminalAdminFull` preset roles.
-- Scoped device-group RBAC, so a `TerminalAdminLimited` user can only terminal into devices in groups they're assigned to.
-- Open ADRs that have to close before this ships:
-  - Sudo I/O capture: does `sudo` inside a session carry the operator identity through the privilege jump?
-  - Editor-escape mitigation: how does `:!sh` from inside `vi` get captured?
-  - TTY auth model: permanent, time-boxed, or operator-requested?
-
-### Phase 3: operability (week 8)
-
-- A health-check / diagnostic surface for the stack: certificate expiry, Postgres replication lag (if applicable), Redis memory, Asynq dead queue, indexer drift, retention horizon. Form not yet decided (CLI subcommand vs. internal RPC vs. dashboard widget).
-- `SECURITY.md` covering the threat model, trust boundaries, secret handling, and the rotation playbooks.
-- Five ADRs:
-  - mTLS identity
-  - Action signing
-  - LPS / LUKS secret flow
-  - Terminal trust model
-  - Event-sourcing audit and tamper-evidence
-
-## Out of scope for 2026.06 (deferred)
-
-These were considered and explicitly pushed past the milestone window. Each has a reason.
-
-| Feature | Why it's not in 2026.06 |
+| Area | What landed |
 |---|---|
-| Group variables | Need secret-taint infrastructure to redact variables consistently at every sink (UI, logs, audit, exports). Not finishable in-window. |
-| Auditd rule management | Incomplete without a SIEM / event-forwarding integration. Ship together with that, not before. |
-| Dashboards, alerting | Adjacent to compliance; designed-but-not-built. Held until compliance reporting is fully stable. |
+| Event-sourcing core | All 11 PL/pgSQL projectors migrated to in-process Go listeners. The PL/pgSQL dispatcher table is gone. |
+| mTLS | SPIFFE peer-class SANs enforced on every inter-service connection, not just agent ↔ gateway. |
+| Action validation | Inline param validation at the API boundary — actions reject malformed input before they reach the agent. |
+| Asynq | Mandatory HMAC envelope on every queued task between control, gateway, and indexer. |
+| Maintenance windows | Per-group windows, evaluated in the device's local timezone. |
+| Action types | `UNINSTALL` assignment mode wired through the agent; serial action-set execution with abort-on-first-failure; one-shot scheduled dispatch. |
+| Handlers | Per-handler files in `server/internal/api/`; god-handlers split, consistent error mapping. |
 
-## After 2026.06
+The 2026.06 rc carries forward into rc-testing during the 2026.07 window — bugs surfaced in rc-testing get patched into the 2026.06 line, not deferred.
 
-Indicative, not committed:
+## 2026.07 — in flight
 
-- **Group variables** with proper secret tainting. Lets you parameterise actions per group without hard-coding values into the action body.
-- **Native dashboards.** Per-fleet / per-group views combining inventory, compliance, and execution metrics. Without these you can already wire Grafana against the audit-log export, but the in-app version reduces the integration burden.
-- **Cryptographic checkpointing of the audit log.** Off-host hash chains and signed periodic anchors for stronger tamper-evidence than the schema-level append-only.
-- **Multi-region gateway topology.** Already partly supported via Redis self-registration; the milestone makes it documented and tested.
+Tracked in `manchtools/power-manage-server#320`. The headline is the **valkey-search cutover** (replaces the RediSearch dependency that doesn't ship in current valkey releases). Around it:
+
+| Area | Issue(s) |
+|---|---|
+| valkey-search cutover | server#320 (umbrella) |
+| Terminal admin RBAC model | `TerminalAdminLimited` / `TerminalAdminFull` preset roles + scoped device-group RBAC. Slipped from 2026.06. |
+| 2026.06 rc-testing follow-ups | Bug fixes surfaced during 2026.06 rollout — patched into 2026.06.x, not 2026.07. |
+| Notifications foundation (server#5) | First slice of the notification subsystem the REBOOT doc references. Probably *not* finishing in 2026.07; tracked here so it isn't forgotten. |
+
+The full Phase 2 / Phase 3 work from the original 2026.06 plan that didn't land — terminal-admin ADRs, `SECURITY.md`, the five named ADRs — is being broken down into individual issues during 2026.07 rather than tracked as a phase.
+
+## Explicitly deferred (no milestone yet)
+
+These have a tracking issue but no committed release. Each line is what's *known* about why it's deferred — the issue is the source of truth.
+
+| Item | Status |
+|---|---|
+| Group variables | **Reverted in PR #239** with a written postmortem. Reopening needs: secret-taint infrastructure across every sink (UI, logs, audit, exports), a threat-model ADR, and a rendering-boundary ADR. Indefinitely postponed; not actively worked. |
+| Auditd rule management | Held until the SIEM / event-forwarding integration story is real; shipping auditd without forwarding produces noise without value. |
+| Dashboards + alerting | Adjacent to compliance reporting; held until compliance projections stabilise. |
+| `RevokeCertificate` RPC + per-fingerprint deny-list | The right shape is "lazy revocation list at the gateway." Tracked but not scheduled. |
+| Live trust-bundle reload (no restart) | `SetTrustBundle` already supports multi-CA at boot; SIGHUP / RPC reload is the missing piece. |
+| Admin-initiated force-renew | RPC + audit event. Currently only agent-initiated renewal at 80% lifetime exists. |
+| Active-active control + leader election | Today control is single-writer. Needed before "multiple control servers" stops being a "no" in the [FAQ](/operations/faq). |
+| CA role separation (agent CA / inter-service CA / HTTPS CA independently rotatable) | A single CA root signs everything today. The split would let `RotateAgentCA` not also touch the gateway's server cert. |
+| `power-manage` CLI driver for terminal sessions | Today the terminal is web-UI-only. A WebSocket-aware CLI client would let CI / scripts open sessions. |
+| Cryptographic checkpointing of the audit log | Off-host hash chains and signed periodic anchors. Stronger tamper-evidence than schema-level append-only. |
+| Retention-report tool | Estimate the cost of a given retention horizon. Form (CLI / RPC / dashboard widget) undecided. |
+| Multi-region gateway topology | Partially supported via Redis self-registration; needs documented + tested deployment shape. |
+
+## Not on the roadmap
+
+If you're looking for these and didn't find them above, they're explicitly *not* planned:
+
+- **Windows / macOS agent.** Linux-only. The agent depends on Linux subsystems (systemd, LUKS, journald, /etc/sudoers, package managers); porting is more than a build-target change.
+- **Bundled web UI for self-hosting.** The hosted UI at `app.power-manage.manchtools.com` connects to your control server; there's no on-prem UI image. Build one against the Connect-RPC API if you need to.
+- **Server-side SIEM uploader.** Use host-level tooling shipped via `SERVICE` actions or poll `ListAuditEvents`.
 
 ## Where to follow along
 
-- Issues and PRs in `manchtools/power-manage-server`
-- The milestone tracker in the server repo: `ROADMAP-2026.06.md`
-- ADRs (when they land): `server/docs/adr/`
+- Issues + PRs in `manchtools/power-manage-server` (server tracker).
+- Milestone trackers per release: `ROADMAP-<release>.md` in the server repo.
+- ADRs (once they land): `server/docs/adr/`. The directory does not exist yet; the first ADR creating it ships with whichever larger piece of work needs it first.

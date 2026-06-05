@@ -3,26 +3,27 @@ title: Reconciliation
 ---
 # Reconciliation
 
-The reconciliation tick is the agent's periodic loop. Every interval (default 5 minutes), the agent:
+The reconciliation tick is the agent's periodic loop. Every interval (default 30 minutes), the agent:
 
 1. Asks the gateway for the current set of assignments that apply to it.
 2. Compares each one against the device's actual state.
 3. Applies any action that's drifted, in the order the action set dictates.
 4. Reports the outcome of every action back as an execution event.
 
-That loop is where the system's idempotency property lives. Re-running the same set of actions against a converged device is a no-op, so reconciling every five minutes costs almost nothing in the steady state.
+That loop is where the system's idempotency property lives. Re-running the same set of actions against a converged device is a no-op, so reconciling every half hour costs almost nothing in the steady state.
 
 ## What sets the interval
 
-The default is 5 minutes. You can override it per assignment from the web UI. Common tunings:
+The agent default is 30 minutes (`defaultSyncInterval` in the agent's main package). Override it on the agent with the `--sync-interval` flag or in the agent config. Common tunings:
 
 | Use case | Suggested tick |
 |---|---|
-| Configuration drift on busy hosts | 1–2 min |
-| Steady-state config that rarely changes | 15 min |
-| Heavy reconciliations bound by maintenance windows | 5 min, with the window doing the work-gating |
+| Configuration drift on busy hosts | 5–10 min |
+| Default | 30 min |
+| Steady-state config that rarely changes | 1 h |
+| Heavy reconciliations bound by maintenance windows | Leave at 30 min; let the window gate the work |
 
-Faster ticks mean tighter drift detection at the cost of more agent CPU per device. On a converged device the cost is roughly "check a hash and decide nothing changed", so even 1-minute ticks are cheap.
+Faster ticks mean tighter drift detection at the cost of more agent CPU per device. On a converged device the cost is roughly "check a hash and decide nothing changed", so even 5-minute ticks are cheap.
 
 ## Reconciliation vs. scheduling vs. instant
 
@@ -48,4 +49,4 @@ If an operator changes an assignment while the agent is offline, the agent won't
 
 ## Forcing an out-of-band tick
 
-The `SYNC` action triggers a reconciliation immediately rather than waiting for the next interval. Useful when you've just made a change in the UI and want to see it land without waiting up to 5 minutes. See [SYNC](/action-reference/system/sync).
+The `SYNC` action triggers a reconciliation immediately rather than waiting for the next interval. Useful when you've just made a change in the UI and want to see it land without waiting up to 30 minutes. See [SYNC](/action-reference/system/sync).

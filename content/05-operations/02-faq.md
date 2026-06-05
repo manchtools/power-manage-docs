@@ -52,6 +52,20 @@ Stand up additional gateway containers on the same `pm-internal` Docker network 
 
 For high availability, run gateways on separate hosts behind a load balancer or DNS round-robin. Agent reconnects automatically when its current gateway drops.
 
+## "Can I run multiple control servers?"
+
+Not today. The control server has several singletons that would race if you ran two replicas against the same Postgres + Redis:
+
+- The dynamic-group evaluator and the stale-execution expiry job both run on a process-local timer with no leader election. Two replicas would re-evaluate every group and emit duplicate expiry events.
+- The `bootstrapAllDevicesGroup` startup path writes to `server_settings_projection`; two replicas racing there can corrupt the row.
+- Most projection writes are protected by the event store's `(stream_type, stream_id, stream_version)` unique constraint, but that catches duplicates *after* they're written — it doesn't serialise the concurrent workers.
+
+Practically, a second control replica would *partially* work — RPC reads are fine — but background work would fire twice per tick. There's no leader-election primitive in the codebase yet.
+
+If you need control-plane HA today, the supported pattern is **standby**, not **active-active**: a second container ready to start on a different host, sharing the database, brought up only if the primary fails. Add a managed-Postgres failover and you have a reasonable cold-standby story.
+
+Active-active control plus leader election is a future improvement; there's no committed milestone for it.
+
 ## "Is there an API?"
 
 Yes. Same Connect-RPC API the web UI uses; it's the public contract. Three flavours of client:
@@ -138,4 +152,11 @@ Treat the bootstrap admin (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) as break-glass
 
 ## "Where do I file bugs?"
 
-[`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) for the server stack, `power-manage-agent` for agent issues, `power-manage-sdk` for proto / SDK questions. Include the server version (logged on container startup with `docker compose logs control --since=24h | grep '"starting control server"'`), a reproducer, and any relevant logs.
+Pick the repo that matches the surface:
+
+- [`manchtools/power-manage-server`](https://github.com/manchtools/power-manage-server/issues) — control server, gateway, indexer.
+- [`manchtools/power-manage-agent`](https://github.com/manchtools/power-manage-agent/issues) — the agent binary and its executors.
+- [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk/issues) — proto definitions, generated Go / TS code, SDK system primitives.
+- [`manchtools/power-manage-web`](https://github.com/manchtools/power-manage-web/issues) — web UI.
+
+Include the server version (logged on container startup with `docker compose logs control --since=24h | grep '"starting control server"'`), a reproducer, and any relevant logs.

@@ -3,9 +3,11 @@ title: ADMIN_POLICY
 ---
 # ADMIN_POLICY
 
-Manages sudo or doas policy for a group of users. Three templates: `FULL` (all sudo), `LIMITED` (curated allowlist), or `CUSTOM` (raw sudoers / doas.conf syntax with a `{group}` placeholder).
+Manages sudo policy for a group of users. Three templates: `FULL` (all sudo), `LIMITED` (curated allowlist), or `CUSTOM` (raw sudoers syntax with a `{group}` placeholder).
 
-The agent creates a dedicated Linux group per action, writes a policy file in `/etc/sudoers.d/` (or `/etc/doas.d/`) that references it, and validates with `visudo -c` before committing.
+The agent creates a dedicated Linux group per action, writes a policy file in `/etc/sudoers.d/`, and validates with `visudo -c` before committing.
+
+> **`backend: DOAS` is reserved but not yet implemented.** The proto carries the enum so the action can grow doas support without a rename, but the executor ignores the field and always writes to `/etc/sudoers.d/`. Selecting `DOAS` today gets you a sudoers policy under a doas-named action — almost certainly not what you want. Until the doas backend lands, treat the `backend` field as `SUDO`-only.
 
 ## Parameters
 
@@ -14,7 +16,7 @@ The agent creates a dedicated Linux group per action, writes a policy file in `/
 | `access_level` | enum | yes | — | `FULL`, `LIMITED`, or `CUSTOM`. |
 | `users` | string[] | yes | — | Usernames to grant access. Each 1–32 chars. |
 | `custom_config` | string | yes if `CUSTOM` | — | Raw sudoers / doas syntax. Supports `{group}` placeholder. Max 64 KB. |
-| `backend` | enum | no | `SUDO` | `SUDO` (default) or `DOAS`. |
+| `backend` | enum | no | `SUDO` | `SUDO` is the only working value. `DOAS` is reserved in the proto but not yet wired up. |
 
 ## What each template means
 
@@ -62,5 +64,4 @@ desired_state: PRESENT
 
 - `visudo -c` runs on the rendered file before install. If it fails, the policy doesn't land and the action errors. Useful guard against syntactically-bad CUSTOM configs.
 - The `LIMITED` template's deny list is the safety net. Don't rely on it as a security boundary; an interactive shell inside any allowed command can still escalate via tricks like `vi :!sh`. For genuine restricted shell access, pair this with a custom role that scopes `StartTerminal` to a small target set (see [Terminal access](/security/terminal-access)).
-- DOAS backend uses `/etc/doas.d/` (modern doas) or appends to `/etc/doas.conf` on older systems. The agent picks the right path based on the doas version it finds.
 - Group names are derived from the action ID and capped at 32 chars. Long action IDs get a stable hash-based truncation, so collisions don't happen even with very similar action names.

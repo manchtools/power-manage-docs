@@ -70,4 +70,4 @@ desired_state: PRESENT
 - The agent refuses to manage the user that owns the agent process itself. Disabling `root` through `USER` is rejected.
 - `linux_uid` autoassignment uses the next free UID in the normal range (or system range if `system_user: true`). To pin a UID across a fleet, set `uid` explicitly.
 - SSH keys are managed via append-if-missing semantics. For pure additive policy that never removes keys outside its list, use the `SSH` action instead.
-- `hidden` requires `accountsservice` installed; otherwise the field is ignored and a warning ends up in the audit log.
+- `hidden` requires `accountsservice` installed (the agent looks for `/var/lib/AccountsService/users/`). On systems without it the field is **silently** skipped — no execution event records the skip today. If you need the GUI-hide behaviour, treat `accountsservice` as a hard prerequisite on the target fleet rather than relying on the audit log to flag it.

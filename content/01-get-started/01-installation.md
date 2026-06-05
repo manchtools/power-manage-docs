@@ -65,7 +65,7 @@ Optional toggles you may want to know about:
 | `CONTROL_ENCRYPTION_KEY_REQUIRED` | `true` | Fail-closed if `CONTROL_ENCRYPTION_KEY` is missing. Set to `false` to allow plaintext secrets in dev. |
 | `CONTROL_PASSWORD_AUTH_ENABLED` | `true` | When `false`, password sign-in is disabled fleet-wide and only SSO works. |
 | `CONTROL_SSH_ACCESS_FOR_ALL` | `false` | Auto-create `SSH` actions so every user can SSH to every device they have access to. |
-| `DYNAMIC_GROUP_EVAL_INTERVAL` | `1h` | How often dynamic device groups recompute their membership. |
+| `DYNAMIC_GROUP_EVAL_INTERVAL` | `1h` | How often dynamic device groups recompute their membership. Clamped to a min of `30m` and a max of `8h` — values outside that range are rounded into the range at startup. |
 
 {% callout type="info" title="Passwords vs SSO" %}
 For SSO-only deployments, set `CONTROL_PASSWORD_AUTH_ENABLED=false` *after* you've added at least one OIDC identity provider. Otherwise you'll lock yourself out: the bootstrap admin can't sign in if password auth is off and no SSO is configured.
@@ -134,7 +134,7 @@ Or the equivalent URI form: `power-manage-agent enroll 'power-manage://control.e
 ## Health checks
 
 - `https://control.example.com/health` returns `ok` (public; safe to point a load balancer at)
-- The indexer's `:8082/health` is internal to the Docker network
+- The indexer's `:8090/health` is internal to the Docker network
 - `docker compose ps` reports container health
 
 If something looks wrong, `docker compose logs control gateway indexer --tail=200` is the first place to look.

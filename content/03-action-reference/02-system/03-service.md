@@ -3,7 +3,7 @@ title: SERVICE
 ---
 # SERVICE
 
-Manages a service unit: installed, enabled at boot, and in the desired runtime state. Four backends supported (systemd, OpenRC, runit, s6), auto-detected from the device unless you set `backend` explicitly.
+Manages a service unit: installed, enabled at boot, and in the desired runtime state. **systemd is the only backend implemented today.** OpenRC, runit, and s6 are reserved as enum values so the proto doesn't need a rename when those land — picking one of them today fails the action with `ErrBackendNotSupported` (`service backend not supported: <op> on backend <name>`).
 
 The `unit_content` field is what you'd put in a `.service` file. Set it and the agent writes the file before evaluating state. Leave it unset and the agent assumes the unit already exists, only managing enable and state.
 
@@ -15,7 +15,7 @@ The `unit_content` field is what you'd put in a `.service` file. Set it and the 
 | `desired_state` | enum | yes | — | `STARTED`, `STOPPED`, or `RESTARTED`. |
 | `enable` | bool | no | `true` | Enable on boot (or disable). |
 | `unit_content` | string | no | — | Full unit file body. Max 64 KB. |
-| `backend` | enum | no | auto-detect | `SYSTEMD`, `OPENRC`, `RUNIT`, or `S6`. |
+| `backend` | enum | no | `SYSTEMD` | `SYSTEMD` (default and the only working value). `OPENRC`, `RUNIT`, `S6` are reserved enum slots; selecting one fails the action. |
 
 ## Idempotency
 

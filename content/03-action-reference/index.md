@@ -26,7 +26,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `SHELL` | Run a shell script. An optional detection script gives you idempotency. |
 | `SCRIPT_RUN` | Run a one-shot script with output capture (no idempotency expected) |
-| `SERVICE` | Manage a service unit. Supports systemd, OpenRC, runit, and s6. |
+| `SERVICE` | Manage a service unit. systemd today; OpenRC, runit, and s6 slots are reserved in the proto but not yet implemented. |
 | `FILE` | Manage file content, ownership, and mode. Managed-block diffing for fragments inside a larger file. |
 | `DIRECTORY` | Manage directory presence, ownership, and mode |
 | `REBOOT` | Reboot the device |
@@ -47,7 +47,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 
 | Action | Purpose |
 |---|---|
-| `ENCRYPTION` | LUKS or GELI passphrase rotation with optional TPM enrolment |
+| `ENCRYPTION` | LUKS passphrase rotation with optional TPM or user-passphrase enrolment. GELI and CGD are proto-enum placeholders only. |
 | `WIFI` | Manage NetworkManager wireless profiles |
 
 ## Lifecycle
@@ -56,11 +56,13 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `AGENT_UPDATE` | Self-update the agent binary. SHA-256 verified, swap-and-restart. |
 
-Both `REBOOT` and `SYNC` ship as instant actions, signed over `(actionID, type, "{}")`. The agent verifies the signature before doing anything, so a compromised Redis can't forge a fleet-wide reboot.
+`REBOOT` and `SYNC` are the only **instant actions** today. They dispatch over the agent's mTLS stream immediately rather than waiting for the next reconciliation tick, signed over `(actionID, type, "{}")`. The agent verifies the signature before acting, so a compromised gateway or Valkey can't forge a fleet-wide reboot.
+
+There's also a separate "rerun a device's current policy now" operator action — `DispatchAssignedActions`. That one is *not* an instant action: it walks the device's assignments and re-dispatches each through the normal action path. Reach for it when you want a device to converge on its assigned state without rebooting or waiting for the next reconciliation tick.
 
 ## Conventions
 
-- Every action is idempotent unless the table above says otherwise. Re-dispatch produces the same end state.
+- Most actions are idempotent. `REBOOT`, `SYNC`, `SCRIPT_RUN`, and `SERVICE` with `desired_state: RESTARTED` are the explicit exceptions; each says so on its own page.
 - Every action emits an `ExecutionCreated` event on dispatch and either an `ExecutionCompleted` or `ExecutionFailed` event when it finishes. The events table is the audit log.
 - `SHELL`, `SCRIPT_RUN`, and `FILE` actions can carry secret content. The audit redactor strips `script`, `detectionScript`, `content`, `customConfig`, `gpgKey`, and `presharedKey` from the visible trail.
 - Privileged operations go through `sdk/go/sys/exec.Privileged()` rather than `os/exec` directly. That's where the sudo / doas decision happens.

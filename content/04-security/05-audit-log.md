@@ -29,7 +29,7 @@ Anything that mutates server-side state, plus a handful of read events that matt
 - SCIM provisioning operations
 
 **Privileged actions:**
-- Terminal sessions: start, attach, detach, output (per chunk), end
+- Terminal sessions: start, attach, detach, **input** (per chunk — *not* output), end
 - LPS password rotation (rotation event; not the password itself)
 - LUKS key rotation
 - Bootstrap-admin sign-in (called out explicitly)
@@ -59,7 +59,7 @@ Secrets don't appear in the audit log. The redactor strips these fields before w
 
 What gets recorded instead is the *event* of the change ("ssh action with name X updated"), not the new secret value. The encrypted secret lives in Postgres separately, scoped to the operations that need it.
 
-Terminal sessions are an explicit exception: the full input/output stream is recorded. If your operator types a secret into a terminal, it ends up in the audit log. There's no automatic redaction inside session output.
+Terminal sessions only capture **input** (what the operator typed), not output (what the shell printed). That's a deliberate trade-off — see [Remote terminal access](/security/terminal-access). If your operator pastes a secret as a command argument, it ends up in the audit log. There's no automatic redaction on the input side either.
 
 ## Tamper-evidence
 

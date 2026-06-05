@@ -8,6 +8,8 @@ Rotates local-account passwords on a schedule. The agent generates a new passwor
 
 LPS is roughly analogous to Microsoft's LAPS: keep local admin passwords strong, unique per device, and recoverable through a centralised audit-logged path rather than scribbled in a wiki.
 
+> **LPS will manage any local account you give it — including `root`, service accounts, and humans.** There is no allow-list, no built-in account-class filter, and no "are you sure" prompt. Every name in `usernames` gets its password rotated on schedule. A typo (`postgrs` instead of `postgres`) will silently create / disable / lock-out the wrong account on every device the action targets. Be deliberate about the list. For service accounts that an application logs into with the password from a config file, rotating *will* break the application — keep LPS for human-and-admin accounts and rotate service-account credentials through their own application path.
+
 ## Parameters
 
 | Field | Type | Required | Default | Description |

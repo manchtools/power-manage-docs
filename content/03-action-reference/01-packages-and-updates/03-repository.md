@@ -13,7 +13,7 @@ Common:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Repository identifier used for file naming. Alphanumeric + `._-`. Max 128 chars. |
+| `name` | string | yes | Repository identifier used for file naming. **Alphanumeric only, max 64 chars** (enforced by server-side validation — `._-` are accepted by the agent's executor but rejected by the proto validator before the action ever reaches the agent). |
 
 APT (`/etc/apt/sources.list.d/<name>.list`):
 
@@ -81,7 +81,7 @@ desired_state: PRESENT
 
 ## Gotchas
 
-- Repository names are validated as filesystem-safe. No slashes, no leading dots.
+- Repository names are validated as alphanumeric-only at the server boundary. Dots and dashes are filesystem-safe but the proto's `alphanum` rule refuses them — if you need them for parity with a vendor's repo-name convention, file a tracker so we can either loosen the rule or document the workaround.
 - Inline GPG keys (`gpg_key`, `dnf.gpgkey`, `zypper.gpgkey`) are PEM-armoured. Raw binary keys are rejected.
 - `apt.trusted: true` skips signature verification. Don't use it outside dev / preview repos.
 - A repository action runs `apt update` (or distro equivalent) after the file changes, so the metadata cache is consistent for the next `PACKAGE` action.
