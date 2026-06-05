@@ -7,7 +7,7 @@ What's shipping in the current release, what's tracked for the next one, and wha
 
 Treat this page as a snapshot. The canonical source for *commitment* is the server repo's `ROADMAP-<release>.md` and the milestone tracker; the canonical source for *what already shipped* is the changelog and `git log`.
 
-## 2026.06 — released as rc2
+## v2026.06 — released as rc2
 
 | Area | What landed |
 |---|---|
@@ -21,7 +21,7 @@ Treat this page as a snapshot. The canonical source for *commitment* is the serv
 
 The 2026.06 rc carries forward into rc-testing during the 2026.07 window — bugs surfaced in rc-testing get patched into the 2026.06 line, not deferred.
 
-## 2026.07 — in flight
+## v2026.07 — in flight
 
 Tracked in `manchtools/power-manage-server#320`. The headline is the **valkey-search cutover** (replaces the RediSearch dependency that doesn't ship in current valkey releases). Around it:
 
