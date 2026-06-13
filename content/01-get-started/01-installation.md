@@ -6,13 +6,13 @@ title: Installation
 power-manage deploys as a Compose stack. Six containers: Traefik, Postgres, Redis (with RediSearch), the control server, the gateway, and the indexer. A `setup.sh` helper generates the cert chain, secrets, and `valkey.conf` so you don't have to assemble them by hand.
 
 {% callout type="warn" title="No web UI is bundled" %}
-The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at **{{WEB_UI_URL}}**. Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
+The server stack does not include a web UI. It exposes a Connect-RPC API only. The web UI is a managed service at [{{WEB_UI_URL}}]({{WEB_UI_URL}}). Point it at your control-server domain and sign in. It's not open-source; anyone needing a custom on-premise client builds their own against the Connect-RPC API. See [The web UI](/get-started/web-ui).
 {% /callout %}
 
 ## Prerequisites
 
 - Docker 24+ or Podman 4.5+ and the Compose plugin
-- Two DNS names pointing at the host: one for the web UI (`control.example.com`), one for the agent gateway (`gateway.example.com`). If you plan to use the remote terminal, a third name (`tty.example.com`) too.
+- Two DNS names pointing at the host: one for the control server to point the web UI at (`control.example.com`), one for the agent gateway (`gateway.example.com`). If you plan to use the remote terminal, a third name (`tty.example.com`) too.
 - TCP port 443 reachable from the public internet (Traefik handles Let's Encrypt; the gateway uses SNI-based TCP passthrough)
 - `openssl` and `bash` on the host
 
