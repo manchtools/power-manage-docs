@@ -43,6 +43,7 @@ services:
       PUBLIC_BRAND_TAGLINE: "docs"
       PUBLIC_SITE_TITLE: "power-manage · Documentation"
       PUBLIC_SITE_DESCRIPTION: "power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated agents, an event-sourced audit log, OIDC and SCIM provisioning, and twenty-three idempotent action types."
+      PUBLIC_SITE_URL: "https://power-manage.docs.manchtools.com"
       PUBLIC_REPO_URL: "https://github.com/manchtools/power-manage-docs"
 
       # {{WEB_UI_URL}} in markdown → this hostname at build time.
