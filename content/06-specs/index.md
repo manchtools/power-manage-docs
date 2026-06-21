@@ -13,6 +13,18 @@ derive from acceptance criteria, implementation derives from tests.
 - [**Example spec**](/specs/example-spec) — a filled-in template for a
   real feature, showing what complete looks like.
 
+## Component specifications
+
+These are the foundational specs describing each component's architecture,
+API surface, and design invariants.
+
+- [**Server**](/specs/server-spec) — control + gateway + indexer, event
+  store, authorization model, internal packages.
+- [**SDK**](/specs/sdk-spec) — protobuf definitions, generated code,
+  capability library, testing strategy.
+- [**Agent**](/specs/agent-spec) — execution model, offline scheduling,
+  security properties, LUKS daemon.
+
 ## How specs drive development
 
 1. **Discuss** — you and the agent discuss the feature. The agent asks
