@@ -31,9 +31,15 @@ V2 list to V1.
 
 ## Definitions
 
-- **Caller scope** — the set of device-groups + user-groups the caller's grants
-  are scoped to for the permission in question. A caller holding an *unscoped*
-  base grant is **unrestricted** (sees/does everything, as today).
+- **Caller scope** — the union of device-group and user-group ids the caller's
+  **scoped grants** confine them to. For the object scopes there is no
+  per-object-permission scope tier; the confinement reuses the device-/user-group
+  scope the caller already holds from their grants (an admin scoped to device
+  group X for device permissions is also confined to X's objects). A caller
+  holding an *unscoped* base grant for the object permission is **unrestricted**
+  (sees/does everything, as today). **Caller scope is read from the JWT-backed
+  request context (`UserContext.ScopedGrants`), never from a per-request DB
+  lookup** — see criterion 13.
 - **Direct scope groups of object O** — the groups derived from O's **own**
   assignments (`Assignment.source_id == O`): `DEVICE_GROUP` / `USER_GROUP`
   targets directly, plus the groups of any `DEVICE` / `USER` target resolved
@@ -65,8 +71,11 @@ Read uses **effective** scope groups; write uses **direct** scope groups.
    (transitive read).
 5. Given a scope-restricted caller and `GetAction` / `GetActionSet` /
    `GetDefinition` / `GetCompliancePolicy` for an object outside their effective
-   scope, when it runs, then it returns `NotFound` (never `PermissionDenied` — no
-   existence leak), consistent with the device handlers.
+   scope, when it runs, then it returns `NotFound` to the client (never
+   `PermissionDenied` — no existence leak), **and the server logs the real reason
+   at WARN** (e.g. "out-of-scope object access denied", with caller id, object id,
+   and the caller's scope group ids) so the denial is observable to operators even
+   though the client sees only `NotFound`. Consistent with the device handlers.
 6. Given a scope-restricted caller and a **mutating** RPC (`Rename*`, `Update*`,
    `Delete*`, `Add*ToSet`/`Remove*`, `AddActionSetToDefinition`/`Remove*`,
    `Add/Remove/UpdateCompliancePolicyRule`, `Reorder*`) on an object whose
@@ -91,6 +100,26 @@ Read uses **effective** scope groups; write uses **direct** scope groups.
 12. Given the four object Search scopes, a self-discovering parity test fails the
     build if any of them lacks the scope filter wiring (matches-zero guard),
     mirroring `scope_enforcement_parity_test.go`.
+13. Given a request, when the handler resolves the caller's scope groups for the
+    object filter, then it reads them **only** from the JWT-backed request context
+    (`UserContext.ScopedGrants`, populated by the auth interceptor from the
+    `sgrants` claim) and issues **no** database query to determine caller scope.
+    The `Search` slice is computed by intersecting the caller's JWT scope groups
+    with each object's pre-projected `assigned_group_ids` index field — both sides
+    are already in hand (JWT + index), so a scoped `Search` adds zero round-trips
+    over an unscoped one.
+14. Given the web role-assignment flow (users → roles, user-groups → roles), when
+    the operator selects role(s), then the scope picker is offered for **any**
+    role whose permissions are scopable — driven by each permission's
+    `PermissionInfo.target_kind` from `ListPermissions`, **not** a hardcoded
+    permission allowlist — and offers a **device-group** picker for `DEVICE`-kind
+    roles and a **user-group** picker for `USER`-kind roles. A role mixing kinds
+    (or any non-scopable permission) offers no scope (unscoped grant), preserving
+    the paired-or-neither `scope_kind`/`scope_id` contract.
+15. Given the web scope picker, when the operator assigns a role with a chosen
+    device-group/user-group scope, then `AssignRoleToUser` /
+    `AssignRoleToUserGroup` is called with the matching `scope_kind` + `scope_id`;
+    when no scope is chosen (or the role is non-scopable), both fields are absent.
 
 ## Out of scope
 
@@ -102,8 +131,9 @@ Read uses **effective** scope groups; write uses **direct** scope groups.
 - A "shared object is read-only / exclusive-ownership" write model — rejected in
   design: because an admin can only assign to groups they administer, the
   visible/manageable set is self-bounded and peer-group sharing is acceptable.
-- Web UI changes beyond what already renders filtered `Search` results (the list
-  pages already consume `Search`; they need no change).
+- The object list-page rendering itself — those pages already consume `Search`
+  and need no change (the scoping is server-side). The **web work in this spec is
+  the role-assignment scope picker** (criteria 14–15), not the list pages.
 
 ## Technical design
 
@@ -117,20 +147,44 @@ Read uses **effective** scope groups; write uses **direct** scope groups.
   group-membership, and set/definition-membership events.
 - `server/internal/api/search_handler.go` — for the four scopes, when the caller
   is scope-restricted, append `@assigned_group_ids:{…}`.
-- `server/internal/auth` — an `ObjectScopeListFilter(ctx, permission)` helper
-  returning `(scopeGroupIDs, restricted)` (the union of the caller's device- and
-  user-group scope ids), analogous to `DeviceScopeListFilter`.
+- `server/internal/auth` — an `ObjectScopeListFilter(ctx)` helper returning
+  `(scopeGroupIDs, restricted)` (the union of the caller's device- and user-group
+  scope ids), analogous to `DeviceScopeListFilter`. It reads
+  `UserContext.ScopedGrants` from context only — the grants already arrived in the
+  JWT `sgrants` claim, so no DB query (criterion 13).
 - `server/internal/api/{action,action_set,definition,compliance_policy}_handler.go`
   — `Get*` enforces effective-scope membership → `NotFound`; mutating handlers
   enforce **direct**-scope membership → `PermissionDenied`.
 - `server/internal/store` — query exposing an object's **direct** and
   **effective** scope groups (for the write check and the projection).
+- `web/src/lib/components/device-group-scope-picker.svelte` (+ a sibling
+  user-group picker, or a generalised `role-scope-picker.svelte`) and the two
+  role-assignment flows `web/src/routes/(app)/users/[id]/+page.svelte` and
+  `web/src/routes/(app)/user-groups/[id]/+page.svelte` — replace the hardcoded
+  `TTY_PERMISSIONS` allowlist (`showScopePicker` derivation) with scopability
+  derived from `ListPermissions().target_kind`, and add user-group scoping for
+  `USER`-kind roles (criteria 14–15). The picker is currently device-group-only
+  and TTY-only; both limits go away.
+
+### Web design notes
+
+- The server already surfaces `PermissionInfo.target_kind` via `ListPermissions`
+  (UNSPECIFIED = not scopable, DEVICE → device-group scope, USER → user-group
+  scope) precisely so the web can gate the picker. The web caches a
+  `permissionKey → target_kind` map from `ListPermissions` and computes a role's
+  scopability as: every permission scopable **and** all of the same kind →
+  offer that kind's group picker; otherwise no scope.
+- `RoleGrantScopeKind` (UNSPECIFIED / DEVICE_GROUP / USER_GROUP) and the
+  paired-or-neither `scope_kind`/`scope_id` contract already exist on
+  `AssignRoleToUser{,Group}` — no proto or RPC change for the web work.
 
 ### Proto changes
 
-None. Scope is derived server-side from the caller's grants; `SearchRequest`
-already carries the scope. No request field is added (a client cannot widen its
-own scope).
+None. Scope is derived server-side from the caller's JWT grants; `SearchRequest`
+already carries the request and the caller's scope rides the JWT, not the body.
+No request field is added (a client cannot widen its own scope). The web work
+reuses the existing `target_kind` metadata and `scope_kind`/`scope_id` grant
+fields.
 
 ### Database changes
 
@@ -153,10 +207,15 @@ None.
   callers. Read uses effective groups; **write uses direct groups** so transitive
   visibility never grants mutation (editing a set never implies editing its
   actions).
-- **No existence leak.** Out-of-scope `Get*` returns `NotFound`, not
-  `PermissionDenied` — same contract as the device/user handlers.
-- **No self-widening.** Scope comes from the caller's grants, never from the
-  request; a client cannot request a wider `assigned_group_ids`.
+- **No existence leak, but observable.** Out-of-scope `Get*` returns `NotFound`,
+  not `PermissionDenied` — same contract as the device/user handlers — **while the
+  server logs the true reason at WARN** (out-of-scope access, caller id, object
+  id, scope ids). The operator can see denials; the client cannot infer existence
+  (criterion 5).
+- **No self-widening.** Scope comes from the caller's JWT grants, never from the
+  request; a client cannot request a wider `assigned_group_ids`. Reading caller
+  scope from the signed token (not a mutable per-request lookup) keeps the slice
+  tamper-proof and avoids a confused-deputy DB read (criterion 13).
 - **Count honesty.** The scoped filter drives the search total so pagination
   never reveals the out-of-scope object count.
 - **Secrets.** None handled. (The point of the feature is to stop scoped admins
@@ -191,10 +250,32 @@ None.
 - Rebuild: bump schema version, boot indexer, assert `assigned_group_ids`
   backfills.
 
+- No-round-trip: a `Search` handler test asserts the caller's scope is taken from
+  the context grants (set up via `WithUser(..., ScopedGrants: …)`) and that no
+  store/DB call is made to resolve caller scope — exercised with a store seam that
+  fails the test if queried for caller-scope resolution (criterion 13).
+
 ### Self-discovering / parity
 
 - A test that enumerates the four object Search scopes and fails if any lacks the
   scope-filter wiring (matches-zero guard).
+- A self-discovering web/permissions test (or a server-fed assertion) that the
+  scope picker's scopability is driven by `target_kind` and not a hardcoded
+  permission list — i.e. there is no `TTY_PERMISSIONS`-style allowlist left in the
+  role-assignment flow (grep-guard or a derived-from-`ListPermissions` unit
+  assertion).
+
+### Web tests (Playwright, behavioral — `web/tests/e2e`)
+
+- Selecting a scopable `DEVICE`-kind role shows the device-group picker; choosing
+  a group and assigning sends `AssignRoleToUser` with
+  `scopeKind=DEVICE_GROUP` + the chosen `scopeId` (asserted via captured RPC,
+  `recordRpc`).
+- Selecting a scopable `USER`-kind role shows the user-group picker and sends
+  `scopeKind=USER_GROUP`.
+- Selecting a non-scopable role (or a mixed-kind selection) shows no picker and
+  sends absent `scope_kind`/`scope_id`.
+- Same three on the user-groups → roles flow.
 
 ## Rejection paths
 
