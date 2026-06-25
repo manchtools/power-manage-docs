@@ -16,6 +16,31 @@ objects **assigned within their scope**, on the same principle already enforced
 for devices and users: *a scoped admin only has access to their own devices,
 their own users, and the objects that run on them.*
 
+## As-built note (2026-06-25)
+
+The implementation refined the index strategy for full freshness with no new
+cascade (see ADR 0024):
+
+- The search index field **`scope_group_ids` carries the object's DIRECT
+  device-/user-group target assignment ids** — not effective groups, and not
+  device/user targets resolved to groups. A direct group-target edge changes only
+  on the object's own assignment events, which already reindex it, so the field
+  can never go stale-high (the leak failure mode). **No projection table, no
+  container cascade, no membership cascade.**
+- **Transitivity (effective read) and device/user→group resolution are resolved
+  live in the handler** — `Get` walks containers (effective); `Get` and mutations
+  resolve device/user targets through membership. Single-object lookups, always
+  fresh.
+- Consequence: a scope-restricted **Search** under-shows objects that are only
+  *transitively* in scope or assigned to an *individual* device/user — they stay
+  readable via `Get`. Fail-closed (sees less, never more); the dominant
+  group-assignment case is exact. Full effective-search is a deferred refinement.
+- A related broader leak was discovered and is **deferred to a follow-up**: the
+  `Search` RPC applies no device/user scope, so the device/user list pages (which
+  use `Search`) leak the whole org to a scoped admin. Closing it needs the same
+  field on the device/user indexes plus a membership reindex cascade and, for
+  dynamic groups, an eventual-consistency tradeoff on an access filter.
+
 ## Motivation
 
 Scope enforcement (#7 / ADR 0006) already confines a scoped admin to their
