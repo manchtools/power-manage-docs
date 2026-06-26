@@ -35,11 +35,16 @@ cascade (see ADR 0024):
   *transitively* in scope or assigned to an *individual* device/user — they stay
   readable via `Get`. Fail-closed (sees less, never more); the dominant
   group-assignment case is exact. Full effective-search is a deferred refinement.
-- A related broader leak was discovered and is **deferred to a follow-up**: the
-  `Search` RPC applies no device/user scope, so the device/user list pages (which
-  use `Search`) leak the whole org to a scoped admin. Closing it needs the same
-  field on the device/user indexes plus a membership reindex cascade and, for
-  dynamic groups, an eventual-consistency tradeoff on an access filter.
+- A related broader leak was discovered and **closed in the same workstream**: the
+  `Search` RPC applied no device/user scope, so the device/user list pages (which
+  use `Search`) leaked the whole org to a scoped admin. Now `idx:devices` /
+  `idx:users` carry `scope_group_ids` (the entity's group memberships) and Search
+  confines on the caller's `ListDevices`/`ListUsers` scope. To keep it fresh —
+  including for **dynamic** groups — without a ticker, the dynamic-group evaluator
+  was reworked to be **event-driven**: it emits a `*GroupMembersReevaluated` delta
+  event (instead of writing membership directly), a projector applies it (the
+  event is the source of truth → no audit/state drift, and a rebuild replays it),
+  and the search listener reindexes the affected devices/users. See ADR 0024.
 
 ## Motivation
 
