@@ -33,11 +33,13 @@ exit-code-bearing check suitable for a post-install gate, a cron/monitoring prob
 1. Given a Control host, when `power-manage-control doctor` runs, then it executes
    every registered check and prints each finding as `severity  check-id  message`
    (plus a one-line remediation), grouped/sorted by severity.
-2. Given the run completes, when no `warning` or `critical` finding was produced,
-   then the process exits **0**; when ≥1 `warning`/`critical` finding exists, it
-   exits **1**; when a check cannot be *executed* at all (config fails to load, or
-   a check panics/errors unexpectedly), it exits **2**. `info`/`ok` results never
-   force a non-zero exit.
+2. Given the run completes, the exit code encodes the **worst** finding severity
+   so a caller can gate at any threshold without a flag: **0** when only `ok`/
+   `info` results (no findings); **1** when the worst finding is a `warning`;
+   **100** when any `critical` finding exists. **2** is reserved for *could-not-run*
+   (config fails to load, or a check errors unexpectedly instead of returning a
+   verdict) — operationally distinct from "ran and found a critical". `info` never
+   forces a non-zero exit.
 3. Given `--json`, when `doctor` runs, then it writes a single JSON object
    `{ "summary": {counts by severity}, "findings": [{id, severity, message,
    remediation, detail?}], "exit_code": N }` to stdout and nothing else to stdout
@@ -55,8 +57,12 @@ exit-code-bearing check suitable for a post-install gate, a cron/monitoring prob
    with a mode more permissive than `0400` (group/other bits set), when checked,
    then a **critical** finding naming the file + its mode.
 7. Given the device/service/action-signing CA certificate, when checked: missing
-   → **critical**; not-yet-valid or already-expired → **critical**; expiring
-   within the configured horizon (default 30 days) → **warning**.
+   → **critical**; not-yet-valid or already-expired → **critical**; **past 80% of
+   its own validity lifetime** (remaining validity < 20% of `NotAfter − NotBefore`
+   — the inverse of the auto-rotation point) → **warning**. The horizon is
+   **derived from each cert's lifetime, not a fixed day count**, so it
+   self-calibrates to short-lived rotating leaf certs and long-lived CA roots
+   alike; the absolute expiry date is reported in the finding `detail`.
 8. Given `CONTROL_CORS_ORIGINS=*` (or otherwise allowing a credentialed wildcard),
    when checked, then a **critical** finding (the runtime already rejects
    credentialed wildcards — ADR 0008 — so this is a config that would break the UI
@@ -73,8 +79,9 @@ exit-code-bearing check suitable for a post-install gate, a cron/monitoring prob
 12. Given the Asynq queues, when checked, then a dead-letter / archived depth `> 0`
     → **warning** with the depth and queue name.
 13. Given the search subsystem, when checked: each expected index missing from
-    `FT.INFO` → **critical**; the last indexer reconcile older than the configured
-    staleness horizon (default 2× the reconcile interval) → **warning**.
+    `FT.INFO` → **critical**; the last indexer reconcile older than **2× the
+    configured reconcile interval** (derived from config, not a fixed wall-clock,
+    so it auto-scales per deployment) → **warning**.
 14. Given the bootstrap admin email is still the default (`admin@example.com`),
     when checked, then a **warning** finding.
 15. Given the check registry, a self-discovering completeness test fails the build
@@ -133,12 +140,15 @@ in the module.
 
 ### Severity & exit-code model
 
-`Severity` ∈ {`ok`, `info`, `warning`, `critical`}. A *finding* is a `warning` or
-`critical` result. Exit: `0` no findings · `1` ≥1 finding · `2` could-not-run
+`Severity` ∈ {`ok`, `info`, `warning`, `critical`}. The exit code encodes the
+**worst** result so a caller gates at any threshold without a flag: `0` ok/info ·
+`1` worst-is-warning · `100` any-critical. `2` is reserved for *could-not-run*
 (config load failure, or a check returning an execution error rather than a
-verdict). A check whose dependency is down (e.g. Valkey unreachable) returns a
-`critical`/`warning` **finding**, not an exit-2 — one dead datastore must not abort
-the rest of the suite.
+verdict) — distinct from "ran and found a critical". A check whose dependency is
+down (e.g. Valkey unreachable) returns a `critical`/`warning` **finding**, not an
+exit-2 — one dead datastore must not abort the rest of the suite. No
+`--strict`/`--fail-on` flag: `doctor && deploy` already fails on warnings, and a
+lenient gate compares `$?` against `100`.
 
 ## Security considerations
 
@@ -194,5 +204,5 @@ the rest of the suite.
 ## References
 
 - [#322](https://github.com/manchtools/power-manage-server/issues/322) — doctor subcommand.
-- [Spec template](./01-spec-template.md); `SECURITY.md` (the posture this validates); ADR 0008 (CORS/identity), ADR 0014 (secrets at rest), ADR 0019 (indexer rebuild gate).
-- Open design questions for approval: (a) `doctor` subcommand of `power-manage-control` vs a standalone `cmd/doctor` binary — spec assumes the subcommand; (b) the expiry/staleness horizons' defaults (30d / 2× reconcile) and whether they're flags; (c) whether a `--strict` mode should also fail on `info`.
+- [Spec template](./01-spec-template.md); `SECURITY.md` (the posture this validates); ADR 0008 (CORS/identity), ADR 0014 (secrets at rest), ADR 0019 (indexer rebuild gate); ADR 0013/0023 (cert rotation at 80% lifetime — the basis for the inferred cert horizon).
+- Resolved decisions: (a) a `doctor` **subcommand of `power-manage-control`** — standalone invocation that runs without the server up, shares the config loader; (b) thresholds are **derived, not fixed**: cert horizon from each cert's own lifetime (< 20% remaining), reconcile staleness from 2× the configured interval — no day-count flags; (c) **graduated exit codes** (0/1/100, plus 2 = could-not-run) instead of a `--strict`/`--fail-on` flag.
