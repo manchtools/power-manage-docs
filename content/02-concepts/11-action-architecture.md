@@ -61,7 +61,7 @@ You'll see these all over the executor code (paths are relative to the SDK repo 
 - `crypto` — AES-GCM (AAD-bound) helpers for at-rest secrets
 <!-- docref: end -->
 
-<!-- docref: begin src=sdk:sys/encryption/encryption.go#Backend:11393461,sdk:sys/service/service.go:c5e7deaa,sdk:docs/02-concepts/02-backends.md:b6f5fcbf -->
+<!-- docref: begin src=sdk:sys/encryption/encryption.go#Backend:11393461,sdk:sys/service/service.go:c5e7deaa,sdk:docs/02-concepts/02-backends.md:fc8a4141 -->
 Packages like `sys/encryption` and `sys/service` take an explicit backend selector even while only one backend exists (LUKS, systemd) — the zero value is invalid and unknown backends return `ErrUnknownBackend`. That's the backend pattern described in the SDK's own docs (`docs/02-concepts/02-backends.md`): new backends land later without breaking the action's proto.
 <!-- docref: end -->
 
