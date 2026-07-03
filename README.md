@@ -1,7 +1,7 @@
 # power-manage Documentation
 
 Source for the public docs site at
-[docs.power-manage.manchtools.com](https://docs.power-manage.manchtools.com).
+[power-manage.docs.manchtools.com](https://power-manage.docs.manchtools.com).
 
 This repo holds only **content + assets**. The rendering engine is
 [open-docs](https://github.com/manchtools/open-docs), shipped as a
@@ -18,13 +18,20 @@ content/                         markdown source
     02-web-ui.md
     03-quick-start.md
   02-concepts/...
-  03-action-reference/
+  03-action-reference/           ← grouped by category, one page per action
     index.md                     ← "Overview"
-    01-package.md ... 23-agent-update.md
+    01-packages-and-updates/     PACKAGE, UPDATE, REPOSITORY, DEB, RPM, APP_IMAGE, FLATPAK
+    02-system/                   SHELL, SCRIPT_RUN, SERVICE, FILE, DIRECTORY, REBOOT, SYNC
+    03-identity-and-access/      USER, GROUP, SSH, SSHD, ADMIN_POLICY, LPS
+    04-security-and-networking/  ENCRYPTION, WIFI
+    05-lifecycle/                AGENT_UPDATE
   04-security/...
   05-operations/...
+  06-specs/                      feature specs (point-in-time; not docref-scanned)
+adr/                             decisions about the docs site itself
 static/                          favicons, OG card, screenshots
 compose.yml                      runtime composition (open-docs:latest)
+docref.toml / docref.lock        docref config + pinned code-repo revisions
 ```
 
 The sidebar is derived entirely from the folder tree (numeric
@@ -81,6 +88,25 @@ Drop new shots into `static/screenshots/` and reference them with
 `{% screenshot src="my-shot.png" alt="..." /%}`. The tag prefixes
 `/screenshots/` automatically.
 
+### docref — docs stay anchored to code
+
+Content in `content/01-…05-` is anchored to the server/agent/sdk code
+with [docref](https://github.com/manchtools/open-docref): behavioral
+claims carry `<!-- docref: begin src=server:… -->` markers whose hashes
+pin the exact code they describe. The sibling repos are declared as
+aliases in `docref.toml` and pinned to origin/main revisions in
+`docref.lock`.
+
+- Run all docref commands **from this repo's root**.
+- `docref check` must exit 0 before pushing content changes.
+- New prose that asserts code behavior gets a claim
+  (`docref claim server:path#Symbol` prints a paste-ready block —
+  never hand-write hashes).
+- After code lands in a sibling repo: `docref update`, re-read any
+  claims that went stale, fix or `docref approve`, commit the lock.
+- `content/06-specs/` and `adr/` are deliberately outside the scan
+  (point-in-time artifacts).
+
 ## Deploying
 
 `compose.prod.yml` reuses the power-manage Traefik that already runs
@@ -120,4 +146,17 @@ there).
 
 ## License
 
-[MIT](./LICENSE) — same as open-docs and the rest of power-manage.
+This repository (docs content and assets) is [MIT](./LICENSE), the same
+license as the [open-docs](https://github.com/manchtools/open-docs)
+engine that renders it.
+
+The power-manage components are licensed individually — check each
+repo's LICENSE before reusing code:
+
+| Repo | License |
+|---|---|
+| docs (this repo) | MIT |
+| sdk | MIT |
+| server | AGPL-3.0 |
+| agent | GPL-3.0 |
+| web | see repo |
