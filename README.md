@@ -159,4 +159,4 @@ repo's LICENSE before reusing code:
 | sdk | MIT |
 | server | AGPL-3.0 |
 | agent | GPL-3.0 |
-| web | see repo |
+| web | proprietary (private repo, no license granted) |
