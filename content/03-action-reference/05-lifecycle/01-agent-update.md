@@ -3,34 +3,44 @@ title: AGENT_UPDATE
 ---
 # AGENT_UPDATE
 
-Updates the agent binary itself. The agent downloads the new binary, verifies its SHA-256 against a checksum file, runs a self-test, and swaps the binary in place. Failed self-tests keep the old binary running.
+Updates the agent binary itself. The agent downloads the new binary, verifies its SHA-256 (against a checksum file, or against a hash pinned inside the CA-signed action), runs a self-test, and swaps the binary in place. Failed self-tests keep the old binary running.
 
-This is the *only* way the agent rolls itself forward in a fleet. There's no other path: distro packages aren't shipped, and `SERVICE` is forbidden from managing `power-manage-agent.service`.
+<!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
+This is the *only* way the agent rolls itself forward in a fleet. There's no other path: distro packages aren't shipped, and `SERVICE` refuses to manage `power-manage-agent.service`.
+<!-- docref: end -->
 
 ## Parameters
 
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AgentUpdateParams:c7480e9b,sdk:proto/pm/v1/actions.proto#AgentUpdateArch:c166c386,server:internal/api/action_validators.go#validateAgentUpdateParams:c528275a -->
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `amd64` | object | no\* | Binary + checksum URLs for x86_64. |
+| `amd64` | object | no\* | Binary source for x86_64. |
 | `amd64.binary_url` | string | yes if `amd64` set | HTTPS URL to the agent binary. |
-| `amd64.checksum_url` | string | yes if `amd64` set | HTTPS URL to a SHA-256 checksum file. |
-| `arm64` | object | no\* | Binary + checksum URLs for arm64. |
-| `arm64.binary_url` | string | yes if `arm64` set | HTTPS URL to the agent binary. |
-| `arm64.checksum_url` | string | yes if `arm64` set | HTTPS URL to a SHA-256 checksum file. |
+| `amd64.checksum_url` | string | no\*\* | HTTPS URL to a SHA256SUMS-style checksum file. The default integrity source — lets an action track "latest" release assets hands-off. |
+| `amd64.expected_sha256` | string | no\*\* | Pinned SHA-256 of the binary, 64 lowercase hex chars. When set it is authoritative and **overrides** `checksum_url`: the hash travels inside the CA-signed action, so integrity doesn't depend on the download origin. Use for staged rollouts / stronger authenticity. |
+| `arm64` | object | no\* | Binary source for arm64. Same sub-fields as `amd64`. |
+| `allow_downgrade` | bool | no | Install even if the target version is older than the running one. Without it the agent refuses a downgrade (anti-rollback). |
+| `allow_redirect` | bool | no | Follow a redirect that changes host or scheme during download (e.g. GitHub release assets 302 to a CDN host). Default false: a cross-origin redirect is refused. SHA-256 verification and the https-only rule still apply either way. |
 
 \* At least one of `amd64` or `arm64` must be set.
+\*\* Per architecture, at least one of `checksum_url` or `expected_sha256` must be set — the server rejects an action with neither, so an update can never run without an integrity check.
+<!-- docref: end -->
 
 ## How it works
 
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1 -->
 1. The agent reads its own architecture and picks the matching entry. If there's no entry for this arch, the action exits with `changed=false` and a noted skip.
-2. It fetches the binary and the checksum file from the URLs. Both must be HTTPS.
-3. The agent parses the checksum file (sha256sums format) and verifies the binary's hash against the entry whose filename matches the binary URL.
-4. It writes the new binary alongside the running one, makes it executable, and runs it in a subprocess as `power-manage-agent --self-test` with a 60-second timeout. The self-test exercises the same wiring the new binary will need in production — see [below](#what-the-self-test-actually-does).
-5. If the self-test passes, the agent swaps the binary atomically (rename) and restarts itself.
-6. If the self-test fails, the new binary is discarded and the old one keeps running.
+2. It determines the expected hash: `expected_sha256` if pinned in the signed action, otherwise it fetches the checksum file (sha256sums format) and takes the entry whose filename matches the binary URL. All URLs must be HTTPS.
+3. It downloads the binary to a staging directory and verifies the SHA-256. A mismatch aborts before anything runs.
+4. It runs the downloaded binary's `version` command and compares with the running version. Same version → `changed=false`, done. An **older** version is refused unless `allow_downgrade` is set on the action (anti-rollback); an unparseable version fails closed.
+5. It runs the new binary in a subprocess as `power-manage-agent self-test` with a 60-second timeout. The self-test exercises the same wiring the new binary will need in production — see [below](#what-the-self-test-actually-does).
+6. If the self-test passes, the agent copies the current binary to `<path>.bak` (manual rollback: restore it and restart the service), atomically swaps in the new binary, and restarts itself.
+7. If the self-test fails, the new binary is discarded and the old one keeps running.
+<!-- docref: end -->
 
 ### What the self-test actually does
 
+<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_selftest.go#runSelfTest:6ab4e9c7 -->
 The subprocess walks four checks in order and exits non-zero on the first failure:
 
 1. **Credentials load.** The new binary reads the agent's mTLS key + certificate from disk and parses them. Catches enrolment-state issues that would prevent the binary from connecting at all.
@@ -38,13 +48,18 @@ The subprocess walks four checks in order and exits non-zero on the first failur
 3. **Bidirectional stream.** It opens the streaming RPC, sends `Hello`, and verifies it receives `Welcome` back. Catches proto mismatches between agent and gateway.
 4. **`SyncActions` round-trip.** It calls `SyncActions` to confirm the new binary can fetch its assignment set. Catches RPC-surface regressions before the binary takes over.
 
-Anything that fails surfaces as the test exit code; the running binary captures stdout/stderr from the subprocess into the execution event so you can see *what* failed.
+Anything that fails surfaces as the test exit code; the running binary captures stdout/stderr from the subprocess into the execution event so you can see *what* failed. Side note: the self-test connects with the live agent's device identity, so the running agent briefly disconnects (a few seconds) while the probe holds the stream.
+<!-- docref: end -->
 
 ## Idempotency
 
-The agent compares the to-be-installed binary's checksum against its own running version. Match means `changed=false`. Mismatch triggers the self-test.
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9 -->
+The agent compares the downloaded binary's reported version against its own running version. Equal means `changed=false`. A newer version triggers the self-test and swap.
+<!-- docref: end -->
 
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.ResetUpdateCycle:fccb41a8,agent:internal/executor/agent_update.go#Executor.markAgentUpdateExecuted:0b162db5 -->
 Multiple `AGENT_UPDATE` actions in one [reconciliation cycle](/concepts/reconciliation) deduplicate to one execution.
+<!-- docref: end -->
 
 ## Example
 
@@ -60,8 +75,12 @@ arm64:
 
 ## Gotchas
 
-- A failing self-test isn't an error in the audit-log sense. The agent reports `changed=false` and notes the failure in the execution event. Fix the underlying issue and dispatch a new `AGENT_UPDATE`.
-- No cooldown between retries. The agent retries on every reconciliation tick (default 30 minutes) until the action succeeds or you cancel the assignment.
-- The checksum file is the same for both architectures by convention; the agent searches for the filename matching its binary URL.
-- A successful self-update restarts the agent process. The current mTLS stream drops and reconnects on the new binary. Operators watching the device's "online" status will see a brief offline blip.
-- Maintenance windows do *not* apply. `AGENT_UPDATE` is treated as critical-path security work and runs as soon as it's available.
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9 -->
+- A failing self-test **fails the action**: the execution reports `FAILED` with the self-test's output in the execution event, and the old binary keeps running. Fix the underlying issue and let the next run retry.
+- No cooldown between retries. Retry frequency is governed entirely by the action's schedule — if the target version is broken and the action runs every 30 minutes, the agent re-downloads and re-tests it every 30 minutes until a fixed release is published or you cancel the assignment.
+<!-- docref: end -->
+- The checksum file is the same for both architectures by convention; the agent searches it for the filename matching its binary URL.
+- A successful self-update restarts the agent process. The current mTLS stream drops and reconnects on the new binary. Operators watching the device's "online" status will see a brief offline blip (the self-test itself also causes one).
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.runDueActions:615f76e3 -->
+- Maintenance windows **do apply**: a scheduled `AGENT_UPDATE` defers like any other due action while the window is closed. Only stream-dispatched instant actions (e.g. "reboot now") bypass the window.
+<!-- docref: end -->

@@ -39,13 +39,15 @@ That's it. RPCs, event subscriptions, the terminal WebSocket: all of those conne
 
 ## CORS and your control server
 
-Your control server needs to allow the web UI's origin on its CORS allowlist. The default config covers `{{WEB_UI_URL}}`. If you've built your own client on a different origin, add it via `CONTROL_CORS_ORIGINS` in `.env`:
+<!-- docref: begin src=server:internal/middleware/cors.go#CORS:89535eab,server:cmd/control/flags.go#applyEnvOverrides:796d6b23,server:deploy/compose.yml:652fa868 -->
+Your control server needs to allow the web UI's origin on its CORS allowlist. The allowlist is **fail-closed**: with no origins configured, every cross-origin request is denied — so set it before your first sign-in. In the reference deploy the `.env` key is `CORS_ORIGINS` (Compose maps it onto the container's `CONTROL_CORS_ORIGINS`), comma-separated if you also run your own client:
 
 ```bash
-CONTROL_CORS_ORIGINS={{WEB_UI_URL}},https://ui.example.com
+CORS_ORIGINS={{WEB_UI_URL}},https://ui.example.com
 ```
 
 If sign-in fails with a network error and the browser console reports a CORS rejection, this is the setting to check.
+<!-- docref: end -->
 
 ## Next steps
 

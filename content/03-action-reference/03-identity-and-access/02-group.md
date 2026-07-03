@@ -7,18 +7,24 @@ Creates or removes a system group and manages its membership exactly. Use it whe
 
 ## Parameters
 
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#GroupParams:3253df6b -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `name` | string | yes | — | Group name. 1–32 chars. |
 | `members` | string[] | no | — | Usernames belonging to the group. Each 1–32 chars. |
-| `gid` | int32 | no | auto | Group ID. 0–65534. |
+| `gid` | int32 | no | auto | Group ID. 0–65534. Only applied when > 0, and on creation only. |
 | `system_group` | bool | no | `false` | Create as system group (GID < 1000). |
+<!-- docref: end -->
 
 ## Idempotency
 
-The agent checks `getent group <name>` for existence and exact member set. If the group is missing it gets created. If members don't match the list exactly, the agent adds missing and removes extras. Matching means `changed=false`.
+<!-- docref: begin src=agent:internal/executor/group.go#Executor.setupGroup:10c99208,sdk:sys/user/group.go#MembersMatch:92b70060 -->
+The agent checks the group for existence and exact member set (order-insensitive). If the group is missing it gets created. If members don't match the list exactly, the agent adds missing and removes extras. Matching means `changed=false`.
+<!-- docref: end -->
 
-`desired_state: ABSENT` removes the group. The `power-manage` group is protected; the agent refuses to delete it.
+<!-- docref: begin src=agent:internal/executor/group.go#Executor.removeGroup:6b3ce48c -->
+`desired_state: ABSENT` removes all members from the group and deletes it. The `power-manage` group is protected; the agent refuses to delete it.
+<!-- docref: end -->
 
 ## Example
 
@@ -45,6 +51,10 @@ desired_state: PRESENT
 
 ## Gotchas
 
+<!-- docref: begin src=agent:internal/executor/helpers.go#syncGroupMembers:7e131c82 -->
 - Membership is exact, not additive. If a user has been manually added to the group on the device and isn't in the action's `members` list, they get removed on the next [reconciliation tick](/concepts/reconciliation). To allow ad-hoc additions, use `USER` to bake users' group memberships into their account record instead.
-- A user listed in `members` who doesn't exist on the device is silently skipped with a warning in the audit log. The action doesn't fail.
-- `gid` is honoured on creation only. Changing it later requires removing the group and recreating, which loses members.
+- A user listed in `members` who doesn't exist on the device is skipped with a warning in the execution output. The action doesn't fail on a missing user — only on an add/remove operation that errors.
+<!-- docref: end -->
+<!-- docref: begin src=agent:internal/executor/group.go#Executor.setupGroup:10c99208 -->
+- `gid` is honoured on creation only. Changing it on an existing group requires removing the group (`desired_state: ABSENT`) and recreating it with the new `gid`; manual out-of-band members are lost, listed `members` are re-added on the next apply.
+<!-- docref: end -->

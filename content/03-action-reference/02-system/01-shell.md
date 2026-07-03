@@ -5,31 +5,35 @@ title: SHELL
 
 Runs a shell script on the device. The general-purpose action for when no specialised type fits. Add a detection script and SHELL becomes idempotent: the agent only runs the remediation script if the detection script reports drift.
 
-For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same parameters, different semantics. `SCRIPT_RUN` always runs and never reports `changed=false`.
+For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same parameters, different lifecycle: `SCRIPT_RUN` runs once per dispatch and is never stored for scheduled re-runs.
 
 ## Parameters
 
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ShellParams:0ec72f48,server:internal/api/action_validators.go#validateShellScriptChoice:cffddecf,agent:internal/executor/executor.go#maxScriptSize:e74b340a -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `script` | string | conditional | — | The remediation script body. Max 1 MB. At least one of `script` or `detection_script` is required — both server-side validation and the web form reject a SHELL action with neither set. |
+| `script` | string | conditional | — | The remediation script body. Max 1 MiB. At least one of `script` or `detection_script` is required — server-side validation and the agent both reject a SHELL action with neither set. |
 | `interpreter` | string | no | `/bin/sh` | Path to the interpreter to invoke. Max 255 chars. |
-| `run_as_root` | bool | no | `false` | Execute under sudo / doas. |
-| `working_directory` | string | no | `$HOME` | Absolute path to `cd` into before running. Must start with `/`. |
-| `environment` | map\<string,string\> | no | — | Environment variables to set for the run. |
-| `detection_script` | string | no | — | Optional idempotency check. Exit 0 means "compliant, skip the remediation". Max 1 MB. |
+| `run_as_root` | bool | no | `false` | `true` escalates through the privilege backend (sudo / doas / direct root). `false` runs the script **once per active graphical desktop session, as that user** — with nobody signed in it's a success no-op that retries on the next reconciliation tick. |
+| `working_directory` | string | no | agent's cwd | Absolute path to run in. Must start with `/`. |
+| `environment` | map\<string,string\> | no | — | Environment variables for the run. Screened by the SDK's env-hijack blocklist — `PATH`, `LD_*`, `LANG`/`LC_*`, and similar are rejected. |
+| `detection_script` | string | no | — | Optional idempotency check. Exit 0 means "compliant, skip the remediation". Max 1 MiB. |
 | `is_compliance` | bool | no | `false` | If true, run only the detection script and report status. Never run the remediation. |
+<!-- docref: end -->
 
 ## How it decides what to run
 
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
 1. If `detection_script` is set, run it.
 2. Exit 0 means compliant. Skip remediation, report `changed=false`.
 3. Non-zero exit and no `script` set means non-compliant. Report it.
 4. Non-zero exit with `script` set means run the remediation.
-5. Re-run the detection script to verify the remediation worked.
+5. Re-run the detection script to verify the remediation worked — if it still exits non-zero, the action fails with "remediation did not resolve the issue".
 
 If `detection_script` is unset, the remediation script runs every time and the action always reports `changed=true`.
 
 `is_compliance=true` makes the agent run only the detection step. The remediation is ignored even when present. That's the mode for read-only audit policies.
+<!-- docref: end -->
 
 ## Examples
 
@@ -62,7 +66,17 @@ is_compliance: true
 
 ## Gotchas
 
-- The exit code of the *remediation* script doesn't gate idempotency. Only the detection script does. A remediation that exits non-zero reports as a failure but doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:2b232bec -->
+- The exit code of the *remediation* script doesn't gate idempotency — only the detection script does. But a non-zero exit from either script fails the action (`script exited with code <n>`). It doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
+<!-- docref: end -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.runShellScript:78290ce4,agent:internal/executor/executor.go#Executor.runShellScriptPerUser:c8cd91af -->
+- `run_as_root: false` is not "run as the agent's user". It fans out to every active desktop session and runs as each signed-in user, prefixing output lines with `[user=<name>]`. One user's failure doesn't stop the rest; the first failure decides the action result.
+- The script body is passed as an argument (`<interpreter> -c <script>`), not on stdin. `/bin/bash`, `/usr/bin/python3`, `/usr/bin/perl` all work as `interpreter` as long as they accept `-c`.
+- The child environment is a curated baseline (`HOME`, `USER`) plus your validated `environment` entries — the agent's own environment does **not** leak through, and the SDK runner forces `LC_ALL=C` and a sanitized `PATH`.
+<!-- docref: end -->
+<!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
 - Secrets in `script` or `detection_script` get redacted from the audit log, but they're sent to the agent in cleartext over mTLS. For credentials at rest, use `LPS`, `ENCRYPTION`, or the IdP credential store instead.
+<!-- docref: end -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
 - The detection-verify-retry sequence runs detection twice if the remediation script ran. Budget for that.
-- `interpreter` is invoked literally. `/bin/bash`, `/usr/bin/env python3`, even `/usr/bin/perl` all work. The script body goes in on stdin.
+<!-- docref: end -->

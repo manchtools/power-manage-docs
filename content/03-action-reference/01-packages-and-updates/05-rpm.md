@@ -3,21 +3,25 @@ title: RPM
 ---
 # RPM
 
-Installs an `.rpm` package from a URL. Same shape as `DEB`, different backend. Used for vendor downloads, custom builds, internal-only software on Fedora / RHEL / openSUSE.
+Installs an `.rpm` package from a URL. Same shape as `DEB`, different backend. Used for vendor downloads, custom builds, internal-only software on Fedora / RHEL / openSUSE. The agent downloads the file, verifies its SHA-256, and installs it through `dnf`/`zypper install <path>` so dependencies resolve from the configured repositories.
 
 ## Parameters
 
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AppInstallParams:76caae4c,server:internal/api/action_validators.go#validateAppInstallParams:113e9432,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `url` | string | yes | — | HTTPS URL to fetch the `.rpm` from. |
-| `checksum_sha256` | string | no | — | 64-char hex digest. Skip only for repos you trust the TLS chain of. |
-| `install_path` | string | no | system tmp | Directory to download into before install. |
+| `url` | string | yes | — | HTTPS URL to fetch the `.rpm` from. Plain `http://` is rejected. |
+| `checksum_sha256` | string | yes | — | 64-char hex digest (the server requires lowercase; the agent compares case-insensitively). Mandatory — the agent refuses to install without it, independent of server validation. |
+| `install_path` | string | no | — | Ignored for `RPM` — the artifact is downloaded to a system temp file and handed to the package manager. The field belongs to `APP_IMAGE`, which shares this proto message. |
+<!-- docref: end -->
 
 ## Idempotency
 
-The agent downloads the `.rpm` to a temp file, runs `rpm -qp --qf "%{NAME}"` to read the canonical package name from the header, then checks `rpm -q <name>` against the device. If matched, `changed=false`. Otherwise `rpm -i` (or `rpm -U` if a different version is installed) runs.
+<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:5e8ee722 -->
+The agent downloads the `.rpm` to a temp file, reads the canonical package name from the header (`rpm -qp %{NAME}`, via the SDK), then checks the device. If the package is already installed, `changed=false`. Otherwise the SDK installs the local file through `dnf`/`zypper`, which resolves dependencies. Removal goes through `dnf`/`zypper remove <name>` so the scriptlets run properly.
 
-Removal (`desired_state: ABSENT`) re-downloads to read the name before removal.
+Removal (`desired_state: ABSENT`) re-downloads to read the name before removal. If the URL is dead, the action fails with an explicit "cannot determine rpm package to remove" error — unlike `DEB`, an rpm filename has no reliable name field (names can contain hyphens), so there is no URL fallback.
+<!-- docref: end -->
 
 ## Example
 
@@ -32,7 +36,11 @@ desired_state: PRESENT
 
 ## Gotchas
 
+<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:5e8ee722 -->
 - The package name comes from the rpm header itself, not the filename.
-- `rpm -i` doesn't resolve dependencies. For dependency resolution, install through `dnf install <url>` via a `SHELL` action, or use `PACKAGE` after configuring a repo.
-- A signed RPM is verified against the keyring on install. Unsigned RPMs install with a warning unless `rpm --nosignature` is set globally on the device.
-- The checksum is optional. Skip it only when you trust the URL's TLS chain.
+- Dependencies are resolved from the device's configured repositories (the install runs through `dnf`/`zypper`, not bare `rpm -i`). If a dependency isn't available in any configured repo, the action fails — add a `REPOSITORY` or `PACKAGE` action ahead of it.
+- Per-file GPG signatures are **not** checked: the install passes `--nogpgcheck` / `--allow-unsigned-rpm`. The artifact's trust model is verified HTTPS plus the mandatory SHA-256 checksum — operator-provided rpms typically carry no signature, and the package manager must not reject them as unsigned.
+<!-- docref: end -->
+<!-- docref: begin src=sdk:sys/remote/http.go#defaultHTTPClient:32293c49 -->
+- The download uses Go's default HTTP transport, so system proxy settings (`HTTP_PROXY` / `HTTPS_PROXY` in the agent's environment) are honoured.
+<!-- docref: end -->

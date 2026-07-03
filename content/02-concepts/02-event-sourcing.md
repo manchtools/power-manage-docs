@@ -3,7 +3,9 @@ title: Event sourcing
 ---
 # Event sourcing
 
+<!-- docref: begin src=server:internal/store/store.go#Store.fireListeners:12d04dc9,server:internal/projectors/wire.go#WireAll:47f93a77 -->
 Every state-changing operation appends an immutable event to the `events` table. Reads come from projection tables (`*_projection`) kept current by Go projector listeners that fire after the event commits. The `events` table itself is the audit log.
+<!-- docref: end -->
 
 ```mermaid
 flowchart LR
@@ -20,10 +22,12 @@ flowchart LR
 
 You'd save maybe 5ms of write latency. In exchange:
 
+<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:66e18472 -->
 - No record of who did what, when, with what payload.
 - A corrupted projection can't be rebuilt; the history is gone.
 - A new column means a destructive migration. A new event type is purely additive.
 - You lose the optimistic-concurrency knob that `UNIQUE (stream_type, stream_id, stream_version)` on the events table gives you.
+<!-- docref: end -->
 
 ## Projector pattern
 
@@ -54,7 +58,9 @@ func applyFooBarHappened(ctx context.Context, q *store.Queries, e store.Persiste
 }
 ```
 
+<!-- docref: begin src=server:internal/projectors/wire.go#WireAll:47f93a77 -->
 `FooBarListener` wires the two together and gets registered on store boot via `projectors.WireAll(store, logger)`.
+<!-- docref: end -->
 
 {% callout type="info" title="TDD rule" %}
 Decoder unit tests live in `internal/projectors/foo_test.go` with table-driven fixtures and synthetic `store.PersistedEvent` values; no DB needed. Listener integration tests in the same file write events through `AppendEvent` and assert the projection row appears.
@@ -62,6 +68,10 @@ Decoder unit tests live in `internal/projectors/foo_test.go` with table-driven f
 
 ## Optimistic concurrency
 
+<!-- docref: begin src=server:internal/store/store.go#Store.AppendEvent:8911d3fe,server:internal/store/store.go#Store.AppendEventWithVersion:973ddaad,server:internal/store/notfound.go#IsVersionConflict:701a9157 -->
 `AppendEvent` auto-increments `stream_version` and retries internally on `23505` unique-constraint violations. `AppendEventWithVersion` takes a caller-supplied expected version; use it when the handler needs to assert nothing has touched the stream since it read the projection.
+<!-- docref: end -->
 
-The TOTP backup-code consume path is a worked example: the handler reads the projection to verify the code, then `AppendEventWithVersion` writes the consumed-event with the projection's version. If anything else touched the user stream in between, the append fails and the operation retries, so the code can't be consumed twice by a concurrent caller.
+<!-- docref: begin src=server:internal/api/totp_handler.go#TOTPHandler.VerifyLoginTOTP:778e8c47 -->
+The TOTP backup-code consume path is a worked example: the handler reads the projection to verify the code, then `AppendEventWithVersion` writes the consumed-event at the projection's version + 1. If anything else touched the user's TOTP stream in between, the append fails and the handler does a one-shot retry against the re-read state, so the code can't be consumed twice by a concurrent caller.
+<!-- docref: end -->

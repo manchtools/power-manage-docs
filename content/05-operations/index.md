@@ -11,3 +11,4 @@ Day-2 reference:
 - [**FAQ**](/operations/faq) — frequently-asked questions about the platform.
 - [**Roadmap**](/operations/roadmap) — what's shipped this release, what's coming next, and what's deferred.
 - [**Action failure modes**](/operations/failure-modes) — which action types are safe to "misconfigure to learn" and which can leave a device worse off.
+- [**control doctor**](/operations/control-doctor) — the read-only health and security-posture pass, with graduated exit codes for CI.

@@ -1,0 +1,25 @@
+# docref keeps the prose in content/ honest against the code it describes.
+# The code lives in sibling repos (server, agent, sdk) — declared as aliases
+# below and pinned in docref.lock, so `docref check` never needs a workspace
+# checkout of the other repos.
+#
+# content/06-specs/ is intentionally OUT of the scan: specs are point-in-time
+# design artifacts, immutable once approved. Anchoring them to live code would
+# report drift forever. adr/ is out for the same reason.
+[scan]
+include = [
+  "content/01-get-started/**/*.md",
+  "content/02-concepts/**/*.md",
+  "content/03-action-reference/**/*.md",
+  "content/04-security/**/*.md",
+  "content/05-operations/**/*.md",
+]
+
+[repos.server]
+url = "https://github.com/manchtools/power-manage-server.git"
+
+[repos.agent]
+url = "https://github.com/manchtools/power-manage-agent.git"
+
+[repos.sdk]
+url = "https://github.com/manchtools/power-manage-sdk.git"

@@ -13,3 +13,4 @@ The cryptographic backbone:
 - [**Remote terminal access**](/security/terminal-access) — operator → device shell, audit-logged.
 - [**Audit log**](/security/audit-log) — what gets recorded, and how to read it.
 - [**CA rotation**](/security/ca-rotation) — the deploy-time procedure for swapping the root CA.
+- [**Two-factor authentication**](/security/two-factor) — TOTP setup, backup codes, and the admin reset path.

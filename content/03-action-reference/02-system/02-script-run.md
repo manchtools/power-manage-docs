@@ -3,7 +3,7 @@ title: SCRIPT_RUN
 ---
 # SCRIPT_RUN
 
-Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/system/shell), different semantics: `SCRIPT_RUN` is not idempotent. It runs every time it's dispatched and always reports `changed=true`.
+Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/system/shell), different lifecycle: `SCRIPT_RUN` is not idempotent across time. It runs when dispatched and — unlike every other action type — is never stored in the agent's offline scheduler, so it won't re-run on the agent's schedule afterwards.
 
 Use `SCRIPT_RUN` for things you want captured in the audit log without writing a detection script first: diagnostics, ad-hoc reports, one-shot data collection.
 
@@ -11,10 +11,12 @@ For idempotent shell work, use [`SHELL`](/action-reference/system/shell) with a 
 
 ## Parameters
 
-Same `ShellParams` proto as `SHELL` — see [the SHELL reference](/action-reference/system/shell) for the full list. Two differences in effect:
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd,agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
+Same `ShellParams` proto as `SHELL` — see [the SHELL reference](/action-reference/system/shell) for the full list. The agent executes both types through the exact same shell path, so `detection_script` and `is_compliance` behave the same *within a single run* (a passing detection still skips the script). The differences are lifecycle:
 
-- **`script` is functionally required.** The agent runs the remediation script unconditionally; without it there's nothing to run. Server-side validation accepts SHELL with only a `detection_script`, but for SCRIPT_RUN that combination is meaningless (the web form blocks it).
-- **`detection_script` and `is_compliance` are accepted but ignored.** They belong to SHELL's idempotency story; SCRIPT_RUN has no idempotency.
+- **`script` is what you want.** The web form expects one; a detection-only SCRIPT_RUN is technically accepted by the server but is just a one-shot compliance probe.
+- **No scheduled re-runs.** SHELL actions are stored on the agent and re-run on their schedule; a SCRIPT_RUN executes once per dispatch and is forgotten.
+<!-- docref: end -->
 
 ## Example
 
@@ -30,6 +32,12 @@ script: |
 
 ## Gotchas
 
-- Output goes to the execution event in the audit log, capped at the agent's per-execution output limit (1 MB by default). Anything over that is truncated, with a note.
-- No idempotency means the script runs on every [reconciliation tick](/concepts/reconciliation) if you put it in an assignment without a schedule. Add a cron schedule or a maintenance window unless you want it firing every tick (default 30 minutes).
-- For sensitive output (passwords, tokens), prefer `SHELL` with a detection script that doesn't echo the value. The audit redactor doesn't scrub script output.
+<!-- docref: begin src=sdk:sys/exec/types.go#MaxOutputBytes:380cb4fa,sdk:sys/exec/capped_buffer.go#truncationMarker:593e1237 -->
+- Output goes to the execution event in the audit log, capped at 1 MiB per stream (stdout and stderr separately). Anything over that is dropped and the output ends with `[output truncated]`.
+<!-- docref: end -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/runtime.go#periodicSync:2e2cbb96 -->
+- "Runs once per dispatch" includes re-dispatches: a SCRIPT_RUN in an assignment runs again whenever the device does a *full* desired-state reconcile — a fresh agent connection or an operator-triggered `SYNC` — though not on the incremental periodic tick. Don't put anything destructive in one without making it safe to repeat.
+<!-- docref: end -->
+<!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
+- For sensitive output (passwords, tokens), prefer `SHELL` with a detection script that doesn't echo the value. The audit redactor scrubs the script *body*, not the script's output.
+<!-- docref: end -->

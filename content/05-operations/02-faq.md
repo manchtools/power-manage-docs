@@ -19,7 +19,7 @@ The agent depends on Linux-specific subsystems (systemd / OpenRC / runit / s6 fo
 
 ## "How do I rotate the encryption key?"
 
-`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, SCIM bearer tokens, LUKS keys, LPS passwords). There's no built-in rotation tooling yet; every encrypted column has to be decrypted with the old key and re-encrypted with the new one as a manual migration.
+`CONTROL_ENCRYPTION_KEY` encrypts secrets at rest (IdP client secrets, TOTP secrets, LUKS keys, LPS passwords). There's no built-in rotation tooling yet; every encrypted column has to be decrypted with the old key and re-encrypted with the new one as a manual migration.
 
 The honest path today:
 
@@ -28,7 +28,9 @@ The honest path today:
 3. Update `CONTROL_ENCRYPTION_KEY` in `.env` to the new value.
 4. Restart the control container.
 
-This is tracked as a real CLI subcommand under the upcoming `SECURITY.md` ADR ([Roadmap](/operations/roadmap)) (until then, write the migration script per-deploy or operate as if the key is permanent.
+<!-- docref: begin src=server:docs/adr/0001-aes-key-rotation.md:0dac293b -->
+The proper fix — a versioned keyring with the key version in the existing `enc:v<n>:` ciphertext prefix, plus a background re-encrypt sweep — is designed in ADR 0001 (`server/docs/adr/0001-aes-key-rotation.md`) but deliberately deferred; until it ships, write the migration script per-deploy or operate as if the key is permanent.
+<!-- docref: end -->
 
 For `PM_TASK_SIGNING_KEY` rotation see [Asynq task signing](/security/task-signing).
 
@@ -39,26 +41,30 @@ Three things to keep in sync:
 | What | How |
 |---|---|
 | Postgres event store | `pg_dump` of the `powermanage` database. Projections rebuild from events; you don't strictly need them in backup. |
-| `.env` | The encryption key in here is what unlocks the event store. Lose it and the backup is useless. |
-| CA bundle | If you back up the event store but lose the agent CA, every enrolled agent has to re-enrol. |
+| `.env` | The encryption key in here is what unlocks the event store's secrets. Lose it and the backup is useless. |
+| CA material | `deploy/certs/` — `ca.crt` / `ca.key` plus the gateway/control service certs. If you back up the event store but lose the agent CA, every enrolled agent has to re-enrol. |
 
-Daily `pg_dump` + off-host storage of `.env` + the contents of `deploy/data/ca/` covers all three. The Redis state (Asynq queues, RediSearch indexes) is regenerable from the event store and doesn't need backup.
+Daily `pg_dump` + off-host storage of `.env` + the contents of `deploy/certs/` covers all three. The Valkey state (Asynq queues, search indexes) is regenerable from the event store and doesn't need backup.
 
 ## "Can I run multiple gateways?"
 
-Yes. The control server doesn't care which gateway an agent is connected to; agent → gateway routing is done by Traefik's SNI passthrough.
+<!-- docref: begin src=server:internal/config/config.go#Config.TraefikSelfRegister:f47e1041,server:internal/handler/agent.go#BootstrapRedirectMiddleware:ff85a16f -->
+Yes, and the plumbing is built in. Each gateway self-registers in Valkey on boot — including publishing its own Traefik routing entries when Traefik runs with the Redis provider (`GATEWAY_TRAEFIK_SELF_REGISTER`, on by default), so `docker compose up --scale gateway=N` works without per-instance route config. Agents first connect to the wildcard bootstrap hostname; whichever gateway receives them replies with an HTTP 307 to its own per-instance hostname, so every subsequent connection lands on the same gateway and the control server knows exactly which gateway holds each device's stream (this mapping is what routes terminal sessions).
+<!-- docref: end -->
 
-Stand up additional gateway containers on the same `pm-internal` Docker network with unique hostnames. Each gateway self-registers in Redis on boot, and the control server enqueues tasks per device. Traefik's `gateway` router doesn't load-balance; each gateway accepts whichever agents land on it.
-
-For high availability, run gateways on separate hosts behind a load balancer or DNS round-robin. Agent reconnects automatically when its current gateway drops.
+For high availability, run gateways on separate hosts. An agent whose gateway drops reconnects through the bootstrap hostname and gets adopted by a surviving gateway.
 
 ## "Can I run multiple control servers?"
 
-Not today. The control server has several singletons that would race if you ran two replicas against the same Postgres + Redis:
+Not today. The control server has several singletons that would race if you ran two replicas against the same Postgres + Valkey:
 
-- The dynamic-group evaluator and the stale-execution expiry job both run on a process-local timer with no leader election. Two replicas would re-evaluate every group and emit duplicate expiry events.
-- The `bootstrapAllDevicesGroup` startup path writes to `server_settings_projection`; two replicas racing there can corrupt the row.
-- Most projection writes are protected by the event store's `(stream_type, stream_id, stream_version)` unique constraint, but that catches duplicates *after* they're written — it doesn't serialise the concurrent workers.
+<!-- docref: begin src=server:cmd/control/periodic.go#startDynamicGroupWorker:0805db00,server:cmd/control/periodic.go#startStaleExecutionExpiry:ef5f969d,server:cmd/control/setup.go#bootstrapAllDevicesGroup:04b9912a -->
+- The dynamic-group evaluator and the stale-execution expiry job both run on a process-local timer with no leader election. Two replicas would re-evaluate every group and race the expiry sweep.
+- The all-devices-group bootstrap on startup emits a seed event; two replicas racing it rely on the event store's uniqueness to dedupe rather than on any coordination.
+<!-- docref: end -->
+<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:66e18472 -->
+- Event writes are protected by the store's `(stream_type, stream_id, stream_version)` unique constraint, but that catches conflicting appends *at write time* — it doesn't serialise the concurrent background workers.
+<!-- docref: end -->
 
 Practically, a second control replica would *partially* work — RPC reads are fine — but background work would fire twice per tick. There's no leader-election primitive in the codebase yet.
 
@@ -85,7 +91,9 @@ curl -X POST https://control.example.com/pm.v1.ControlService/ListDevices \
   -d '{"pageSize": 50}'
 ```
 
-The full RPC surface (164 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:6549d444 -->
+The full `ControlService` surface (164 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
+<!-- docref: end -->
 
 ## "How do I forward logs / events to my SIEM?"
 
@@ -100,33 +108,39 @@ For the host-tooling path, ship a `SHELL` or `FILE` action that drops the agent 
 
 Two steps:
 
-1. **Delete the device record** via the `DeleteDevice` RPC (web UI: device-detail → **Delete**). This emits a `DeviceDeleted` event. The projection row is dropped, the events table keeps the history (so the audit log remembers the device existed), and the control server stops enqueueing actions for it.
-2. **Uninstall the agent** on the host: `sudo apt remove power-manage-agent` (or distro equivalent). The agent's local state lives under `/var/lib/power-manage-agent/`; `--purge` removes it too.
+<!-- docref: begin src=server:internal/api/device_handler.go#DeviceHandler.DeleteDevice:d74b7e3f,server:internal/crl/crl.go#Store.Revoke:17984417 -->
+1. **Delete the device record** via the `DeleteDevice` RPC (web UI: device-detail → **Delete**). This emits a `DeviceDeleted` event — the projection row is dropped, the events table keeps the history, the control server stops enqueueing actions for it — **and revokes the device's mTLS certificate**: its fingerprint lands on the Valkey-backed CRL, and the gateway rejects the cert at its next connection attempt instead of trusting it until its 1-year expiry.
+2. **Uninstall the agent** on the host: `sudo apt remove power-manage-agent` (or distro equivalent). The agent's local state lives under `/var/lib/power-manage/`; remove that directory too if you want the credentials gone.
+<!-- docref: end -->
 
-{% callout type="warn" title="Cert revocation isn't implemented yet" %}
-The agent's mTLS certificate stays valid until the CA rotates (default 1-year lifetime). The gateway does not currently check a revocation deny-list during the handshake. With no device record on the control plane the cert can't dispatch anything useful, but if you've stopped trusting the host itself (compromise, theft) and want the cert to stop working before its natural expiry, the only options today are CA rotation (re-issues every active agent's cert) or shutting down the gateway. A proper `RevokeCertificate` RPC is on the [Roadmap](/operations/roadmap).
+{% callout type="note" title="Revocation rides deletion" %}
+There is no standalone `RevokeCertificate` RPC — deleting the device *is* the revocation lever (and every certificate renewal revokes the superseded cert automatically). The gateway's revocation check is fail-closed: it refuses to boot without loading the list, and keeps the last snapshot through a Valkey blip. See [mTLS and signed actions](/security/mtls).
 {% /callout %}
 
 ## "What happens if Postgres goes down?"
 
-The control server returns 5xx for any RPC that needs to write or read state. The gateway keeps streaming to connected agents (it doesn't have Postgres), but new dispatches can't be enqueued because the control server can't produce them.
+The control server returns errors for any RPC that needs to read or write state. The gateway keeps streaming to connected agents (it doesn't have Postgres), but new dispatches can't be enqueued because the control server can't produce them.
 
-Agents keep doing their current scheduled work using their offline cache. They re-sync once the control server is back. Execution events buffer locally on each agent (up to a configurable size) and ship to the control inbox when the gateway can re-deliver them.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler:29adb32b -->
+Agents keep doing their scheduled work: the offline scheduler executes from the agent's local action store (re-verifying each stored signed envelope before running it) and re-syncs once the control plane is back.
+<!-- docref: end -->
 
-So: short outages (minutes) are invisible to most operators. Long outages (hours) lose any actions that were supposed to be scheduled during the window, but converged-state actions continue running on agents.
+So: short outages (minutes) are invisible to most operators. Long outages (hours) delay anything that needed a fresh dispatch, but converged-state actions continue running on agents.
 
-## "What happens if Redis goes down?"
+## "What happens if Redis/Valkey goes down?"
 
-The Asynq queue and the RediSearch indexes are gone. Concretely:
+The Asynq queues and the search indexes live there. Concretely:
 
-- **New action dispatches** fail at the enqueue step. The control server returns an error to the operator.
+<!-- docref: begin src=server:deploy/valkey.conf.template:92f3972a -->
+- **New action dispatches** fail at the enqueue step while it's down. The control server returns an error to the operator.
 - **Search** stops working. Listing devices/users/actions still works (those come from Postgres projections); free-text search doesn't.
-- **Already-in-flight tasks** are lost. Asynq is in-memory in Redis. When Redis comes back, the queue is empty.
-- **Agents' bidi streams** stay open (they don't talk to Redis directly).
+- **Queued tasks survive a restart.** The stack runs Valkey with `appendonly yes` on a bind-mounted volume, so tasks already enqueued are recovered when the container comes back. What's lost is whatever operators *tried* to enqueue during the outage — those calls failed loudly at dispatch time.
+- **Agents' bidi streams** stay open (they don't talk to Valkey directly), but the gateway also fail-closes new mTLS admissions if its revocation-list cache has never loaded — a gateway restarted *during* a Valkey outage won't come up until Valkey returns.
+<!-- docref: end -->
 
-When Redis restarts, the search index needs to be rebuilt. The control server exposes the `RebuildSearchIndex` RPC for that; in the web UI it's **Settings** → **Search** → **Rebuild index** (available to users with the `RebuildSearchIndex` permission).
+If the search indexes come back stale or missing, trigger `RebuildSearchIndex` (web UI: **Settings** → **Search** → **Rebuild index**).
 
-For HA, the Compose stack isn't the right shape. Switch to a Redis replica setup with Sentinel or run on a managed Redis-compatible service.
+For HA, the Compose stack isn't the right shape. Switch to a Valkey replica setup with Sentinel or run on a managed Redis-compatible service.
 
 ## "Action vs. compliance policy: which do I use when?"
 
@@ -146,7 +160,9 @@ For most operators, "dev" is a staging host that mirrors prod. For per-developer
 
 ## "Can I have multiple admins?"
 
-Yes. The `Admin` role is just a seeded role with all permissions; it's not special. Create users, then call `AssignRoleToUser` to grant them Admin (web UI: **Users** → user-detail → **Roles** → add). Or build your own admin-equivalent role from `CreateRole` + the subset of permissions you actually want to grant.
+<!-- docref: begin src=server:internal/store/migrations/008_seeds.sql:d0e93fa9 -->
+Yes. The `Admin` role is just a seeded role carrying the full permission set; it's not special. Create users, then call `AssignRoleToUser` to grant them Admin (web UI: **Users** → user-detail → **Roles** → add). Or build your own admin-equivalent role from `CreateRole` + the subset of permissions you actually want to grant.
+<!-- docref: end -->
 
 Treat the bootstrap admin (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) as break-glass once you have at least one real admin: switch off password auth (`CONTROL_PASSWORD_AUTH_ENABLED=false`) and you'll only reach it by toggling that back on.
 

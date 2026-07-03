@@ -7,21 +7,29 @@ Grants a list of users SSH access by managing a dedicated Linux group plus an `s
 
 ## Parameters
 
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#SshParams:c8bd2df2,agent:internal/executor/action_ssh.go#Executor.executeSsh:54e5fbc4 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `allow_pubkey` | bool | no | `true` | Allow public-key authentication. |
+| `allow_pubkey` | bool | no | `false` | Allow public-key authentication. The web UI pre-checks it; an action with the field unset writes `PubkeyAuthentication no`. |
 | `allow_password` | bool | no | `false` | Allow password authentication. |
-| `users` | string[] | no | — | Usernames to grant SSH access. Each 1–32 chars. |
+| `users` | string[] | yes | — | Usernames to grant SSH access. Each 1–32 chars. The agent rejects an empty list. |
+<!-- docref: end -->
 
 ## How it works
 
-The agent creates a Linux group named `pm-ssh-<actionId>` (hashed to 32 chars if the action ID is long). It writes an `sshd_config.d/<priority>-pm-ssh-<actionId>.conf` drop-in with a `Match Group` directive that allows the listed authentication methods for the group. Members of `users` are added to the group. `sshd` is reloaded.
+<!-- docref: begin src=agent:internal/executor/action_ssh.go#sshGroupName:2ddfb689,agent:internal/executor/action_ssh.go#shortGroupName:acd6b1fe,agent:internal/executor/action_ssh.go#sshConfigPath:9ef48418,agent:internal/executor/action_ssh.go#generateSshGroupConfig:41e8aa4c -->
+The agent creates a Linux group named `pm-ssh-<actionId>` (the group name is capped at Linux's 32-char limit; a long action ID gets a stable hash-suffix truncation). It writes an `/etc/ssh/sshd_config.d/pm-ssh-<actionId>.conf` drop-in with a `Match Group` block that sets `PubkeyAuthentication` and `PasswordAuthentication` yes/no for the group. Members of `users` are added to the group. `sshd` is reloaded when the drop-in changes.
+<!-- docref: end -->
 
 ## Idempotency
 
-The agent checks three things: group membership matches `users` exactly, the drop-in file content matches the desired auth methods, and `sshd` is reloaded if anything changed. Matching state means `changed=false` and no `sshd` reload.
+<!-- docref: begin src=agent:internal/executor/action_ssh.go#Executor.setupSshAccess:6e505f3b -->
+The agent checks two things: the drop-in file content matches the desired auth methods, and group membership matches `users` exactly. Both matching means `changed=false` and no writes. A changed drop-in is validated with `sshd -t` before it counts, then `sshd` is reloaded; a membership-only change syncs the group without touching `sshd`.
+<!-- docref: end -->
 
+<!-- docref: begin src=agent:internal/executor/action_ssh.go#Executor.removeSshAccess:4e20ca92 -->
 `desired_state: ABSENT` removes the group, the drop-in, and reloads `sshd`.
+<!-- docref: end -->
 
 ## Example
 
@@ -41,5 +49,7 @@ desired_state: PRESENT
 
 - The corresponding `authorized_keys` for each user has to be managed separately. Use `USER` with `ssh_authorized_keys` for that.
 - Multiple `SSH` actions can coexist on a device. Each gets its own group + drop-in, so policies stack.
-- Re-naming the action creates a new group and a new drop-in. The agent doesn't garbage-collect the old one automatically; remove the old action with `desired_state: ABSENT` first.
-- `allow_password: true` is rarely the right answer. SSHD's drop-in writer emits each directive as a single `key value` line; it can't express a multi-line `Match` block today, so you can't currently scope password auth to a source-IP range from inside power-manage. If you need that, drop a hand-rolled `sshd_config.d/` fragment via a `FILE` action.
+- Re-creating the action creates a new group and a new drop-in (both are named after the action ID). The agent doesn't garbage-collect the old one automatically; remove the old action with `desired_state: ABSENT` first.
+<!-- docref: begin src=agent:internal/executor/action_ssh.go#generateSshGroupConfig:41e8aa4c -->
+- `allow_password: true` is rarely the right answer. The drop-in only expresses the fixed `Match Group` + auth-method block above; you can't scope password auth to a source-IP range from inside power-manage. If you need that, drop a hand-rolled `sshd_config.d/` fragment via a `FILE` action.
+<!-- docref: end -->
