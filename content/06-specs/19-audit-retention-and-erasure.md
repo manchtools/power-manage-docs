@@ -396,9 +396,19 @@ this spec pins them so a future refactor can't silently break them.
 - PII projection columns keep `NOT NULL` and take the `"[redacted]"` sentinel on
   erasure — the active-email unique index is `WHERE is_deleted = false`, so
   soft-deleted erased rows never collide and email is reusable (AC 15).
-- Snapshot capture: replay events ≤ N into fresh tables within the prune
-  transaction (deterministic == state@N, independent of live-projection drift);
-  serialize into the archive artifact.
+- Snapshot capture: **the archived artifact IS the ciphertext events ≤ N**
+  (a header plus one event row per line, streamed through the `ArchiveStore`).
+  The events are the snapshot: replaying them through the appliers
+  reproduces state@N deterministically (AC 17), and because PII rides in
+  them DEK-sealed, the archive holds no plaintext and a crypto-shredded
+  user restores as the redaction sentinel (AC 21a) — consistent with
+  "archives hold only ciphertext PII" under Out of scope.
+  *(Amended 2026-07-05: an earlier draft of this bullet described
+  serializing replayed projection tables into the artifact. That would
+  have placed decrypted plaintext PII in cold storage and let a restore
+  reproduce PII with the key table absent — defeating crypto-shred. The
+  implementation archives the events; no projection state is ever
+  written to an archive.)*
 - Append-only trigger (`009_v2026_07.sql`) amended — no exemption exists today,
   so this is a real migration: `DELETE` permitted only when a transaction-scoped
   `SET LOCAL` guard is set by the prune path **and** an `EventLogPruned` event is
