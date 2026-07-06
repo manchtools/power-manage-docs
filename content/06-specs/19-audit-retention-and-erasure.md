@@ -381,10 +381,18 @@ this spec pins them so a future refactor can't silently break them.
 ### Proto changes
 
 - No `EraseUser` RPC — deletion carries the shred.
-- Retention config surface (window + archive backend + backend config + worker
-  enabled), `@gotags`-validated (fs path absolute/writable when fs selected;
-  window bounds; unknown backend rejected).
-- Doctor response gains retention + dual key-invariant fields.
+- ~~Retention config surface (window + archive backend + backend config + worker
+  enabled), `@gotags`-validated~~ *(Amended 2026-07-06, maintainer decision:
+  retention is configured via **environment variables only** —
+  `CONTROL_RETENTION_ENABLED` / `_WINDOW` / `_ARCHIVE_BACKEND` /
+  `_ARCHIVE_PATH` / `_INTERVAL` — no RPC/UI surface. The same validation
+  rules apply, enforced fatally at boot: window ≥ 24h and never silently
+  clamped, backend must be `filesystem`, archive path absolute; a doctor
+  finding flags a running server whose retention env has since become
+  invalid. Rationale: retention is an operator/deployment concern like the
+  KEK; an RPC surface can be added later without breaking the env path.)*
+- Doctor (the CLI; there is no Doctor RPC) gains retention-posture + dual
+  key-invariant checks.
 - `IdentityLinkLoginUpdated` gains `user_id` (`@gotags validate:"required,ulid"`).
 
 ### Database changes
@@ -444,7 +452,9 @@ None.
   scope; irreversible, so the web UI keeps/gains step-up confirmation and every
   delete is audit-evented. Absent **and** out-of-scope targets return `NotFound`
   uniformly (no existence oracle, AC 13). Retention config changes are
-  permission-gated and audit-evented.
+  deployment-layer changes (environment variables, see the amended Proto
+  changes section) — gated by host/deploy access rather than an RPC
+  permission, the same trust boundary as the KEK itself.
 - **Fail-closed everywhere.** Append fails rather than write plaintext PII (AC 6);
   unwrap-failure aborts rather than mask as erasure (AC 10); archive-then-delete
   means no event is deleted whose sealed archive did not land (AC 28); a delete
