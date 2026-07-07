@@ -1,6 +1,6 @@
 ---
 title: "Server-side inventory collection interval"
-status: draft
+status: approved
 created: 2026-07-04
 updated: 2026-07-07
 ---
@@ -211,8 +211,18 @@ None.
 | Scenario | Error code | Client message | Logged context |
 |---|---|---|---|
 | Non-zero interval outside [120, 10080] | InvalidArgument | "inventory interval out of range" | actor, target, value |
-| Out-of-scope / absent device or group | NotFound | "device not found" / "device group not found" | actor, target |
+| Absent device or group | NotFound | "device not found" / "device group not found" | actor, target |
+| Out-of-scope device or group | PermissionDenied | "permission denied" | actor, target |
 | Unauthenticated | Unauthenticated | (interceptor) | method, remote |
+
+> **Amended during implementation (2026-07-07):** the original table said
+> out-of-scope → NotFound, but the spec also pins "identical scope model
+> to the sync-interval RPCs" — and the WS3 helpers those RPCs use
+> (`EnforceDeviceScopeOnBaseTier` / `EnforceDeviceGroupScope`) return
+> PermissionDenied for out-of-scope *mutations* across every
+> device-targeted write (NotFound is the read-visibility code). The
+> template's security-reviewed behavior wins; absent targets still
+> return NotFound.
 
 ## Rollout and migration
 
