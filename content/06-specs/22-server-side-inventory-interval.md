@@ -64,10 +64,14 @@ spec 19's "as-of last inventory" claims rely on.
 5. Given the control-side inventory scheduler, when it ticks (fixed 15 min
    cadence, advisory-lock single-flighted across replicas), then for every
    device whose inventory age exceeds its resolved interval AND whose
-   `last_seen_at` is recent enough to plausibly be connected, it enqueues at
+   `last_seen_at` is within one tick period (heartbeats update it every
+   30 s, so a connected device is always within this window), it enqueues at
    most one signed `RequestInventory` per tick, with an Asynq deadline
    **below the tick period** so requests to disconnected devices expire
-   rather than accumulate.
+   rather than accumulate. **No per-tick batch cap** (pinned): the
+   first-rollout herd (the whole fleet is stale on day one) is absorbed by
+   Asynq's queueing — the ingest side drains at its own pace, and the
+   deadline expires whatever cannot be delivered within a tick.
 6. Given a device with no inventory rows at all, when the scheduler evaluates
    it, then it is treated as stale (first collection happens automatically
    once the device is seen).
@@ -76,14 +80,27 @@ spec 19's "as-of last inventory" claims rely on.
    the RPC surface (`GetDevice` / `ListDevices`), then the Device message
    reports `last_inventory_at` and `inventory_overdue = true` — computed from
    the server-held cadence, valid even while the device is offline.
-   **Deliberately NOT a doctor check** (pinned): stale inventory is inevitable
-   on large fleets and would permanently trip doctor; overdue is an RPC/UI
-   signal, not a health gate.
+   Inventory age is `now − MAX(device_inventory.collected_at)` for the
+   device. **Deliberately NOT a doctor check** (pinned): stale inventory is
+   inevitable on large fleets and would permanently trip doctor; overdue is
+   an RPC/UI signal, not a health gate.
+   The scheduler threshold (interval) and the overdue threshold
+   (interval + grace) differ **deliberately**: the scheduler re-collects as
+   soon as inventory is *due*, so under normal operation the grace gap means
+   `overdue` only trips when collection is *failing* (device offline, agent
+   broken) — the stale-by-policy vs stale-because-broken distinction.
 8. Given the manual `RefreshDeviceInventory` RPC, when it succeeds, then it
    naturally resets freshness (inventory age is measured from
    `device_inventory.collected_at`); manual refresh semantics are unchanged.
 9. Given the agent, then it is **unchanged** by this spec: collection remains
    server-initiated over the WS4-verified signed `RequestInventory` path.
+10. Given `CONTROL_INVENTORY_SCHEDULER_ENABLED=false` (default `true`), when
+    the control server boots, then the scheduler is not started (one boot
+    log line states so) — the deployment-layer escape hatch for
+    change-frozen environments that must not run osquery on a cadence.
+    Manual `RefreshDeviceInventory` and the `inventory_overdue` computation
+    are unaffected (freshness is still evaluated against policy; it simply
+    will not self-heal).
 
 ## Out of scope
 
@@ -95,6 +112,10 @@ spec 19's "as-of last inventory" claims rely on.
 - The compliance FACT-rule consumption of inventory freshness — 2026.09
   (#492).
 - A configuration knob for the scheduler tick (fixed 15 min; cheap query).
+  The only operational knob is the on/off switch
+  (`CONTROL_INVENTORY_SCHEDULER_ENABLED`, AC 10).
+- A per-tick batch cap (pinned: Asynq queueing absorbs the first-rollout
+  herd; revisit only if ingest pressure is observed in practice).
 
 ## Technical design
 
@@ -111,7 +132,10 @@ spec 19's "as-of last inventory" claims rely on.
     (validate → `EnforceDeviceScopeOnBaseTier`) and
     `SetDeviceGroupSyncInterval` (validate → `EnforceDeviceGroupScope`);
     out-of-scope/absent targets → `NotFound`. Device read paths populate the
-    two new fields from the freshness query.
+    two new fields from the freshness data **joined into the existing list /
+    get queries** (`ListDevices` is plain SQL — a grouped/LATERAL join on
+    `MAX(device_inventory.collected_at)`, never a per-row N+1; the search
+    index is not involved).
   - `internal/store`: migration adding `inventory_interval_minutes` to
     `devices_projection` and `device_groups_projection` (default 0);
     typed payloads + projector appliers for the two new event types (device /
@@ -125,7 +149,9 @@ spec 19's "as-of last inventory" claims rely on.
     / retention-worker pattern: `runPeriodic`, `TryWithAdvisoryLock`
     single-flight, panic recovery). Reuses the exact signing + enqueue code
     path of `RefreshDeviceInventory` (`asynq.MaxRetry(3)`,
-    `asynq.Deadline(now + <tick)`).
+    `asynq.Deadline(now + <tick)`). Gated by
+    `CONTROL_INVENTORY_SCHEDULER_ENABLED` (default `true`; `false` skips the
+    worker with one boot log line — AC 10).
 - **web** (direct-to-main) — show `last_inventory_at` / overdue badge on the
   device list and detail views; interval fields on the device / group edit
   surfaces alongside the sync interval.
@@ -171,10 +197,12 @@ None.
 - Scheduler (real Postgres): stale device gets exactly one enqueued signed
   request per tick; fresh device gets none; never-collected device counts as
   stale; device with old `last_seen_at` is skipped; single-flight (second
-  replica skips); panic in one cycle doesn't kill the worker.
+  replica skips); panic in one cycle doesn't kill the worker;
+  `CONTROL_INVENTORY_SCHEDULER_ENABLED=false` starts no worker.
 - Freshness/RPC: `last_inventory_at` and `inventory_overdue` correct at the
   boundary (age just below vs above interval + grace); overdue computable
-  while device offline.
+  while device offline; the list query carries the fields without a per-row
+  N+1.
 - Full-fidelity rebuild: the two new events reproduce the projection columns
   byte-identically (extend the existing fixture).
 
@@ -192,8 +220,11 @@ None.
 - **Behavioral change (deliberate):** with the 24 h server default, every
   device begins receiving a signed inventory request once its inventory is
   older than 24 h — today nothing collects automatically. The 15 min tick +
-  `last_seen_at` filter + per-tick dedup bound the load; operators can raise
-  intervals per group up to 7 d.
+  `last_seen_at` filter + per-tick dedup bound the request side; the
+  first-rollout ingest herd is accepted (pinned) — Asynq queueing absorbs
+  it and the sub-tick deadline expires undeliverable requests. Operators can
+  raise intervals per group up to 7 d, or disable the scheduler entirely via
+  `CONTROL_INVENTORY_SCHEDULER_ENABLED=false` (change-frozen environments).
 
 ## Audit findings
 
