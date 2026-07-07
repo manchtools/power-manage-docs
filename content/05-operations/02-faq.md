@@ -62,11 +62,11 @@ Not today. The control server has several singletons that would race if you ran 
 - The dynamic-group evaluator and the stale-execution expiry job both run on a process-local timer with no leader election. Two replicas would re-evaluate every group and race the expiry sweep.
 - The all-devices-group bootstrap on startup emits a seed event; two replicas racing it rely on the event store's uniqueness to dedupe rather than on any coordination.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:66e18472 -->
+<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:7ec3ab3a -->
 - Event writes are protected by the store's `(stream_type, stream_id, stream_version)` unique constraint, but that catches conflicting appends *at write time* — it doesn't serialise the concurrent background workers.
 <!-- docref: end -->
 
-Practically, a second control replica would *partially* work — RPC reads are fine — but background work would fire twice per tick. There's no leader-election primitive in the codebase yet.
+Practically, a second control replica would *partially* work — RPC reads are fine — but the dynamic-group and expiry workers would fire twice per tick. Newer background workers (audit-log retention, the inventory scheduler) already single-flight across replicas via Postgres advisory locks (`TryWithAdvisoryLock`); the dynamic-group evaluator and expiry sweep haven't been ported to that pattern yet.
 
 If you need control-plane HA today, the supported pattern is **standby**, not **active-active**: a second container ready to start on a different host, sharing the database, brought up only if the primary fails. Add a managed-Postgres failover and you have a reasonable cold-standby story.
 
@@ -91,8 +91,8 @@ curl -X POST https://control.example.com/pm.v1.ControlService/ListDevices \
   -d '{"pageSize": 50}'
 ```
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:6549d444 -->
-The full `ControlService` surface (164 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:e6b2ec4d -->
+The full `ControlService` surface (166 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
 <!-- docref: end -->
 
 ## "How do I forward logs / events to my SIEM?"
@@ -160,7 +160,7 @@ For most operators, "dev" is a staging host that mirrors prod. For per-developer
 
 ## "Can I have multiple admins?"
 
-<!-- docref: begin src=server:internal/store/migrations/008_seeds.sql:d0e93fa9 -->
+<!-- docref: begin src=server:internal/store/migrations/008_seeds.sql:68a06c9b -->
 Yes. The `Admin` role is just a seeded role carrying the full permission set; it's not special. Create users, then call `AssignRoleToUser` to grant them Admin (web UI: **Users** → user-detail → **Roles** → add). Or build your own admin-equivalent role from `CreateRole` + the subset of permissions you actually want to grant.
 <!-- docref: end -->
 

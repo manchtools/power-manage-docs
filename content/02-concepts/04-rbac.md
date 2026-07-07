@@ -3,7 +3,7 @@ title: RBAC and scopes
 ---
 # RBAC and scopes
 
-<!-- docref: begin src=server:internal/store/migrations/008_seeds.sql:d0e93fa9,server:internal/auth/permissions.go#AllPermissions:46b6daca -->
+<!-- docref: begin src=server:internal/store/migrations/008_seeds.sql:68a06c9b,server:internal/auth/permissions.go#AllPermissions:665a1b03 -->
 Permissions are dynamic. Operators define roles by picking from a fixed permission list, and a user can hold several roles directly or pick them up from user groups. The seeded `Admin` and `User` roles are defaults you can replace, not the only options.
 <!-- docref: end -->
 
@@ -36,6 +36,6 @@ Permissions are unioned across a user's direct roles and all groups they belong 
 
 ## Identity providers and SCIM
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#CreateIdentityProviderRequest.auto_create_users:07cee631,server:internal/scim/users.go:4052bd61 -->
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#CreateIdentityProviderRequest.auto_create_users:07cee631,server:internal/scim/users.go:6ba4e92a -->
 For SSO, OIDC identity providers create users on first sign-in when `auto_create_users` is on. SCIM v2 endpoints accept full user and group provisioning from upstream IdPs. Both paths map onto the same event types the web UI emits, so the audit trail looks the same no matter how the change came in.
 <!-- docref: end -->

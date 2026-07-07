@@ -5,7 +5,7 @@ title: Device inventory
 
 The agent reports hardware, OS, and network facts about every device it runs on. Operators see the data on the device-detail page; the server stores it as a set of tables (one row per CPU, one per block device, etc.) and exposes them through Connect-RPC.
 
-Inventory is **request-response, not streaming**. A refresh runs when the server asks for one, plus on the agent's own cadence (on connect and every 24 hours). The agent collects locally and ships the result back. There is no continuous background telemetry.
+Inventory is **request-response, not streaming**, and always **server-initiated**: a refresh runs when an operator asks for one, or when the server-side scheduler notices a device's inventory is older than its configured interval. The agent collects locally and ships the result back — it has no timer of its own, and there is no continuous background telemetry.
 
 ## What gets collected
 
@@ -31,9 +31,21 @@ If [`osquery`](/concepts/osquery) is installed on the device, the agent layers i
 4. The gateway proxies the result back to control via `InternalService`; control persists the tables and surfaces them via `GetDeviceInventory`.
 <!-- docref: end -->
 
-<!-- docref: begin src=sdk:client.go#InventoryHandler:2277d9b5 -->
-The agent-initiated path (on connect + every 24 h) collects the same tables on its own schedule, with no server command involved.
+## Collection cadence
+
+<!-- docref: begin src=server:internal/inventorysched/inventorysched.go#Tick:b1c40c96,server:internal/inventorysched/inventorysched.go#DefaultIntervalMinutes:b1c40c96 -->
+Periodic collection is scheduled **by the server**, not the agent. Every 15 minutes the control server checks for connected devices whose inventory is older than their resolved interval and sends each one a signed inventory request over the exact same path as a manual refresh. The default interval is 24 hours.
 <!-- docref: end -->
+
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#SetDeviceInventoryIntervalRequest:55d9b12b,sdk:proto/pm/v1/control.proto#SetDeviceGroupInventoryIntervalRequest:24594347 -->
+The interval is policy you set per device or per device group (`SetDeviceInventoryInterval` / `SetDeviceGroupInventoryInterval`, 2 h – 7 d): a device-level override wins; otherwise the smallest interval across the device's groups applies; otherwise the 24 h default. `0` means "inherit". Changes are event-sourced and audit-visible like every other setting.
+<!-- docref: end -->
+
+<!-- docref: begin src=server:internal/inventorysched/inventorysched.go#Overdue:4842b820,sdk:proto/pm/v1/control.proto#Device.inventory_overdue:47df467c -->
+The device list and detail views show `last_inventory_at` and an **inventory overdue** badge. Overdue trips only when inventory age exceeds the interval *plus* a grace period (one hour or 25 % of the interval, whichever is larger) — under normal operation the scheduler re-collects as soon as inventory is due, so the badge means collection is *failing* (device offline, agent broken), not merely "due". It's computed from server-held policy, so it stays meaningful while a device is offline.
+<!-- docref: end -->
+
+Change-frozen environments that must not run osquery on a cadence can disable the scheduler with `CONTROL_INVENTORY_SCHEDULER_ENABLED=false` — manual refresh and the overdue computation keep working; freshness simply won't self-heal.
 
 <!-- docref: begin src=server:internal/store/queries/inventory.sql:d2d9ad07 -->
 Inventory is **not event-sourced** the same way action history is. The latest snapshot replaces the previous one per table. There's no audit trail of "what was on the device three weeks ago" — that's a deliberate scope choice; if you need point-in-time facts, wire a [`SCRIPT_RUN`](/action-reference/system/script-run) to dump and ship them.

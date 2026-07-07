@@ -55,13 +55,13 @@ A built-in dynamic group called "All Devices" is seeded on first boot. Its query
 
 ## When membership recomputes
 
-<!-- docref: begin src=server:internal/projectors/device_listener.go#enqueueDynamicDeviceGroupsForDevice:18e1abc5,server:cmd/control/periodic.go#startDynamicGroupWorker:0805db00,server:cmd/control/flags.go#clampDurations:0b177e87 -->
+<!-- docref: begin src=server:internal/projectors/device_listener.go#enqueueDynamicDeviceGroupsForDevice:18e1abc5,server:cmd/control/periodic.go#startDynamicGroupWorker:0805db00,server:cmd/control/flags.go#clampDurations:6460bc95 -->
 - **Event-queued.** A label change or device registration enqueues the affected dynamic groups for re-evaluation inside the projector transaction. The queue is drained by a server worker on the `DYNAMIC_GROUP_EVAL_INTERVAL` cadence (default `1h`, clamped to 30m–8h), with a full re-evaluation every 24h as a safety net.
 <!-- docref: end -->
 <!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService.EvaluateDynamicGroup:9567a7bf -->
 - **Manual.** The `EvaluateDynamicGroup` RPC forces a re-evaluation on demand.
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/store/queries/devices.sql:13a691e6,sdk:proto/pm/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
+<!-- docref: begin src=server:internal/store/queries/devices.sql:fca66bbb,sdk:proto/pm/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
 A group's `sync_interval_minutes` field is **not** a group re-evaluation timer — it sets the agent sync cadence for the group's member devices (a device-level override wins; otherwise the smallest non-zero interval across the device's groups applies).
 <!-- docref: end -->

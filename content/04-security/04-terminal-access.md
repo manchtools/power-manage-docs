@@ -68,7 +68,7 @@ Session start, stop, and force-termination are recorded in the audit log, along 
 
 Six RBAC permissions cover the terminal feature:
 
-<!-- docref: begin src=server:internal/auth/permissions.go#AllPermissions:46b6daca -->
+<!-- docref: begin src=server:internal/auth/permissions.go#AllPermissions:665a1b03 -->
 | Permission | What it grants |
 |---|---|
 | `StartTerminal` | Open a new terminal session against a device |
@@ -89,7 +89,7 @@ Only the operator's **input** stream is captured. The gateway tees stdin frames 
 
 The audit log shows:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:6678853b,server:internal/eventtypes/types.go#TerminalSessionStopped:6678853b,server:internal/eventtypes/types.go#TerminalSessionTerminated:6678853b -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:f3b5b093,server:internal/eventtypes/types.go#TerminalSessionStopped:f3b5b093,server:internal/eventtypes/types.go#TerminalSessionTerminated:f3b5b093 -->
 - Session start (`TerminalSessionStarted`): operator, device, session ID
 - Session input: everything the operator typed, per coalesced chunk
 - Session end: stopped by the operator (`TerminalSessionStopped`) or force-terminated by an admin (`TerminalSessionTerminated`)
