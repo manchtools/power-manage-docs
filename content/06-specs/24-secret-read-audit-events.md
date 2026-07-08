@@ -2,6 +2,7 @@
 title: "Audit events for secret reads (LPS / LUKS)"
 status: draft
 created: 2026-07-04
+updated: 2026-07-08
 ---
 
 # Audit events for secret reads (LPS / LUKS)
@@ -35,21 +36,34 @@ existed; this makes it true.
 2. Given an authorized `GetDeviceLuksKeys`, when it returns, then a
    `LuksKeysViewed` event is appended (actor, device, timestamp, key identifiers —
    **never** the passphrase).
-3. Given a rejected read (unauthenticated, wrong role, out-of-scope → NotFound,
-   or a decrypt failure), when it fails, then **no** view event is appended.
+3. Given a read rejected **at the handler** (out-of-scope → NotFound, absent
+   device, decrypt failure), when it fails, then a `LpsPasswordsViewDenied` /
+   `LuksKeysViewDenied` event is appended (actor, requested device, reason —
+   never any secret material) and **no** view event — "who wanted to read it
+   without access" is auditable, not just journal-logged. Reads rejected **at
+   the interceptor** (unauthenticated, or the caller lacks the base permission
+   entirely) never reach the handler and stay journal-only (see Out of scope —
+   the interceptor cannot know the target device without parsing payloads).
+   Denied-event appends are best-effort like the view events (`AUDIT GAP` on
+   failure) and never change the caller-visible NotFound response.
 4. Given the view events, when `ListAuditEvents` is queried, then they appear
    with the actor/device/time and are covered by the read-side redaction schema
    (no secret material can leak through the audit API).
-5. Given a successful read, when it appends the event, then exactly **one** event
-   is appended per call (not one per returned entry, unless the design chooses
-   per-entry — see Out of scope).
+5. Given a successful read, when it appends the event, then exactly **one**
+   event is appended per call, listing the returned identifiers. (**Pinned
+   2026-07-08**: per-call. Each call returns one key/password set, so per-call
+   IS the natural forensic unit; per-entry is rejected as noise.)
 
 ## Out of scope
 
-- Auditing *failed authorization attempts* beyond the existing interceptor logs.
-- Per-entry vs per-call granularity is drafted as **per-call** (one event listing
-  the identifiers); per-entry is a heavier alternative if forensic granularity is
-  required — decision left open, per-call default.
+- Auditing interceptor-tier authorization failures as EVENTS, across all RPCs.
+  Those denials (missing base permission, unauthenticated) are logged to the
+  journal by the RPC logging interceptor — procedure, request_id, user_id when
+  authenticated, code, duration, client metadata — but carry **no target
+  device** (the interceptor never parses payloads), and making it payload-aware
+  per-RPC is a whole subsystem. AC 3 deliberately carves out the two
+  secret-read RPCs at the HANDLER tier, where the target device is known; the
+  generic case stays out.
 - Changing the read RPCs' authorization (unchanged).
 
 ## Technical design
@@ -57,7 +71,8 @@ existed; this makes it true.
 ### Affected packages
 
 - `server/internal/eventtypes` (+ `payloads`) — `LpsPasswordsViewed`,
-  `LuksKeysViewed` typed payloads (identifiers only, no secrets).
+  `LuksKeysViewed`, `LpsPasswordsViewDenied`, `LuksKeysViewDenied` typed
+  payloads (identifiers/reason only, no secrets).
 - `server/internal/api/device_handler.go` — append on the success path of
   `GetDeviceLpsPasswords` / `GetDeviceLuksKeys` (after authz + decrypt, before
   returning); an append failure logs `AUDIT GAP` but does not fail the read (the
@@ -89,8 +104,12 @@ None.
 
 - Success → exactly one view event with correct actor/device/identifiers, no
   secret material; `ListAuditEvents` shows it; redaction verified.
-- Rejection (unauth / wrong role / out-of-scope NotFound / decrypt failure) →
-  zero view events.
+- Handler-tier rejection (out-of-scope NotFound / absent device / decrypt
+  failure) → zero VIEW events, exactly one DENIED event with actor + requested
+  device + reason, and the caller response unchanged (still NotFound — the
+  denied event must not create an existence oracle).
+- Interceptor-tier rejection (unauthenticated / missing base permission) →
+  zero events of either kind (journal-only).
 - Payload never contains a password/passphrase (assert on the stored event).
 
 ## Rejection paths
