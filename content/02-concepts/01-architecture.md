@@ -20,20 +20,20 @@ flowchart LR
 
 ## Control server
 
-<!-- docref: begin src=server:internal/store/store.go#Store.AppendEvent:8911d3fe,server:cmd/indexer/main.go:259813c9 -->
+<!-- docref: begin src=server:internal/store/store.go#Store.AppendEvent:d18121d5,server:cmd/indexer/main.go:259813c9 -->
 The control server is the only thing that **writes** to Postgres. Every state change goes through its `AppendEvent` path. The indexer reads Postgres read-only as part of its drift-reconciliation loop (see below); the gateway and agent never touch Postgres at all.
 <!-- docref: end -->
 
 It runs on `:8081` and hosts:
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:6549d444,server:cmd/control/main.go#main:ef3d6b72,sdk:proto/pm/v1/internal.proto#InternalService:8786ba93,server:cmd/control/flags.go#parseFlags:931db7c0 -->
-- The Connect-RPC `ControlService` over HTTPS plus JWT for the web UI and CLI (164 RPCs across users, devices, actions, assignments, groups, IdPs, SCIM, TOTP, compliance, audit, search)
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:e6b2ec4d,server:cmd/control/main.go#main:997b3c43,sdk:proto/pm/v1/internal.proto#InternalService:8786ba93,server:cmd/control/flags.go#parseFlags:d739daf2 -->
+- The Connect-RPC `ControlService` over HTTPS plus JWT for the web UI and CLI (166 RPCs across users, devices, actions, assignments, groups, IdPs, SCIM, TOTP, compliance, audit, search)
 - The `SSOCallback` RPC that completes the OIDC code exchange for SSO sign-in
 - The SCIM v2 endpoint at `/scim/v2/{slug}/` for IdP user and group provisioning
 - The internal mTLS-protected `InternalService` on `:8082` that the gateway calls for credential-bearing operations (LUKS keys, LPS passwords, auto-update info)
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/projectors/wire.go#WireAll:47f93a77,server:internal/store/store.go#Store.fireListeners:12d04dc9 -->
+<!-- docref: begin src=server:internal/projectors/wire.go#WireAll:c0a71065,server:internal/store/store.go#Store.fireListeners:12d04dc9 -->
 State changes go into the event store. Reads come from projection tables that Go listeners keep current after each commit.
 <!-- docref: end -->
 
@@ -80,7 +80,7 @@ The web UI is a SvelteKit SPA hosted separately from the server. Browsers fetch 
 
 Every state change is an immutable event. Projections are derived from the event log and can be rebuilt at any time.
 
-<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:66e18472 -->
+<!-- docref: begin src=server:internal/store/migrations/002_event_store.sql:7ec3ab3a -->
 That gets you a few things. The `events` table is the audit log, so there's no second source of truth to drift. Any past state is reconstructable for debugging. Adding a field is a new event, not a destructive migration. Every event carries an actor and a sequence number, so a missing entry is visible.
 <!-- docref: end -->
 

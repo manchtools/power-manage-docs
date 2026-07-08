@@ -73,7 +73,7 @@ There's also a separate "rerun a device's current policy now" operator action â€
 <!-- docref: begin src=agent:internal/executor/executor.go#IsInstantAction:401666e5,agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
 - Most actions are idempotent. `REBOOT`, `SYNC`, `SCRIPT_RUN`, and `SERVICE` with `desired_state: RESTARTED` are the explicit exceptions; each says so on its own page.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:6678853b,server:internal/eventtypes/types.go#ExecutionCompleted:6678853b,server:internal/eventtypes/types.go#ExecutionFailed:6678853b -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:f3b5b093,server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093 -->
 - Every action emits an `ExecutionCreated` event on dispatch and a terminal `ExecutionCompleted`, `ExecutionFailed`, or `ExecutionTimedOut` event when it finishes. The events table is the audit log.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->

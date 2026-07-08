@@ -120,7 +120,7 @@ Don't write actions that depend on each other across separate assignments. There
 Don't put secrets in `SHELL` scripts and assume the audit log redactor will save you. It scrubs script bodies (`script`, `detectionScript`) and file `content` from the visible trail, but actual encrypted-at-rest storage lives under the dedicated primitives (`LPS` for local passwords, `ENCRYPTION` for LUKS, the IdP credential store for OAuth secrets). Use the right one.
 <!-- docref: end -->
 
-<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:796d6b23 -->
+<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:41b51197 -->
 Don't set `CONTROL_PASSWORD_AUTH_ENABLED=false` until you've added and tested an OIDC provider. Locking yourself out is recoverable but tedious.
 <!-- docref: end -->
 

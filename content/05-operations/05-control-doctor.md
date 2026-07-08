@@ -53,7 +53,7 @@ A panicking check never aborts the suite — it's recovered into a "could not ru
 
 ## What it checks
 
-<!-- docref: begin src=server:internal/doctor/registry.go#DefaultChecks:650fcb22 -->
+<!-- docref: begin src=server:internal/doctor/registry.go#DefaultChecks:dd5d9b84 -->
 | Check | Looks at |
 |---|---|
 | `secrets` | Weak or placeholder secrets in the env (short JWT secret, default passwords) |
@@ -68,6 +68,9 @@ A panicking check never aborts the suite — it's recovered into a "could not ru
 | `search` | Expected search indexes present, indexer alive |
 | `terminal` | Valkey keyspace notifications + Traefik terminal-routing config (the silent terminal-404 trap) |
 | `admin` | Bootstrap admin still on the default email |
+| `dek_invariants` | Per-user PII encryption keys: every active user has an unwrappable DEK; no shredded (deleted) user still holds one |
+| `projection_drift` | Projections that stopped applying events — caught before retention prunes the history that would re-derive them |
+| `retention` | Audit-log retention posture: warns when retention is off (unbounded log growth), Critical on a config the server would refuse to boot with |
 <!-- docref: end -->
 
 <!-- docref: begin src=server:internal/doctor/doctor.go#Finding:0281b8e2 -->

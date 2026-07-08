@@ -70,7 +70,7 @@ If the gateway has no record of the device trying to connect, it's a network iss
 
 Two things look like this:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:6678853b,server:internal/eventtypes/types.go#ExecutionFailed:6678853b -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093 -->
 1. **The action was idempotent and the device was already converged.** `ExecutionCompleted` events with `changed=false` are the normal "no-op" result. Check the execution detail in the web UI; if it says `changed: false`, the device was already in the desired state.
 2. **The action's detection script lied.** Custom `SHELL` actions with a `detection_script` report compliant when the script returns 0. If the script returns 0 incorrectly, the agent skips the remediation.
 <!-- docref: end -->
@@ -93,7 +93,7 @@ The agent self-heals package-manager locks before package operations — but onl
 Three layers:
 
 1. **TOTP enabled but not entered.** If the account has TOTP, the password is only step 1 — the server returns a short-lived challenge and the sign-in form should show the code prompt. See [Two-factor authentication](/security/two-factor). If the prompt never appears, the JS is broken (browser console will tell you); try an incognito window in case it's a cached bundle.
-<!-- docref: begin src=server:cmd/control/admin_user.go#ensureAdminUser:51dfafb4 -->
+<!-- docref: begin src=server:cmd/control/admin_user.go#ensureAdminUser:f0dbf778 -->
 2. **Bootstrap admin password forgotten.** The bootstrap admin comes from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` and is created **only if no user with that email exists** — changing the password in `.env` later does nothing (the existing user row wins; changing the *email* would create a second admin instead). Another admin can reset it: web UI **Users** → user-detail → **Reset password** (the `UpdateUserPassword` RPC). If you don't have another admin, recover from a Postgres backup or fix the row via `psql`.
 <!-- docref: end -->
 <!-- docref: begin src=server:cmd/control/flags.go#validateAdminPassword:74044caa -->

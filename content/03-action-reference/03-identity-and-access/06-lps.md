@@ -58,7 +58,7 @@ desired_state: PRESENT
 <!-- docref: begin src=sdk:crypto/lps.go#SealLpsPassword:94af0f03,agent:internal/executor/lps.go#Executor.setupLpsPasswords:daa2a2c0,server:internal/api/internal_handler.go#InternalHandler.ProxyStoreLpsPasswords:da6698e9 -->
 - Passwords flow **agent → control**, sealed to the control server's X25519 LPS public key before they leave the device — the relaying gateway carries an opaque blob it cannot open. The seal is bound to (device, action, username), so a blob can't be replayed into another record. The agent seals *before* setting the password locally: if it can't seal (no verified control key yet), it refuses to rotate rather than strand a credential. Control unseals and re-encrypts with its at-rest key.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/audit_handler.go#eventRedactionSchemas:5e97c281,server:internal/api/device_handler.go#DeviceHandler.GetDeviceLpsPasswords:fabbbb9d -->
+<!-- docref: begin src=server:internal/api/audit_handler.go#eventRedactionSchemas:dd5d7439,server:internal/api/device_handler.go#DeviceHandler.GetDeviceLpsPasswords:fabbbb9d -->
 - Passwords never appear in the audit log — the rotation event's password field is redacted from the audit API; only "rotation occurred" is visible. Retrieval goes through `GetDeviceLpsPasswords`, gated on the dedicated `GetDeviceLpsPasswords` permission. Note that retrievals themselves are not currently written to the audit log.
 <!-- docref: end -->
 - The target accounts have to exist before LPS runs. A listed user that doesn't exist is skipped with a warning; LPS never creates accounts. If you're managing both, put a `USER` action ahead of LPS in the same action set.

@@ -29,7 +29,7 @@ flowchart LR
 | Renewal | At **80% of cert lifetime** (~292 days in), the agent calls `RenewCertificate` on the control server. The control server validates the presented cert's fingerprint against the DB, demands proof-of-possession, issues a new cert, and revokes the superseded one. |
 | Revocation | A Valkey-backed CRL shared by control (writer) and gateways (cached readers). Deleting a device revokes its cert; renewing a cert revokes the superseded one. The gateway's per-connection check is fail-closed. |
 
-<!-- docref: begin src=server:internal/ca/ca.go#CA.IssueCertificateFromCSR:e62c3adb,server:cmd/control/flags.go#parseFlags:931db7c0 -->
+<!-- docref: begin src=server:internal/ca/ca.go#CA.IssueCertificateFromCSR:e62c3adb,server:cmd/control/flags.go#parseFlags:d739daf2 -->
 The issued cert's validity defaults to 8760 hours (1 year, the `-cert-validity` flag on the control server). The CA signs only the CSR's public key — the private key never leaves the agent — and refuses any CSR that requests Subject Alternative Names, so a malicious agent can't mint a cert carrying internal hostnames. The device ID lands in the Subject CN, and the CA stamps the `agent` SPIFFE peer-class URI SAN itself.
 <!-- docref: end -->
 
@@ -59,7 +59,7 @@ The gateway caches the CRL in memory and checks each connection's cert fingerpri
 
 ## One CA root
 
-<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:796d6b23,server:internal/ca/ca.go#CA.SetTrustBundle:89b525aa -->
+<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:41b51197,server:internal/ca/ca.go#CA.SetTrustBundle:89b525aa -->
 Today there is **one** CA root in play, configured through `CONTROL_CA_CERT` / `CONTROL_CA_KEY`. The same CA signs the agent client certs *and* the gateway / control server certs used for the inter-service `InternalService` mTLS (separated by SPIFFE peer class, not by CA). The HTTPS cert on the Traefik edge is independent (your own issuer or Let's Encrypt). For rotation, `CONTROL_CA_TRUST_BUNDLE` can point the control server's *verification* pool at a PEM containing multiple CA certs while `CONTROL_CA_KEY` keeps signing — see [CA rotation](/security/ca-rotation).
 <!-- docref: end -->
 

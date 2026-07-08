@@ -51,7 +51,7 @@ This page documents the failure mode of every action type when it's given inputs
 
 ## Reading the execution event
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:6678853b,server:internal/eventtypes/types.go#ExecutionFailed:6678853b,server:internal/eventtypes/types.go#ExecutionTimedOut:6678853b -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093,server:internal/eventtypes/types.go#ExecutionTimedOut:f3b5b093 -->
 Every action emits one of three terminal events:
 
 - `ExecutionCompleted` — the action ran to completion. `changed=true` means state was mutated; `changed=false` means it was already in the desired state.

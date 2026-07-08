@@ -28,8 +28,8 @@ Eight trust boundaries. The list below is what each one is, then what it actuall
 <!-- docref: begin src=server:internal/taskqueue/sign.go#Signer.Wrap:2248192e,server:internal/taskqueue/sign.go#Signer.VerifyMiddleware:8511fb71 -->
 7. **Control to and from Asynq / Valkey.** Every task payload is HMAC-signed with `PM_TASK_SIGNING_KEY`. The consumer verifies (constant-time) before handing off to its handler.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/crypto/crypto.go#NewEncryptor:1f25da9e,server:internal/crypto/crypto.go#Encryptor.EncryptWithContext:22fe1d32 -->
-8. **Control to Postgres.** sqlc-generated queries. Secrets at rest go through AES-256-GCM with `CONTROL_ENCRYPTION_KEY` (new writes bind an AAD context, `enc:v2`).
+<!-- docref: begin src=server:internal/crypto/crypto.go#NewEncryptor:1f25da9e,server:internal/crypto/crypto.go#Encryptor.EncryptWithContext:9ebf6086 -->
+8. **Control to Postgres.** sqlc-generated queries. Secrets at rest go through AES-256-GCM with `CONTROL_ENCRYPTION_KEY`, every ciphertext AAD-bound to its row context (single `enc:v1` format, spec 20 — retired unbound formats fail loudly).
 <!-- docref: end -->
 
 ## What stays safe when something gets compromised

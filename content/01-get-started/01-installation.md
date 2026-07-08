@@ -36,7 +36,7 @@ cd power-manage-server/deploy
 
 ## What goes in `.env`
 
-<!-- docref: begin src=server:deploy/.env.example:2daedfcb,server:cmd/control/flags.go#validateJWTSecretStrength:455b6cee,server:cmd/control/admin_user.go#ensureAdminUser:51dfafb4 -->
+<!-- docref: begin src=server:deploy/.env.example:2daedfcb,server:cmd/control/flags.go#validateJWTSecretStrength:455b6cee,server:cmd/control/admin_user.go#ensureAdminUser:f0dbf778 -->
 If you'd rather edit by hand, here's the shape of the file (`deploy/.env.example` is the annotated reference). The minimum to bring the stack up is:
 
 ```bash
@@ -66,7 +66,7 @@ ADMIN_PASSWORD=<strong password>
 
 Optional toggles you may want to know about:
 
-<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:796d6b23,server:cmd/control/setup.go#seedSSHAccessForAll:dd6ef865,server:cmd/control/flags.go#clampDurations:0b177e87 -->
+<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:41b51197,server:cmd/control/setup.go#seedSSHAccessForAll:dd6ef865,server:cmd/control/flags.go#clampDurations:6460bc95 -->
 | Variable | Default | What it does |
 |---|---|---|
 | `CONTROL_PASSWORD_AUTH_ENABLED` | `true` | When `false`, password sign-in is disabled fleet-wide and only SSO works. |
@@ -84,7 +84,7 @@ For SSO-only deployments, set `CONTROL_PASSWORD_AUTH_ENABLED=false` *after* you'
 docker compose up -d
 ```
 
-<!-- docref: begin src=server:cmd/control/admin_user.go#ensureAdminUser:51dfafb4 -->
+<!-- docref: begin src=server:cmd/control/admin_user.go#ensureAdminUser:f0dbf778 -->
 Traefik usually has certificates in under a minute. Once they're issued, sign in: open the web UI at **{{WEB_UI_URL}}**, point it at your control-server domain (`control.example.com`), and use the admin credentials from setup. The admin account is created on first boot only; afterwards you should add a real SSO provider and treat the bootstrap account as break-glass.
 <!-- docref: end -->
 
@@ -92,7 +92,7 @@ For details on how the hosted UI talks to your server (and what it does *not* se
 
 The stack runs six containers:
 
-<!-- docref: begin src=server:deploy/compose.yml:652fa868,server:cmd/control/flags.go#parseFlags:931db7c0,server:internal/config/config.go#FromEnv:76de60f2,server:cmd/indexer/main.go:259813c9 -->
+<!-- docref: begin src=server:deploy/compose.yml:652fa868,server:cmd/control/flags.go#parseFlags:d739daf2,server:internal/config/config.go#FromEnv:76de60f2,server:cmd/indexer/main.go:259813c9 -->
 - **Traefik** terminates TLS and routes traffic. SNI-based TCP passthrough sends agent mTLS straight to the gateway.
 - **Postgres** holds the event store and projections.
 - **Valkey** runs the Asynq task queue, the search indexes (valkey-search), and short-lived auth state.
@@ -133,7 +133,7 @@ Useful flags (`--help` for the full list):
 | `--uninstall` | — | Remove the agent and its config |
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/deviceauth/enroll_server.go#EnrollSocketPath:9838543e,server:cmd/control/flags.go#parseFlags:931db7c0,agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb -->
+<!-- docref: begin src=agent:internal/deviceauth/enroll_server.go#EnrollSocketPath:9838543e,server:cmd/control/flags.go#parseFlags:d739daf2,agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb -->
 The install script registers the agent through a local enrolment socket at `/run/pm-agent/enroll.sock`. The control server signs a client certificate (1-year validity, auto-renews at 80% lifetime), and the agent starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
 <!-- docref: end -->
 
@@ -167,7 +167,7 @@ Or the equivalent URI form: `power-manage-agent enroll 'power-manage://control.e
 
 ## Health checks
 
-<!-- docref: begin src=server:cmd/control/main.go#main:ef3d6b72,server:cmd/indexer/main.go#main:2b6178cf -->
+<!-- docref: begin src=server:cmd/control/main.go#main:997b3c43,server:cmd/indexer/main.go#main:2b6178cf -->
 - `https://control.example.com/health` returns `ok` (public; safe to point a load balancer at)
 - The indexer's `:8090/health` is internal to the Docker network
 - `docker compose ps` reports container health

@@ -15,7 +15,7 @@ Power-manage has one CA root today: the value of `CONTROL_CA_CERT` / `CONTROL_CA
 
 There is no `RotateRootCA` CLI command or RPC. Rotation is a deploy-time procedure built around two primitives:
 
-<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:796d6b23,server:internal/ca/ca.go#CA.SetTrustBundle:89b525aa -->
+<!-- docref: begin src=server:cmd/control/flags.go#applyEnvOverrides:41b51197,server:internal/ca/ca.go#CA.SetTrustBundle:89b525aa -->
 - **The control server's trust bundle.** `CONTROL_CA_TRUST_BUNDLE` points at a PEM with multiple CA certs; during the rotation window both the *old* root and the *new* root verify agent certs. Signing stays on `CONTROL_CA_CERT` / `CONTROL_CA_KEY`.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/mtls/mtls.go#NewTLSConfig:4e33a1ed -->
@@ -117,7 +117,7 @@ cp certs/ca.new.key certs/ca.key
 docker compose restart control gateway
 ```
 
-<!-- docref: begin src=agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,server:internal/eventtypes/types.go#DeviceCertRenewed:6678853b -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,server:internal/eventtypes/types.go#DeviceCertRenewed:f3b5b093 -->
 From this point: every `RenewCertificate` and every fresh enrolment produces a cert signed by the new root, and the renewal response carries the new CA cert, which agents adopt (it chains to their enrolled root via the cross-signature). Existing agent certs signed by the *old* root stay trusted because the bundle still contains it. Watch the audit log for `DeviceCertRenewed` events to track migration — agents renew at 80% of their cert lifetime.
 <!-- docref: end -->
 
@@ -145,7 +145,7 @@ It does **not** rotate:
 - `PM_TASK_SIGNING_KEY` (HMAC for Asynq envelopes). See [Asynq task signing](/security/task-signing).
 - The HTTPS cert on Traefik.
 
-<!-- docref: begin src=server:internal/ca/ca.go#NewFromPEM:2da06d00,server:cmd/control/flags.go#parseFlags:931db7c0 -->
+<!-- docref: begin src=server:internal/ca/ca.go#NewFromPEM:2da06d00,server:cmd/control/flags.go#parseFlags:d739daf2 -->
 One more constraint on the *new* key's type: the CA key signs both certificates and dispatched actions, so it must be ECDSA or RSA — the control server refuses to boot with anything else (Ed25519 included). Issued agent certs get the validity from the `-cert-validity` flag (default 1 year).
 <!-- docref: end -->
 
