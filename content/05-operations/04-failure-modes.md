@@ -41,7 +41,7 @@ This page documents the failure mode of every action type when it's given inputs
 <!-- docref: end -->
 | `UPDATE` | Distro updates can break a device. Power-manage doesn't sandbox the package manager. | Pin to known-good package versions if your fleet is sensitive. Use maintenance windows + canary devices. |
 | `LPS` | Rotates passwords for every account in `usernames`. A typo can rotate the wrong account's password. Service accounts whose password is in a config file *will* break. | Treat `usernames` as a hand-curated list. Test on one device first. See the [LPS warning block](/action-reference/identity-and-access/lps). |
-<!-- docref: begin src=agent:internal/executor/luks.go:50fbfdca -->
+<!-- docref: begin src=agent:internal/executor/luks.go:47837cb3 -->
 | `ENCRYPTION` | Rotates LUKS passphrases. A bug here can lose access to the volume. Only the agent-managed passphrase slot is rewritten — other keyslots survive rotation. | Always keep at least one independent recovery key in a keyslot the agent doesn't manage. |
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/download.go#fetchArtifact:71cb53c3 -->
