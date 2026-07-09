@@ -30,7 +30,7 @@ Generated managed passphrases are word-based: at least `min_words` capitalised w
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:6858f990,agent:internal/executor/luks.go#Executor.takeOwnership:27c5364d,agent:internal/executor/luks.go#Executor.checkAndRotate:36fb0bc7 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:cc4a0407,agent:internal/executor/luks.go#Executor.takeOwnership:8933e7d4,agent:internal/executor/luks.go#Executor.checkAndRotate:de8a43c1 -->
 The agent auto-detects the encrypted volume on first run (preferring the volume the PSK unlocks, falling back to heuristic detection). Subsequent runs:
 
 1. Check the local rotation-state store. If never managed, take ownership using `preshared_key`, generate a managed passphrase, enrol it, and send it to the control server. The old key is only removed after the server confirms — and round-trips — the new one.
@@ -46,7 +46,7 @@ The device-bound key (when `device_bound_key_type` is not `NONE`) is reconciled 
 
 LUKS2 has eight slots (0–7). The agent uses them as follows:
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:36fb0bc7,sdk:sys/encryption/tpm.go#tpmEnroller.Enroll:3ede22be,sdk:sys/encryption/tpm.go#tpmEnroller.Wipe:5a854081,agent:internal/luksd/protocol.go#userPassphraseSlot:7b8f34c0 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:de8a43c1,sdk:sys/encryption/tpm.go#tpmEnroller.Enroll:3ede22be,sdk:sys/encryption/tpm.go#tpmEnroller.Wipe:5a854081,agent:internal/luksd/protocol.go#userPassphraseSlot:7b8f34c0 -->
 | Key | Slot | Set by | Lifecycle |
 |---|---|---|---|
 | **Managed passphrase.** The server-stored secret the agent rotates on schedule. | auto (lowest free slot) | `cryptsetup luksAddKey` without an explicit slot. | Rewritten every `rotation_interval_days`; old slot wiped only after the new one verifies. |
@@ -56,7 +56,7 @@ LUKS2 has eight slots (0–7). The agent uses them as follows:
 
 A device with `device_bound_key_type=NONE` has no device-bound slot at all.
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:27c5364d -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:8933e7d4 -->
 The pre-shared key from the action's `preshared_key` field is consumed during the very first rotation: the agent uses it to authenticate against an existing keyslot, adds the new managed passphrase to a fresh slot, verifies the server round-trip, then wipes the PSK slot. After that, the PSK is gone from the device and not retrievable from the server.
 <!-- docref: end -->
 
@@ -69,7 +69,7 @@ The flow is:
 1. The operator assigns an `ENCRYPTION` action with `device_bound_key_type=USER_PASSPHRASE`.
 2. The operator issues the user a one-shot enrolment token from the device-detail page in the web UI.
 3. The user runs `power-manage-agent luks set-passphrase --token <token>` on the device (no sudo needed — the CLI is unprivileged).
-<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:f9610395 -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:6a1f4df2 -->
 4. The CLI prompts enter + confirm (up to 3 attempts for a matching pair, with a 16-char floor as UX) and hands {token, passphrase} to the root agent's LUKS daemon over a local socket. The daemon validates the token via the agent's gateway session — single-use, device-bound, short-TTL — and enforces the action's min-length/complexity policy server-authoritatively, plus a reuse check against previous passphrase hashes.
 5. If the input clears the policy checks, the daemon fetches the current managed passphrase over the mTLS stream, revokes whatever device-bound key existed (e.g. a stale TPM seal), and enrols the user passphrase into slot 7.
 <!-- docref: end -->
@@ -106,10 +106,10 @@ desired_state: PRESENT
 ## Gotchas
 
 - The pre-shared key only matters for the very first rotation on a device. After that the agent uses its own managed passphrase. Don't reuse the PSK across many devices; it gets you owned-keyslot ownership and that's it.
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:6858f990,agent:internal/executor/luks.go#Executor.enrollTpm:e3a16272 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:cc4a0407,agent:internal/executor/luks.go#Executor.enrollTpm:e3a16272 -->
 - TPM enrolment is best-effort. If the device has no TPM (no `/dev/tpm0` / `/dev/tpmrm0`), the device-key reconciliation fails with "TPM2 device not found" — the failure is noted in the execution output and the agent log, but the action itself doesn't fail and the volume stays passphrase-only. It is not surfaced as a distinct audit event, so check execution output if you expect TPM auto-unlock.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:36fb0bc7 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:de8a43c1 -->
 - Rotating breaks any external tools that have a saved copy of the managed LUKS passphrase. If you have a separate recovery key in another keyslot, it survives rotation. The managed slot is the only one that gets rewritten.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/api/device_handler.go#DeviceHandler.GetDeviceLuksKeys:df2eaf75 -->

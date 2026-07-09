@@ -19,7 +19,7 @@ Manages a directory: presence, ownership, and mode. The complement to [`FILE`](/
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_directory.go#Executor.directoryMatchesDesired:fbe5d64f,agent:internal/executor/action_directory.go#Executor.executeDirectory:f63af3d7 -->
+<!-- docref: begin src=agent:internal/executor/action_directory.go#Executor.directoryMatchesDesired:fed8a844,agent:internal/executor/action_directory.go#Executor.executeDirectory:f63af3d7 -->
 `stat` the directory. Owner, group, and mode each match (checked only when set)? `changed=false`. Otherwise the agent creates the directory and applies mode and ownership through a symlink-safe, fd-anchored path.
 
 For `desired_state: ABSENT` the agent removes the directory. Protected system paths are refused — for **both** PRESENT and ABSENT, so the action can neither `chmod`/`chown` nor delete them.

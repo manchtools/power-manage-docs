@@ -103,7 +103,7 @@ The stack runs six containers:
 
 ## Enrolling your first agent
 
-<!-- docref: begin src=agent:install.sh:a9f2b6bc -->
+<!-- docref: begin src=agent:install.sh:68a486dc -->
 The agent ships as a single `install.sh` published with every release. It downloads the binary, sets up the `power-manage-agent` systemd unit, and enrols against the control server in one step. There's no `.deb` or `.rpm` package today; the curl pipe is the only supported install path.
 <!-- docref: end -->
 
@@ -120,7 +120,7 @@ Use `--pre` to install the latest release candidate instead of the stable releas
 
 Useful flags (`--help` for the full list):
 
-<!-- docref: begin src=agent:install.sh:a9f2b6bc -->
+<!-- docref: begin src=agent:install.sh:68a486dc -->
 | Flag | Default | What it does |
 |---|---|---|
 | `-s, --server URL` | — | Control-server URL the agent enrols against |

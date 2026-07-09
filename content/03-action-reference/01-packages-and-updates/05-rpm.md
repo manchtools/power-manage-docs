@@ -17,7 +17,7 @@ Installs an `.rpm` package from a URL. Same shape as `DEB`, different backend. U
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:5e8ee722 -->
+<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:8acb6864 -->
 The agent downloads the `.rpm` to a temp file, reads the canonical package name from the header (`rpm -qp %{NAME}`, via the SDK), then checks the device. If the package is already installed, `changed=false`. Otherwise the SDK installs the local file through `dnf`/`zypper`, which resolves dependencies. Removal goes through `dnf`/`zypper remove <name>` so the scriptlets run properly.
 
 Removal (`desired_state: ABSENT`) re-downloads to read the name before removal. If the URL is dead, the action fails with an explicit "cannot determine rpm package to remove" error — unlike `DEB`, an rpm filename has no reliable name field (names can contain hyphens), so there is no URL fallback.
@@ -36,7 +36,8 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:5e8ee722 -->
+<!-- docref: begin src=agent:internal/executor/action_rpm.go#Executor.executeRpm:8acb6864 -->
+- On a host without an rpm backend (no dnf/zypper), the action reports the **Not applicable** status with the reason `no supported .rpm package manager available on this system` — it is neither a failure nor a silent success.
 - The package name comes from the rpm header itself, not the filename.
 - Dependencies are resolved from the device's configured repositories (the install runs through `dnf`/`zypper`, not bare `rpm -i`). If a dependency isn't available in any configured repo, the action fails — add a `REPOSITORY` or `PACKAGE` action ahead of it.
 - Per-file GPG signatures are **not** checked: the install passes `--nogpgcheck` / `--allow-unsigned-rpm`. The artifact's trust model is verified HTTPS plus the mandatory SHA-256 checksum — operator-provided rpms typically carry no signature, and the package manager must not reject them as unsigned.

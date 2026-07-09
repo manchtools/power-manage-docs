@@ -17,12 +17,12 @@ Installs a `.deb` package from a URL. Used when the package isn't in a repositor
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.executeDeb:d5f8fa1c -->
+<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.executeDeb:c38446d8 -->
 The agent downloads the `.deb` to a temp file, reads the canonical package name out of the file's control metadata (`dpkg-deb`, via the SDK), then checks whether that package is already installed. If it is, `changed=false`. Otherwise the SDK installs the local file through `apt`, which resolves dependencies and runs maintainer scripts. Removal goes through `apt remove <name>` for the same reason.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.debAbsentPackageName:a2aeed29 -->
-For `desired_state: ABSENT` the same download-and-read-name flow runs so the agent knows what to remove. (The URL filename isn't trusted as the package name; it often differs.) If the download fails — the artifact was deleted upstream after the install — the agent falls back to parsing the `name_version_arch.deb` filename so a stale-URL ABSENT can still converge to "already absent".
+<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.debAbsentPackageName:0d94750e -->
+For `desired_state: ABSENT` the same download-and-read-name flow runs so the agent knows what to remove — but only when the artifact is verifiable (https + checksum): origin-served control-file bytes may only pick the removal target after checksum verification, so with no verifiable checksum the agent derives the name from the signed URL instead. The same `name_version_arch.deb` filename fallback covers a failed download — the artifact was deleted upstream after the install — so a stale-URL ABSENT still converges to "already absent".
 <!-- docref: end -->
 
 ## Example
@@ -38,13 +38,14 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.executeDeb:d5f8fa1c -->
+<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.executeDeb:c38446d8 -->
+- On a host without a deb backend (no apt), the action reports the **Not applicable** status with the reason `no supported .deb package manager available on this system` — it is neither a failure nor a silent success.
 - The package name is extracted from the `.deb` control file, not parsed from the URL. URLs like `https://example/foo-utils-1.2.deb` won't mislead the agent.
 - Dependencies are resolved from the device's configured repositories (the install runs through `apt`, not bare `dpkg -i`). If a dependency isn't available in any configured repo, the action fails — add a `REPOSITORY` or `PACKAGE` action ahead of it in the action set.
 <!-- docref: end -->
 <!-- docref: begin src=sdk:sys/remote/http.go#defaultHTTPClient:32293c49 -->
 - The download uses Go's default HTTP transport, so system proxy settings (`HTTP_PROXY` / `HTTPS_PROXY` in the agent's environment) are honoured.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/download.go#fetchArtifact:37286b7a,agent:internal/executor/download.go#redirectForArtifact:dc140dbf -->
+<!-- docref: begin src=agent:internal/executor/download.go#fetchArtifact:71cb53c3,agent:internal/executor/download.go#redirectForArtifact:dc140dbf -->
 - Because the download is checksum-pinned, cross-origin redirects are followed (GitHub-style CDN bounces work); an `https → http` downgrade is refused at every hop.
 <!-- docref: end -->

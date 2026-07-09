@@ -80,7 +80,7 @@ Open the `Install curl` action (still on the **Actions** page) and use the **Ass
 | Target | device group `production` |
 | Mode | `REQUIRED` |
 
-<!-- docref: begin src=sdk:proto/pm/v1/common.proto#AssignmentMode:d94753c7,agent:cmd/power-manage-agent/main.go#defaultSyncInterval:2d5b57db,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=sdk:proto/pm/v1/common.proto#AssignmentMode:d94753c7,agent:cmd/power-manage-agent/main.go#defaultSyncInterval:2d5b57db,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 Save. On the next [reconciliation tick](/concepts/reconciliation) (default 30 minutes) every production agent picks up the dispatch. If you don't want to wait, dispatch a `SYNC` from the device-detail page to force an immediate tick. The same Assign flow is on the detail page for an action set, definition, or compliance policy. Assignments are always created *from* whatever's being assigned.
 <!-- docref: end -->
 

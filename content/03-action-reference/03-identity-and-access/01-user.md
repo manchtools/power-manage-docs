@@ -33,7 +33,7 @@ On creation of a plain enabled account (none of `no_password` / `system_user` / 
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.updateUser:1851f99e -->
+<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.updateUser:50055ffa -->
 The agent checks each field individually against the device's current state (the passwd entry, `~/.ssh/authorized_keys` content, the AccountsService override for `hidden`). Mismatched fields are updated, matching ones are skipped; nothing to change reports `changed=false`.
 <!-- docref: end -->
 

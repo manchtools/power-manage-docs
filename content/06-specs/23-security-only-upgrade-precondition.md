@@ -1,8 +1,8 @@
 ---
 title: "NOT_APPLICABLE execution status (security-only precondition and friends)"
-status: draft
+status: implemented
 created: 2026-07-04
-updated: 2026-07-08
+updated: 2026-07-09
 ---
 
 # `NOT_APPLICABLE` execution status

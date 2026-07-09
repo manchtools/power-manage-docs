@@ -48,7 +48,7 @@ For the mTLS cases the gateway's logs are explicit: `tls: client certificate sig
 
 ### Agent shows "offline" in the UI but the process is running
 
-<!-- docref: begin src=agent:cmd/power-manage-agent/backend.go#randomBackoff:677c7f0d -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/backend.go#randomBackoff:8ef0d674 -->
 The agent process can be up and still not registered as online. The "online" signal is a heartbeat over the bidi gateway stream; if the stream broke, the agent retries indefinitely with exponential backoff (randomised start, doubling, capped at **5 minutes**) — so after a long outage it can take up to 5 minutes to come back even though the network is fine.
 <!-- docref: end -->
 
@@ -70,7 +70,7 @@ If the gateway has no record of the device trying to connect, it's a network iss
 
 Two things look like this:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:07405676,server:internal/eventtypes/types.go#ExecutionFailed:07405676 -->
 1. **The action was idempotent and the device was already converged.** `ExecutionCompleted` events with `changed=false` are the normal "no-op" result. Check the execution detail in the web UI; if it says `changed: false`, the device was already in the desired state.
 2. **The action's detection script lied.** Custom `SHELL` actions with a `detection_script` report compliant when the script returns 0. If the script returns 0 incorrectly, the agent skips the remediation.
 <!-- docref: end -->

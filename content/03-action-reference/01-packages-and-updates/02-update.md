@@ -14,14 +14,14 @@ Runs the device's package manager in upgrade mode. Equivalent to `apt dist-upgra
 <!-- docref: begin src=sdk:proto/pm/v1/actions.proto#UpdateParams:5efdd421 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `security_only` | bool | no | `false` | Install only security updates. Supported on apt (`unattended-upgrade`), dnf (`--security`), and zypper (`patch --category security`). On pacman it **fails closed** — the action errors rather than silently widening to a full upgrade. |
+| `security_only` | bool | no | `false` | Install only security updates. Supported on apt (`unattended-upgrade`), dnf (`--security`), and zypper (`patch --category security`). On pacman it stays **fail-closed** — nothing is upgraded and the action reports the **Not applicable** status rather than silently widening to a full upgrade. |
 | `autoremove` | bool | no | `false` | Remove orphaned dependencies after the upgrade. |
 | `reboot_if_required` | bool | no | `false` | Schedule a reboot if this run newly flagged one as needed. |
 <!-- docref: end -->
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_update.go#Executor.executeUpdate:fbe0dbc7,sdk:pkg/apt.go#apt.HasUpdates:a3c2627c,sdk:pkg/dnf.go#dnf.HasUpdates:8ebfaa5b,sdk:pkg/pacman.go#pacman.HasUpdates:c18e859c,sdk:pkg/zypper.go#zypper.HasUpdates:0cf38046 -->
+<!-- docref: begin src=agent:internal/executor/action_update.go#Executor.executeUpdate:6978695a,sdk:pkg/apt.go#apt.HasUpdates:a3c2627c,sdk:pkg/dnf.go#dnf.HasUpdates:8ebfaa5b,sdk:pkg/pacman.go#pacman.HasUpdates:c18e859c,sdk:pkg/zypper.go#zypper.HasUpdates:0cf38046 -->
 Before upgrading, the agent asks the package manager whether anything is pending: `dnf check-update` (exit 100), `pacman -Qu`, `zypper list-updates`, and a simulated `apt-get -s upgrade` (counting `Inst ` lines rather than parsing localised text, so non-English locales work). The index refresh and upgrade still run either way — the probe drives the `changed` flag, so a device with nothing pending reports `changed=false` instead of a state change.
 <!-- docref: end -->
 
@@ -39,7 +39,7 @@ reboot_if_required: true
 ## Gotchas
 
 <!-- docref: begin src=sdk:pkg/pkg.go#ErrSecurityOnlyUnsupported:eb93571f,sdk:pkg/apt.go#apt.securityUpgrade:101052c8 -->
-- `security_only` on Debian / Ubuntu runs `unattended-upgrade`, which must be installed — if it's absent the action fails closed with an actionable error rather than doing a full upgrade. Arch (pacman) has no security/non-security distinction and rejects the request outright.
+- `security_only` on Debian / Ubuntu runs `unattended-upgrade`, which must be installed — if it's absent the action stays fail-closed (no full upgrade) and reports the **Not applicable** status with the reason in the result. Arch (pacman) has no security/non-security distinction and reports the same way.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/action_update.go#Executor.scheduleRebootAfterUpdate:57122116 -->
 - `reboot_if_required` schedules the reboot 1 minute out, not immediate, and notifies signed-in users ("A system update requires a reboot. This system will reboot in 1 minute."). It only fires when *this* run created the reboot requirement — a device that already needed a reboot before the upgrade won't be rebooted by it. A reboot that fails to schedule fails the action.

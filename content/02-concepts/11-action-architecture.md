@@ -3,7 +3,7 @@ title: Action architecture
 ---
 # How actions are built
 
-<!-- docref: begin src=agent:internal/executor/action_user.go:fa2ad1e6,sdk:sys/user/accountsservice.go:f29e345c -->
+<!-- docref: begin src=agent:internal/executor/action_user.go:7ee801cd,sdk:sys/user/accountsservice.go:f29e345c -->
 Actions are not 1-to-1 wrappers around shell commands. They're declarative, typed operations that compose small system primitives from the SDK. That's why the action surface is short — twenty-odd action types — but the things you can express are broad: `USER` covers half a dozen `useradd`, `usermod`, `chage`, `passwd`, and AccountsService calls, and `ENCRYPTION` covers cryptsetup *and* systemd-cryptenroll *and* on-disk state tracking.
 <!-- docref: end -->
 
@@ -21,11 +21,11 @@ Understanding the layering matters when you're picking the right action type, wh
 └──────────────────────────────────────────────┘
 ```
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ActionType:89f99edb,agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:2b232bec -->
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ActionType:89f99edb,agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:a9a78b2a -->
 **Proto** is the contract. Every action type is an enum value on `ActionType` with a typed params message, and every dispatch travels as a CA-signed `SignedActionEnvelope`. Validation rules (`validate:` tags) are proto-level — the server validates at the boundary; the agent verifies the envelope's signature before executing.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:2b232bec,agent:internal/executor/executor.go#Executor.ExecuteEnvelope:d7ab4e1d -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:a9a78b2a,agent:internal/executor/executor.go#Executor.ExecuteEnvelope:d7ab4e1d -->
 **Executor** is per-action-type Go code in `agent/internal/executor/`. The dispatch is a single `switch` on the envelope's `ActionType` in `executor.go`'s `ExecuteWithStreaming` method (`ExecuteEnvelope` is the non-streaming wrapper); each case calls a dedicated `executeXxx` method that takes the typed params (plus desired state where relevant) and returns a `CommandOutput`, a `changed` flag, and an error. The executor is where idempotency lives: every method first reads current state, compares to desired state, and short-circuits when they match.
 <!-- docref: end -->
 
@@ -82,7 +82,7 @@ The standing rule (see CLAUDE.md): shared utilities go in the SDK first, not in 
 
 - **Idempotency is structural, not aspirational.** The current-state read is in the same method as the desired-state apply.
 - **Adding distro support is cheap.** Add a backend to the SDK; every action that uses it gets it.
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:f3b5b093 -->
-- **Auditing is uniform.** Every action emits `ExecutionCreated` / `ExecutionCompleted` / `ExecutionFailed` regardless of what it ran, with the same payload shape.
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:07405676 -->
+- **Auditing is uniform.** Every action emits `ExecutionCreated` / `ExecutionCompleted` / `ExecutionFailed` / `ExecutionNotApplicable` regardless of what it ran, with the same payload shape.
 <!-- docref: end -->
 - **The agent stays small.** The action surface doesn't grow per backend; the SDK substrate does.

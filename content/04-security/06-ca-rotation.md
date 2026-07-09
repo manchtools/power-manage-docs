@@ -117,7 +117,7 @@ cp certs/ca.new.key certs/ca.key
 docker compose restart control gateway
 ```
 
-<!-- docref: begin src=agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,server:internal/eventtypes/types.go#DeviceCertRenewed:f3b5b093 -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,server:internal/eventtypes/types.go#DeviceCertRenewed:07405676 -->
 From this point: every `RenewCertificate` and every fresh enrolment produces a cert signed by the new root, and the renewal response carries the new CA cert, which agents adopt (it chains to their enrolled root via the cross-signature). Existing agent certs signed by the *old* root stay trusted because the bundle still contains it. Watch the audit log for `DeviceCertRenewed` events to track migration — agents renew at 80% of their cert lifetime.
 <!-- docref: end -->
 

@@ -41,22 +41,23 @@ This page documents the failure mode of every action type when it's given inputs
 <!-- docref: end -->
 | `UPDATE` | Distro updates can break a device. Power-manage doesn't sandbox the package manager. | Pin to known-good package versions if your fleet is sensitive. Use maintenance windows + canary devices. |
 | `LPS` | Rotates passwords for every account in `usernames`. A typo can rotate the wrong account's password. Service accounts whose password is in a config file *will* break. | Treat `usernames` as a hand-curated list. Test on one device first. See the [LPS warning block](/action-reference/identity-and-access/lps). |
-<!-- docref: begin src=agent:internal/executor/luks.go:dd88f26f -->
+<!-- docref: begin src=agent:internal/executor/luks.go:50fbfdca -->
 | `ENCRYPTION` | Rotates LUKS passphrases. A bug here can lose access to the volume. Only the agent-managed passphrase slot is rewritten — other keyslots survive rotation. | Always keep at least one independent recovery key in a keyslot the agent doesn't manage. |
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/download.go#fetchArtifact:37286b7a -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/download.go#fetchArtifact:71cb53c3 -->
 | `AGENT_UPDATE` | Self-test catches most regressions, but a passing self-test doesn't guarantee a healthy stream under load. | The downloaded binary is checksum-verified, then run in `self-test` mode under a 60-second ceiling before it replaces the live binary. If the self-test fails, the old binary keeps running. If it passes but the new binary degrades, set the action to `ABSENT` to stop further rollout and re-deploy the prior version. |
 <!-- docref: end -->
 | `SCRIPT_RUN` | Runs every dispatch. A script with side effects (DB writes, file deletes) runs unconditionally — there's no idempotency gate. | Wrap side-effecting work in `SHELL` with a detection script. Save `SCRIPT_RUN` for read-only diagnostics. |
 
 ## Reading the execution event
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093,server:internal/eventtypes/types.go#ExecutionTimedOut:f3b5b093 -->
-Every action emits one of three terminal events:
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:07405676,server:internal/eventtypes/types.go#ExecutionFailed:07405676,server:internal/eventtypes/types.go#ExecutionTimedOut:07405676 -->
+Every action emits one of four terminal events:
 
 - `ExecutionCompleted` — the action ran to completion. `changed=true` means state was mutated; `changed=false` means it was already in the desired state.
 - `ExecutionFailed` — the action errored. The event carries the error plus stdout/stderr from whatever sub-process or SDK call failed.
 - `ExecutionTimedOut` — the action exceeded its per-action timeout. The agent killed the sub-process.
+- `ExecutionNotApplicable` — the action is structurally inapplicable to the device (a `DEB` action on an rpm host, `security_only` on a package manager with no security-patch scoping). Nothing ran; the reason is in the event. Neither a failure nor a success.
 <!-- docref: end -->
 
 For safe-to-misconfigure actions, `ExecutionFailed` is the *expected* failure path — the device is fine. For stateful-on-failure actions, `ExecutionFailed` may mean partial state changes landed; read the output carefully and consider rolling back manually.

@@ -3,7 +3,7 @@ title: SYNC
 ---
 # SYNC
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd,agent:cmd/power-manage-agent/runtime.go#periodicSync:2e2cbb96 -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb,agent:cmd/power-manage-agent/runtime.go#periodicSync:2e2cbb96 -->
 Triggers an out-of-band [reconciliation tick](/concepts/reconciliation). The agent immediately fetches its assignments from the gateway and runs a **full** desired-state reconcile — it re-applies every assigned action, not just new or changed ones, exactly like a fresh connection does. That's the lever for correcting drift *now* instead of within the next reconciliation interval.
 <!-- docref: end -->
 
@@ -17,7 +17,7 @@ None. Instant actions are parameterless — the signed envelope carries no param
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 None in the traditional sense. Triggering `SYNC` is itself the operation, and the actual work performed depends on the device's assignments at that moment. The SYNC action itself reports success with `changed=false` and `Sync triggered` as its output; the actions it triggers report their own outcomes.
 <!-- docref: end -->
 
@@ -32,7 +32,7 @@ type: SYNC
 ## Gotchas
 
 - `SYNC` doesn't pause for the maintenance window. The actions it triggers respect their own windows, so dispatching `SYNC` outside one isn't dangerous; anything window-gated stays queued.
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 - A flood of `SYNC` to the same device coalesces. The trigger is a single-slot channel — while a sync is already pending, further SYNC actions log "sync already pending" and fold into that one tick.
 <!-- docref: end -->
 <!-- docref: begin src=agent:cmd/power-manage-agent/main.go#defaultSyncInterval:2d5b57db -->

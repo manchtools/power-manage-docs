@@ -38,7 +38,7 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/action_appimage.go#sha256File:fc1b5818,agent:internal/executor/download.go#fetchArtifact:37286b7a -->
+<!-- docref: begin src=agent:internal/executor/action_appimage.go#sha256File:fc1b5818,agent:internal/executor/download.go#fetchArtifact:71cb53c3 -->
 - Downloads stream straight into the destination directory and are hashed as they go, then atomically renamed into place — large AppImages (GB-scale) don't blow up memory, and a failed or mismatched download never clobbers an existing file.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/action_appimage.go#Executor.executeAppImage:4cef8a51 -->

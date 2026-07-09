@@ -7,7 +7,7 @@ Installs a Flatpak from a configured remote. Most fleets default to `flathub`; y
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#FlatpakParams:9451b1ba,agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:63d18683 -->
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#FlatpakParams:9451b1ba,agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:db63062a -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `app_id` | string | yes | — | Reverse-DNS application ID (e.g. `org.mozilla.firefox`). Max 255 chars; flag-shaped values are rejected. |
@@ -45,8 +45,8 @@ desired_state: PRESENT
 <!-- docref: begin src=agent:internal/executor/action_flatpak.go#Executor.executeFlatpakPerUser:a64d295b -->
 - Per-user installs (`system_wide: false`) run for **every currently signed-in graphical session**, as that user. With no one signed in, the action logs a warning and reports success as a no-op — it runs again on the next reconciliation tick once a user signs in. Per-user *removal* is broader: it reaches every account on the box that has the app, signed in or not.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:63d18683 -->
-- If flatpak isn't installed on the device, the action skips with `skipped: flatpak not available on this system` rather than failing. Use a `PACKAGE` action to ensure flatpak is present first.
+<!-- docref: begin src=agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:db63062a -->
+- If flatpak isn't installed on the device, the action reports the **Not applicable** status with the reason `flatpak not available on this system` — neither a failure nor a silent success. Use a `PACKAGE` action to ensure flatpak is present first.
 <!-- docref: end -->
 <!-- docref: begin src=sdk:pkg/flatpak.go#flatpak.Pin:6fb1023b,agent:internal/executor/action_flatpak.go#Executor.executeFlatpakSystem:2d4a72af -->
 - Pinning uses `flatpak mask`. The mask is removed automatically on uninstall, but a `pin: false` re-dispatch does **not** drop an existing mask — the agent only converges the pin *on*. To unpin without removing the app, run `flatpak mask --remove` via `SHELL`.

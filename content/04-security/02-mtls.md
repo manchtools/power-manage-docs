@@ -115,7 +115,7 @@ The signature pre-image is `SHA-256(len32(domain) || domain || envelopeBytes)` w
 Algorithm is **ECDSA (ASN.1) or RSA PKCS#1 v1.5, both with SHA-256**, picked from the CA key's type; Ed25519 (and anything else) is explicitly refused by the verifier, and the control server refuses to boot with a signer-incompatible CA key rather than silently produce unverifiable dispatches.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 Instant actions (`REBOOT`, `SYNC`) are signed too — the type is bound inside the verified envelope, so a signature minted for a non-`SYNC` action cannot be lifted onto a `SYNC` dispatch. If the signature doesn't verify, nothing is stored, synced, or executed: the agent returns a `FAILED` result carrying the verification error ("refusing to execute unsigned/tampered action"), which lands in the audit log as an `ExecutionFailed` event — a forgery attempt leaves a trace.
 <!-- docref: end -->
 

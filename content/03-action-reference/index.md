@@ -60,7 +60,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `AGENT_UPDATE` | Self-update the agent binary. SHA-256 verified, swap-and-restart. |
 
-<!-- docref: begin src=server:internal/api/action_dispatch.go#ActionHandler.DispatchInstantAction:0c9f64b1,sdk:proto/pm/v1/actions.proto#SignedActionEnvelope:05aac70b,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=server:internal/api/action_dispatch.go#ActionHandler.DispatchInstantAction:0c9f64b1,sdk:proto/pm/v1/actions.proto#SignedActionEnvelope:05aac70b,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 `REBOOT` and `SYNC` are the only **instant actions** today. They dispatch over the agent's mTLS stream immediately rather than waiting for the next reconciliation tick. Like every dispatch, they carry a CA-signed `SignedActionEnvelope` whose bytes bind the action type, execution ID, desired state, timeout, and target device. The agent verifies the signature over those exact bytes before acting, so a compromised gateway or Valkey can't forge a fleet-wide reboot or retarget a captured envelope.
 <!-- docref: end -->
 
@@ -73,8 +73,8 @@ There's also a separate "rerun a device's current policy now" operator action â€
 <!-- docref: begin src=agent:internal/executor/executor.go#IsInstantAction:401666e5,agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
 - Most actions are idempotent. `REBOOT`, `SYNC`, `SCRIPT_RUN`, and `SERVICE` with `desired_state: RESTARTED` are the explicit exceptions; each says so on its own page.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:f3b5b093,server:internal/eventtypes/types.go#ExecutionCompleted:f3b5b093,server:internal/eventtypes/types.go#ExecutionFailed:f3b5b093 -->
-- Every action emits an `ExecutionCreated` event on dispatch and a terminal `ExecutionCompleted`, `ExecutionFailed`, or `ExecutionTimedOut` event when it finishes. The events table is the audit log.
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:07405676,server:internal/eventtypes/types.go#ExecutionCompleted:07405676,server:internal/eventtypes/types.go#ExecutionFailed:07405676 -->
+- Every action emits an `ExecutionCreated` event on dispatch and a terminal `ExecutionCompleted`, `ExecutionFailed`, `ExecutionTimedOut`, or `ExecutionNotApplicable` event when it finishes. The events table is the audit log.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
 - `SHELL`, `SCRIPT_RUN`, `FILE`, `SERVICE`, `ADMIN_POLICY`, `REPOSITORY`, `ENCRYPTION`, and `WIFI` actions can carry secret content. The audit redactor strips `script`, `detectionScript`, `content`, `unitContent`, `customConfig`, `gpgKey`, `presharedKey`, `psk`, and `clientKey` from the visible trail.

@@ -16,7 +16,7 @@ If osquery isn't installed, the agent falls back to its baseline inventory colle
 The agent looks for `osqueryi` at the conventional locations first — `/usr/bin/osqueryi`, `/usr/local/bin/osqueryi`, `/opt/osquery/bin/osqueryi` — then falls back to a `PATH` lookup. First hit wins.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.getOsquery:71bd6df0 -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.getOsquery:76e7fc53 -->
 Initialisation is lazy — the registry is created on the first query, not at agent start, and a failed probe is re-checked on the next use, so adding osquery later doesn't require an agent restart (only the next inventory refresh or on-demand query).
 <!-- docref: end -->
 

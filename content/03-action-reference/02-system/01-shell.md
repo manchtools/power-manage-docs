@@ -66,7 +66,7 @@ is_compliance: true
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:2b232bec -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:a9a78b2a -->
 - The exit code of the *remediation* script doesn't gate idempotency — only the detection script does. But a non-zero exit from either script fails the action (`script exited with code <n>`). It doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.runShellScript:78290ce4,agent:internal/executor/executor.go#Executor.runShellScriptPerUser:c8cd91af -->

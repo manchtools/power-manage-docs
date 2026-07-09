@@ -44,7 +44,7 @@ You write compliance in two stages because it lives in two artefacts:
 
 3. **Assign the policy** to a device group. The Assign button on the policy's detail page targets device groups exactly the way action / action-set assignments do.
 
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.detectChanges:cdb14b82,server:internal/compliance/evaluator.go#Evaluator.EvaluateInTx:c9e84084 -->
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.detectChanges:3371df74,server:internal/compliance/evaluator.go#Evaluator.EvaluateInTx:c9e84084 -->
 The agent now evaluates the policy every reconciliation tick: it runs the detection script and always reports the result back, even when it hasn't changed. Status transitions are events; the audit log replays them per device.
 <!-- docref: end -->
 

@@ -37,11 +37,11 @@ Three different ways an action can run:
 
 **Reconciliation tick.** The default. The agent's loop notices the assignment, runs the action, reports. No-op on converged devices.
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ActionSchedule:2f9d3987,agent:internal/scheduler/scheduler.go#Scheduler.Start:797e35c6 -->
+<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ActionSchedule:2f9d3987,agent:internal/scheduler/scheduler.go#Scheduler.Start:ecd13b70 -->
 **Schedule.** A cron expression or fixed interval attached to the assignment. Independent of the reconciliation tick: the action runs at the scheduled time even on devices that just reconciled. The offline scheduler keeps schedules firing while the agent is disconnected.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd,agent:internal/executor/executor.go#IsInstantAction:401666e5 -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb,agent:internal/executor/executor.go#IsInstantAction:401666e5 -->
 **Instant.** Dispatched immediately over the agent's stream, bypassing the tick. `SYNC` and `REBOOT` work this way when dispatched from a device-detail page in the UI.
 <!-- docref: end -->
 
@@ -63,6 +63,6 @@ If an operator changes an assignment while the agent is offline, the agent won't
 
 ## Forcing an out-of-band tick
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
 The `SYNC` action triggers a reconciliation immediately rather than waiting for the next interval. Useful when you've just made a change in the UI and want to see it land without waiting up to 30 minutes. See [SYNC](/action-reference/system/sync).
 <!-- docref: end -->

@@ -9,7 +9,7 @@ The agent can open an interactive shell to authorised operators through the cont
 The trust model leans toward the device. The agent decides whether *terminal* access is allowed at all. The TTY enable flag is enforced locally by the agent on every session-start request, so the gateway can't open a session against a device whose flag is off.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_tty.go#runTTY:4075ab09 -->
+<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_tty.go#runTTY:f0d527d2 -->
 > **Caveat: "terminal access disabled" is not the same as "remote root access disabled."** An operator with `DispatchAction` permission can run any [`SHELL`](/action-reference/system/shell) or [`SCRIPT_RUN`](/action-reference/system/script-run) script as root, including using `detection_script` as a structured way to read state back. Earlier agent code tried to gate the `tty enable` command on being invoked from an interactive TTY, but that turned out to be defeatable in one line (`script(1)` allocates a PTY), so the gate was dropped on purpose — the command now requires root instead. The TTY enable flag is what prevents an *interactive* session — RBAC over `DispatchAction` is what prevents the equivalent via a script. Treat them as two doors, both of which need to be closed.
 <!-- docref: end -->
 
@@ -89,7 +89,7 @@ Only the operator's **input** stream is captured. The gateway tees stdin frames 
 
 The audit log shows:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:f3b5b093,server:internal/eventtypes/types.go#TerminalSessionStopped:f3b5b093,server:internal/eventtypes/types.go#TerminalSessionTerminated:f3b5b093 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:07405676,server:internal/eventtypes/types.go#TerminalSessionStopped:07405676,server:internal/eventtypes/types.go#TerminalSessionTerminated:07405676 -->
 - Session start (`TerminalSessionStarted`): operator, device, session ID
 - Session input: everything the operator typed, per coalesced chunk
 - Session end: stopped by the operator (`TerminalSessionStopped`) or force-terminated by an admin (`TerminalSessionTerminated`)

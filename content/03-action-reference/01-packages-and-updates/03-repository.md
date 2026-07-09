@@ -3,9 +3,9 @@ title: REPOSITORY
 ---
 # REPOSITORY
 
-Adds or removes a third-party package repository. Each backend (apt, dnf, pacman, zypper) has its own native config shape, so the parameter set is split per manager. Set only the fields for the managers you actually use on the target devices; a `disabled: true` sub-config (or an absent one) makes the action a no-op skip on hosts running that manager.
+Adds or removes a third-party package repository. Each backend (apt, dnf, pacman, zypper) has its own native config shape, so the parameter set is split per manager. Set only the fields for the managers you actually use on the target devices; a `disabled: true` sub-config (or an absent one) makes the action report the **Not applicable** status on hosts running that manager.
 
-<!-- docref: begin src=sdk:sys/repo/validate.go#manager.Validate:791c557d,sdk:sys/repo/validate.go#hasControl:a3e20977,agent:internal/executor/action_repository.go#Executor.executeRepository:95e5d246 -->
+<!-- docref: begin src=sdk:sys/repo/validate.go#manager.Validate:791c557d,sdk:sys/repo/validate.go#hasControl:a3e20977,agent:internal/executor/action_repository.go#Executor.executeRepository:f48b455f -->
 The agent validates every field aggressively — before any privileged side effect. Control characters or newlines in any value are refused at validation time to prevent config injection, and the offending field is named without echoing its value.
 <!-- docref: end -->
 
@@ -75,7 +75,7 @@ Zypper — configured through `zypper addrepo` / `modifyrepo`:
 
 ## Idempotency
 
-<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:404ec309,sdk:sys/repo/apt.go#manager.updateAptKey:f3733dcc,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
+<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/apt.go#manager.updateAptKey:f3733dcc,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
 apt, dnf, and pacman compare the desired config against what's on disk and skip the write when nothing changed (`changed=false`): apt compares the deb822 source *and* the dearmored key bytes, dnf requires a byte-identical `.repo` file, pacman compares its rebuilt `pacman.conf`. zypper is the exception — it reconfigures via `removerepo` + `addrepo` on every run and always reports `changed=true`.
 <!-- docref: end -->
 
@@ -109,6 +109,6 @@ desired_state: PRESENT
 <!-- docref: begin src=sdk:sys/repo/repo.go#AptConfig:301a1d74 -->
 - `apt.trusted: true` skips signature verification. Don't use it outside dev / preview repos. It's ignored whenever a key is configured.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:404ec309,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
-- A repository action refreshes the metadata cache after the config changes (`apt update`, `dnf makecache --repo <name>`, `pacman -Sy`, `zypper refresh`), so the next `PACKAGE` action sees it. The refresh is non-fatal — a typo'd URL surfaces as a warning in the output, but the config still lands.
+<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
+- A repository action refreshes the metadata cache after the config changes (`apt update`, `dnf makecache --repo <name>`, `pacman -Sy`, `zypper refresh`), so the next `PACKAGE` action sees it. The refresh is non-fatal for reachability problems — a typo'd URL surfaces as a warning in the output, but the config still lands. The exception: if apt rejects the just-written source file at parse time, the write is rolled back and the action fails rather than leaving apt broken on the host.
 <!-- docref: end -->

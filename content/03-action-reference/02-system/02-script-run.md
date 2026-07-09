@@ -11,7 +11,7 @@ For idempotent shell work, use [`SHELL`](/action-reference/system/shell) with a 
 
 ## Parameters
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:2ce743bd,agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
+<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb,agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
 Same `ShellParams` proto as `SHELL` — see [the SHELL reference](/action-reference/system/shell) for the full list. The agent executes both types through the exact same shell path, so `detection_script` and `is_compliance` behave the same *within a single run* (a passing detection still skips the script). The differences are lifecycle:
 
 - **`script` is what you want.** The web form expects one; a detection-only SCRIPT_RUN is technically accepted by the server but is just a one-shot compliance probe.

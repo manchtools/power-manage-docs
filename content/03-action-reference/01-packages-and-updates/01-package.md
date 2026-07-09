@@ -24,8 +24,8 @@ Before any operation, the agent self-heals the package manager: clears `apt` / `
 | `zypper_name` | string | no | — | Override for openSUSE. |
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/action_package.go#Executor.executePackage:59345769,agent:internal/executor/action_package.go#Executor.getPackageNameForManager:56e215e3 -->
-\* The web form requires at least one of `name`, `apt_name`, `dnf_name`, `pacman_name`, or `zypper_name`. The proto itself doesn't enforce it: an action that resolves to no name for the device's package manager is skipped as a success no-op (`skipped: no package name configured for this package manager`), not failed.
+<!-- docref: begin src=agent:internal/executor/action_package.go#Executor.executePackage:4b928afb,agent:internal/executor/action_package.go#Executor.getPackageNameForManager:56e215e3 -->
+\* The web form requires at least one of `name`, `apt_name`, `dnf_name`, `pacman_name`, or `zypper_name`. The proto itself doesn't enforce it: an action that resolves to no name for the device's package manager reports the **Not applicable** status with the reason `no package name configured for this package manager` — not failed, and not a silent success.
 
 The agent runs the matching manager on the device. Unspecified managers are not touched.
 <!-- docref: end -->
