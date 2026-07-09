@@ -17,7 +17,7 @@ SCIM lets your IdP (Okta, Entra ID, Keycloak, …) push users and groups into Po
 
 ## The endpoint surface
 
-<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:5531cee7 -->
+<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:84400ff5 -->
 All routes mount under `/scim/v2/{slug}/…`: discovery (`ServiceProviderConfig`, `Schemas`, `ResourceTypes`), Users (list/create/get/replace/patch/delete), and Groups (same verbs). Every route — including discovery — goes through bearer-token authentication.
 <!-- docref: end -->
 

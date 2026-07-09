@@ -112,8 +112,8 @@ desired_state: PRESENT
 <!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:de8a43c1 -->
 - Rotating breaks any external tools that have a saved copy of the managed LUKS passphrase. If you have a separate recovery key in another keyslot, it survives rotation. The managed slot is the only one that gets rewritten.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/device_handler.go#DeviceHandler.GetDeviceLuksKeys:df2eaf75 -->
-- The current managed passphrase (and its history) is retrievable through the web UI's device-detail page under **Encryption** via the `GetDeviceLuksKeys` RPC, gated on the dedicated `GetDeviceLuksKeys` permission. Keys are stored encrypted at rest and decrypted per request. Note that retrievals themselves are not currently written to the audit log.
+<!-- docref: begin src=server:internal/api/device_handler.go#DeviceHandler.GetDeviceLuksKeys:b41f8631 -->
+- The current managed passphrase (and its history) is retrievable through the web UI's device-detail page under **Encryption** via the `GetDeviceLuksKeys` RPC, gated on the dedicated `GetDeviceLuksKeys` permission. Keys are stored encrypted at rest and decrypted per request. Every retrieval is itself audited: a `LuksKeysViewed` event records who read which keys (rotation IDs and device paths only, never the passphrase), and a handler-tier denial records `LuksKeysViewDenied`.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/luks.go#Executor.removeLuksManagement:e6eb9e84 -->
 - `desired_state: ABSENT` removes the agent's local state but does *not* unenroll the managed keyslot — the keys remain on the device. Use `cryptsetup luksRemoveKey` manually if you need to fully decommission.

@@ -10,7 +10,7 @@ Eight trust boundaries. The list below is what each one is, then what it actuall
 <!-- docref: begin src=server:internal/auth/interceptor.go#AuthInterceptor:82574866,server:internal/auth/interceptor.go#AuthzInterceptor:1682f36d,server:internal/auth/interceptor.go#RateLimiters:599a057d -->
 1. **Web or CLI to control RPC.** HTTPS plus JWT bearer. The auth interceptor and per-procedure rate limits run first; the authz interceptor enforces permission gates.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:5531cee7,server:internal/scim/auth.go#Handler.withAuth:5cd524d7 -->
+<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:84400ff5,server:internal/scim/auth.go#Handler.withAuth:5cd524d7 -->
 2. **SCIM IdP to SCIM endpoint.** Bcrypt-hashed bearer token per provider slug. Rate limits bucket on the slug (100/min) and on slug + client IP (20/min), applied *before* the bcrypt compare so token guessing can't be turned into a CPU DoS.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/idp/oidc.go#OIDCProvider.VerifyAndExtractClaims:abea947e,server:internal/idp/state.go#CodeChallengeS256:59390ddd,server:internal/api/sso_handler.go#validateSSORedirectURL:74b691ab -->

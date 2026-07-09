@@ -89,7 +89,7 @@ Only the operator's **input** stream is captured. The gateway tees stdin frames 
 
 The audit log shows:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:07405676,server:internal/eventtypes/types.go#TerminalSessionStopped:07405676,server:internal/eventtypes/types.go#TerminalSessionTerminated:07405676 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#TerminalSessionStarted:cb8bc377,server:internal/eventtypes/types.go#TerminalSessionStopped:cb8bc377,server:internal/eventtypes/types.go#TerminalSessionTerminated:cb8bc377 -->
 - Session start (`TerminalSessionStarted`): operator, device, session ID
 - Session input: everything the operator typed, per coalesced chunk
 - Session end: stopped by the operator (`TerminalSessionStopped`) or force-terminated by an admin (`TerminalSessionTerminated`)

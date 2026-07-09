@@ -70,7 +70,7 @@ If the gateway has no record of the device trying to connect, it's a network iss
 
 Two things look like this:
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:07405676,server:internal/eventtypes/types.go#ExecutionFailed:07405676 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCompleted:cb8bc377,server:internal/eventtypes/types.go#ExecutionFailed:cb8bc377 -->
 1. **The action was idempotent and the device was already converged.** `ExecutionCompleted` events with `changed=false` are the normal "no-op" result. Check the execution detail in the web UI; if it says `changed: false`, the device was already in the desired state.
 2. **The action's detection script lied.** Custom `SHELL` actions with a `detection_script` report compliant when the script returns 0. If the script returns 0 incorrectly, the agent skips the remediation.
 <!-- docref: end -->
@@ -112,7 +112,7 @@ The SCIM bearer token is bcrypt-hashed at rest. If you copied it from the web UI
 
 To fix, call `RotateSCIMToken` (in the UI: **Identity providers** → **SCIM** tab → **Rotate token** on the provider). A new token displays once. Copy it, then update the IdP's SCIM config with the new value.
 
-<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:5531cee7 -->
+<!-- docref: begin src=server:internal/scim/handler.go#NewHandler:84400ff5 -->
 If the rotation also doesn't work, check for rate limiting: the SCIM endpoint allows **100 requests/minute per provider slug** and **20 requests/minute per slug + client IP**. A 429 means back off for a minute; a sustained 429 at low volume means something else (a retry loop on the IdP side) is burning the budget.
 <!-- docref: end -->
 

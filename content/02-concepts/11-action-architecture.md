@@ -82,7 +82,7 @@ The standing rule (see CLAUDE.md): shared utilities go in the SDK first, not in 
 
 - **Idempotency is structural, not aspirational.** The current-state read is in the same method as the desired-state apply.
 - **Adding distro support is cheap.** Add a backend to the SDK; every action that uses it gets it.
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:07405676 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:cb8bc377 -->
 - **Auditing is uniform.** Every action emits `ExecutionCreated` / `ExecutionCompleted` / `ExecutionFailed` / `ExecutionNotApplicable` regardless of what it ran, with the same payload shape.
 <!-- docref: end -->
 - **The agent stays small.** The action surface doesn't grow per backend; the SDK substrate does.

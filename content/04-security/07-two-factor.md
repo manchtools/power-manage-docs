@@ -77,6 +77,6 @@ There is no admin *setup* path: an admin can remove a user's second factor, neve
 
 ## What lands in the audit log
 
-<!-- docref: begin src=server:internal/eventtypes/types.go#TOTPSetupInitiated:07405676,server:internal/api/audit_handler.go#eventRedactionSchemas:dd5d7439 -->
+<!-- docref: begin src=server:internal/eventtypes/types.go#TOTPSetupInitiated:cb8bc377,server:internal/api/audit_handler.go#eventRedactionSchemas:dd5d7439 -->
 Every TOTP state change is an event: `TOTPSetupInitiated`, `TOTPVerified`, `TOTPDisabled`, `TOTPBackupCodeUsed` (with the code's index, not the code), and `TOTPBackupCodesRegenerated`. The secret-bearing fields — the encrypted TOTP secret and the backup-code bcrypt hashes — are redacted when events are read back through `ListAuditEvents`, the same schema-aware redaction the rest of the [audit log](/security/audit-log) uses.
 <!-- docref: end -->

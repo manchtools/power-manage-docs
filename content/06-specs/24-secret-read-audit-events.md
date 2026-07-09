@@ -1,8 +1,8 @@
 ---
 title: "Audit events for secret reads (LPS / LUKS)"
-status: draft
+status: implemented
 created: 2026-07-04
-updated: 2026-07-08
+updated: 2026-07-09
 ---
 
 # Audit events for secret reads (LPS / LUKS)
