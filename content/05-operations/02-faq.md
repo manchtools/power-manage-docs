@@ -91,8 +91,8 @@ curl -X POST https://control.example.com/pm.v1.ControlService/ListDevices \
   -d '{"pageSize": 50}'
 ```
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:e6b2ec4d -->
-The full `ControlService` surface (166 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService:4add8f59 -->
+The full `ControlService` surface (167 RPCs) is documented in the proto files at [`manchtools/power-manage-sdk`](https://github.com/manchtools/power-manage-sdk).
 <!-- docref: end -->
 
 ## "How do I forward logs / events to my SIEM?"

@@ -57,7 +57,7 @@ Filters and sorts are validated up front against what each index actually declar
 Results come back with the entity `id`, its `scope`, convenience top-level fields (`name` — hostname for devices, email for users — `description`, `member_count`), and the full indexed hash in the `fields` map. `total_count` and `next_page_token` drive pagination.
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/auth/permissions.go#AllPermissions:665a1b03,server:internal/auth/interceptor.go#AuthzInterceptor.WrapUnary:b29794e8,server:internal/auth/interceptor.go#isExpensiveProcedure:bc05a794 -->
+<!-- docref: begin src=server:internal/auth/permissions.go#AllPermissions:665a1b03,server:internal/auth/interceptor.go#AuthzInterceptor.WrapUnary:b29794e8,server:internal/auth/interceptor.go#isExpensiveProcedure:c1bf7cb4 -->
 `Search` and `RebuildSearchIndex` are each gated by the permission of the same name (the authz interceptor authorizes by RPC name), and both fall into the "expensive procedure" class that gets a tighter per-user rate ceiling than ordinary reads.
 <!-- docref: end -->
 

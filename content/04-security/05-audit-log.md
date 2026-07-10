@@ -49,8 +49,22 @@ The web UI's **Audit** section (backed by `ListAuditEvents`) lets you filter by:
 - Stream type (`stream_type` — device, user, action, token, …)
 - Event type (`event_type`, e.g. `ExecutionCompleted`, `UserDisabled`)
 
-The same filters are available via Connect-RPC for export to a SIEM — it's a paginated unary RPC reading straight from Postgres, not a stream. There is no server-side time-range or outcome filter today; page through and filter client-side if you need those cuts.
+The same filters are available via Connect-RPC — a paginated unary RPC reading straight from Postgres, not a stream.
 <!-- docref: end -->
+
+The list view renders each event with actor, target (device / user / object, resolved to hostnames and e-mail addresses where possible), event type, outcome, and timestamp; the privileged-read events (osquery reads, log reads, secret views, LUKS-token grants, session lifecycle) additionally render a one-line human-readable summary of who read what on which device.
+
+## Export
+
+<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ExportAuditEventsRequest:b0fbe706,server:internal/api/audit_export.go#AuditHandler.ExportAuditEvents:8bec80be -->
+For DSAR requests and external review, `ExportAuditEvents` exports the filtered log as **CSV** or **JSON** server-side. It is a unary, *chunked* export: each call returns the next fragment of the artifact plus a page token, and the client loops until the token comes back empty — the server never holds more than one page in memory, and the keyset cursor means events appended mid-export can't duplicate rows. The filters mirror the audit view: exact actor, a stream-type set, an event-type substring, and an `occurred_at` range.
+<!-- docref: end -->
+
+<!-- docref: begin src=server:internal/api/audit_export.go#exportEvent:6903a7e9,server:internal/auth/interceptor.go#procedureAlternatives:b105addb -->
+The export cannot widen access relative to the list: it is gated by the same `ListAuditEvents` permission, and every exported row is built from the same read-side redaction path the list uses — a redacted field can never appear in an export.
+<!-- docref: end -->
+
+The web UI's **Export** button on the Audit page drives this RPC with whatever filters are currently applied (the search box maps to the event-type substring filter).
 
 ## Redaction
 
