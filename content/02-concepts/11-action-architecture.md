@@ -49,7 +49,7 @@ Each action type bundles whatever combination of SDK primitives is needed to con
 
 You'll see these all over the executor code (paths are relative to the SDK repo root):
 
-<!-- docref: begin src=sdk:sys/exec/runner.go#Runner:7679445f,sdk:sys/fs/protected.go:c1d3dc9b,sdk:sys/user/accountsservice.go:f29e345c,sdk:sys/service/service.go:c5e7deaa,sdk:sys/encryption/encryption.go#Backend:11393461,sdk:pkg/pkg.go#Manager:48758d2d,sdk:verify/verify.go:aa5b34f4,sdk:crypto/aead.go:5d5e4331 -->
+<!-- docref: begin src=sdk:sys/exec/runner.go#Runner:7679445f,sdk:sys/fs/protected.go:c1d3dc9b,sdk:sys/user/accountsservice.go:f29e345c,sdk:sys/service/service.go:4bdeb244,sdk:sys/encryption/encryption.go#Backend:11393461,sdk:pkg/pkg.go#Manager:48758d2d,sdk:verify/verify.go:aa5b34f4,sdk:crypto/aead.go:5d5e4331 -->
 - `sys/exec` — privileged subprocess execution (direct / sudo / doas, per `PrivilegeBackend`)
 - `sys/fs` — file ops with path-traversal and protected-prefix guards
 - `sys/user` — useradd / usermod / groupadd, AccountsService, authorized_keys
@@ -61,7 +61,7 @@ You'll see these all over the executor code (paths are relative to the SDK repo 
 - `crypto` — AES-GCM (AAD-bound) helpers for at-rest secrets
 <!-- docref: end -->
 
-<!-- docref: begin src=sdk:sys/encryption/encryption.go#Backend:11393461,sdk:sys/service/service.go:c5e7deaa,sdk:docs/02-concepts/02-backends.md:fc8a4141 -->
+<!-- docref: begin src=sdk:sys/encryption/encryption.go#Backend:11393461,sdk:sys/service/service.go:4bdeb244,sdk:docs/02-concepts/02-backends.md:fc8a4141 -->
 Packages like `sys/encryption` and `sys/service` take an explicit backend selector even while only one backend exists (LUKS, systemd) — the zero value is invalid and unknown backends return `ErrUnknownBackend`. That's the backend pattern described in the SDK's own docs (`docs/02-concepts/02-backends.md`): new backends land later without breaking the action's proto.
 <!-- docref: end -->
 

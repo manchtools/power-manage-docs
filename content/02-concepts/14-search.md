@@ -27,8 +27,8 @@ flowchart LR
     A[Search RPC] -->|FT.SEARCH| VS
 ```
 
-<!-- docref: begin src=server:internal/api/search_listener.go#SearchListener:6555342f,server:internal/api/search_listener.go#AffectedSearchOps:c57788be -->
-Maintenance is event-driven: a post-commit store listener classifies every appended event into reindex/remove operations. One event can fan out to several rows — a group-membership change reindexes the group (member count) *and* the affected user or device (its scope groups changed); an assignment change reindexes the source object's `assigned` and `scope_group_ids` tags. Listener errors are logged and swallowed (post-commit contract): a dropped enqueue means bounded drift until the next reconcile, never a failed mutation.
+<!-- docref: begin src=server:internal/api/search_listener.go#SearchListener:7a5b7f63,server:internal/api/search_listener.go#AffectedSearchOps:9f857e86 -->
+Maintenance is event-driven: a post-commit store listener classifies every appended event into reindex/remove operations (plus an O(1) indexed-field touch for device heartbeats, which keeps the online/offline status filter fresh without a row reload). One event can fan out to several rows — a group-membership change reindexes the group (member count) *and* the affected user or device (its scope groups changed); an assignment change reindexes the source object's `assigned` and `scope_group_ids` tags. Listener errors are logged and swallowed (post-commit contract): a dropped enqueue means bounded drift until the next reconcile, never a failed mutation.
 <!-- docref: end -->
 
 <!-- docref: begin src=server:internal/search/worker.go#BuildSearchWorkerMux:a6dc5329,server:cmd/indexer/main.go#parseFlags:80179e19 -->
@@ -80,7 +80,7 @@ An AST-scanning test asserts that the object types enforced at the handler bound
 {% /callout %}
 
 {% callout type="warn" title="Search is eventually consistent" %}
-<!-- docref: begin src=server:internal/api/search_listener.go#SearchListener:6555342f -->
+<!-- docref: begin src=server:internal/api/search_listener.go#SearchListener:7a5b7f63 -->
 The index trails the event store by an async enqueue + worker hop (normally milliseconds). If an enqueue is lost, drift is bounded by the indexer's periodic reconcile — worst case about an hour at the default interval. Point lookups and list pages read Postgres projections and are never stale in this way.
 <!-- docref: end -->
 {% /callout %}

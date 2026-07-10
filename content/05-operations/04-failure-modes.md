@@ -44,7 +44,7 @@ This page documents the failure mode of every action type when it's given inputs
 <!-- docref: begin src=agent:internal/executor/luks.go:47837cb3 -->
 | `ENCRYPTION` | Rotates LUKS passphrases. A bug here can lose access to the volume. Only the agent-managed passphrase slot is rewritten — other keyslots survive rotation. | Always keep at least one independent recovery key in a keyslot the agent doesn't manage. |
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/download.go#fetchArtifact:71cb53c3 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:3dca9d56,agent:internal/executor/download.go#fetchArtifact:71cb53c3 -->
 | `AGENT_UPDATE` | Self-test catches most regressions, but a passing self-test doesn't guarantee a healthy stream under load. | The downloaded binary is checksum-verified, then run in `self-test` mode under a 60-second ceiling before it replaces the live binary. If the self-test fails, the old binary keeps running. If it passes but the new binary degrades, set the action to `ABSENT` to stop further rollout and re-deploy the prior version. |
 <!-- docref: end -->
 | `SCRIPT_RUN` | Runs every dispatch. A script with side effects (DB writes, file deletes) runs unconditionally — there's no idempotency gate. | Wrap side-effecting work in `SHELL` with a detection script. Save `SCRIPT_RUN` for read-only diagnostics. |

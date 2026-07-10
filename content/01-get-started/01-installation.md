@@ -103,7 +103,7 @@ The stack runs six containers:
 
 ## Enrolling your first agent
 
-<!-- docref: begin src=agent:install.sh:68a486dc -->
+<!-- docref: begin src=agent:install.sh:3461c990 -->
 The agent ships as a single `install.sh` published with every release. It downloads the binary, sets up the `power-manage-agent` systemd unit, and enrols against the control server in one step. There's no `.deb` or `.rpm` package today; the curl pipe is the only supported install path.
 <!-- docref: end -->
 
@@ -120,7 +120,7 @@ Use `--pre` to install the latest release candidate instead of the stable releas
 
 Useful flags (`--help` for the full list):
 
-<!-- docref: begin src=agent:install.sh:68a486dc -->
+<!-- docref: begin src=agent:install.sh:3461c990 -->
 | Flag | Default | What it does |
 |---|---|---|
 | `-s, --server URL` | — | Control-server URL the agent enrols against |
@@ -136,6 +136,18 @@ Useful flags (`--help` for the full list):
 <!-- docref: begin src=agent:internal/deviceauth/enroll_server.go#EnrollSocketPath:9838543e,server:cmd/control/flags.go#parseFlags:d739daf2,agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb -->
 The install script registers the agent through a local enrolment socket at `/run/pm-agent/enroll.sock`. The control server signs a client certificate (1-year validity, auto-renews at 80% lifetime), and the agent starts heartbeating to the gateway. It shows up in the web UI within a few seconds.
 <!-- docref: end -->
+
+### The systemd unit is agent-managed
+
+<!-- docref: begin src=agent:internal/unit/unit.go#Reconcile:3048fba9,agent:cmd/power-manage-agent/cmd_installunit.go#runInstallUnit:0294d049 -->
+The `power-manage-agent.service` unit file ships **inside** the agent binary and is installed by the binary itself (`power-manage-agent install-unit` — what `install.sh` calls under the hood). At every daemon startup the agent compares the on-disk unit against its embedded copy and rewrites it (plus `daemon-reload`) when they differ, logging the drift at ERROR — so a binary update updates the unit's capability set and hardening directives too. The rewritten unit takes effect at the next service restart or reboot; the agent never restarts itself. A self-update refreshes the unit before its own restart, so updates converge in the restart they already perform.
+<!-- docref: end -->
+
+Do **not** edit the unit file directly — the agent will revert it (loudly). Operator customizations belong in drop-ins, which win over the unit per systemd semantics and which the agent never touches:
+
+```bash
+sudo systemctl edit power-manage-agent   # creates power-manage-agent.service.d/override.conf
+```
 
 ### Enrolment tokens
 

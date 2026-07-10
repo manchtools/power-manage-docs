@@ -59,7 +59,7 @@ Always run at least one indexer instance. Listing pages in the web UI (devices, 
 
 The agent runs as root on managed Linux endpoints. It:
 
-<!-- docref: begin src=agent:internal/deviceauth/enroll_server.go#EnrollSocketPath:9838543e,agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,sdk:proto/pm/v1/actions.proto#ActionType:89f99edb,agent:internal/executor/agent_update.go#executeAgentUpdate:6e49e8f9 -->
+<!-- docref: begin src=agent:internal/deviceauth/enroll_server.go#EnrollSocketPath:9838543e,agent:cmd/power-manage-agent/cert_rotation.go#renewAt:211ccaeb,sdk:proto/pm/v1/actions.proto#ActionType:89f99edb,agent:internal/executor/agent_update.go#executeAgentUpdate:3dca9d56 -->
 - Enrols once through a local Unix socket using a registration token. No sudo required to enrol.
 - Receives a CA-signed client certificate (1-year validity) and renews at 80% of its lifetime
 - Streams heartbeats and execution results to the gateway over Connect-RPC bidi

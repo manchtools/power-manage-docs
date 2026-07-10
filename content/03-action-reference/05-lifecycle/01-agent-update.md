@@ -28,14 +28,15 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 ## How it works
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:3dca9d56,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1 -->
 1. The agent reads its own architecture and picks the matching entry. If there's no entry for this arch, the action exits with `changed=false` and a noted skip.
 2. It determines the expected hash: `expected_sha256` if pinned in the signed action, otherwise it fetches the checksum file (sha256sums format) and takes the entry whose filename matches the binary URL. All URLs must be HTTPS.
 3. It downloads the binary to a staging directory and verifies the SHA-256. A mismatch aborts before anything runs.
 4. It runs the downloaded binary's `version` command and compares with the running version. Same version → `changed=false`, done. An **older** version is refused unless `allow_downgrade` is set on the action (anti-rollback); an unparseable version fails closed.
 5. It runs the new binary in a subprocess as `power-manage-agent self-test` with a 60-second timeout. The self-test exercises the same wiring the new binary will need in production — see [below](#what-the-self-test-actually-does).
-6. If the self-test passes, the agent copies the current binary to `<path>.bak` (manual rollback: restore it and restart the service), atomically swaps in the new binary, and restarts itself.
-7. If the self-test fails, the new binary is discarded and the old one keeps running.
+6. If the self-test passes, the agent copies the current binary to `<path>.bak` (manual rollback: restore it and restart the service) and atomically swaps in the new binary.
+7. It invokes the **new** binary's `install-unit`, refreshing the systemd unit from the template embedded in the new binary (fail-open — a unit failure never aborts a completed swap), then restarts itself: the respawn picks up binary and unit together.
+8. If the self-test fails, the new binary is discarded and the old one keeps running.
 <!-- docref: end -->
 
 ### What the self-test actually does
@@ -53,7 +54,7 @@ Anything that fails surfaces as the test exit code; the running binary captures 
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:3dca9d56 -->
 The agent compares the downloaded binary's reported version against its own running version. Equal means `changed=false`. A newer version triggers the self-test and swap.
 <!-- docref: end -->
 
@@ -75,7 +76,7 @@ arm64:
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:6e49e8f9 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:3dca9d56 -->
 - A failing self-test **fails the action**: the execution reports `FAILED` with the self-test's output in the execution event, and the old binary keeps running. Fix the underlying issue and let the next run retry.
 - No cooldown between retries. Retry frequency is governed entirely by the action's schedule — if the target version is broken and the action runs every 30 minutes, the agent re-downloads and re-tests it every 30 minutes until a fixed release is published or you cancel the assignment.
 <!-- docref: end -->
