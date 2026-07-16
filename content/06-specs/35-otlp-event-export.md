@@ -10,14 +10,15 @@ created: 2026-07-14
 
 Power Manage exports its audit and security-relevant events to an external
 observability/SIEM pipeline using a single open standard — **OTLP logs**. A
-control-server background worker streams events from the immutable event store,
+dedicated exporter service streams events from the immutable event store,
 redacts secret material, maps each to an OTLP `LogRecord`, and ships them to a
-configurable OTLP endpoint (gRPC or HTTP). Power Manage is only ever the
-**producer**: it never stores, queries, or serves exported events, and it
-speaks no legacy SIEM dialect. Translation to a specific SIEM's ingest format
-(syslog/CEF, Splunk HEC, etc.) is the operator's concern, performed by an OTel
-Collector they run — the canonical `OTLP → syslog` bridge is stock Collector
-configuration, not code Power Manage carries.
+configurable OTLP endpoint (gRPC or HTTP) without entering the control server's
+request or boot path. Power Manage is only ever the **producer**: it never
+stores, queries, or serves exported events, and it speaks no legacy SIEM
+dialect. Translation to a specific SIEM's ingest format (syslog/CEF, Splunk
+HEC, etc.) is the operator's concern, performed by an OTel Collector they run —
+the canonical `OTLP → syslog` bridge is stock Collector configuration, not code
+Power Manage carries.
 
 ## Motivation
 
@@ -56,38 +57,47 @@ single-flight via advisory lock).
    a newly-added event type is exported by DEFAULT — a new security-relevant
    event is never silently dropped (fail-toward-export for a compliance feed). A
    guard asserts the exported set is non-empty and that every excluded type is
-   deliberately enumerated.
+   deliberately enumerated. Excluded events are locally acknowledged, so a
+   checkpoint containing only exclusions still advances instead of looping.
 3. Given a secret-bearing event (secret-read, IdP secret, LUKS/LPS), when it is
    exported, then the `LogRecord` carries identifiers and metadata only, never
    secret material — the export reuses the `redactEventData` audit redactor, and
-   an unknown-schema secret-bearing payload is redacted fail-closed.
-4. Given at-least-once delivery, when the worker exports a batch, then the
-   persisted cursor advances only after the endpoint acknowledges; on restart
-   export resumes from the cursor with no gap, and resetting the cursor replays
-   history from that point.
-5. Given the OTLP endpoint is unreachable, when events are appended, then no
-   event is lost (the cursor holds, the event store is the durable buffer), the
-   RPC/append path is entirely unaffected (export is asynchronous and decoupled),
-   and export catches up automatically when the endpoint returns.
-6. Given the exporter runs as a single dedicated service instance (the default
-   deployment), then no cross-replica coordination is required and each event is
-   exported once. If an operator runs more than one exporter instance, they
-   coordinate via a single-flight advisory lock (or leader election) so fan-out
-   does not multiply deliveries; the SIEM's dedupe on `event.id` is the backstop
-   either way.
-7. Given concurrent in-flight appends, when the worker chooses how far to
+   an unknown or malformed payload is emitted as a minimal metadata-only record
+   with a mapping-error marker rather than skipped or copied through.
+4. Given at-least-once delivery, when the exporter ships a batch, then the
+   persisted cursor advances only after the endpoint acknowledges every
+   exportable record through the checkpoint and locally acknowledges exclusions;
+   on restart export resumes from the cursor with no gap, and resetting the
+   cursor replays history from that point. A crash after remote acknowledgement
+   but before cursor persistence may duplicate records, so consumers deduplicate
+   on `event.id`.
+5. Given the OTLP endpoint is unreachable or slow, when events are appended,
+   then no event is lost (the cursor holds, the event store is the durable
+   buffer), every export attempt has a bounded deadline, the RPC/append path is
+   entirely unaffected, and export catches up automatically with bounded
+   exponential backoff and jitter when the endpoint returns.
+6. Given one or more exporter replicas, when a replica starts its export loop,
+   then it must acquire the shared single-flight advisory lock before reading or
+   sending; a standby replica does not export while another owns the lock. The
+   lock prevents intentional fan-out but does not change the at-least-once
+   duplicate window from AC 4.
+7. Given concurrent in-flight appends, when the exporter chooses how far to
    advance, then it never advances past a `sequence_num` that a
    not-yet-committed lower append could still occupy — no event is skipped under
    concurrency (the prune.go commit-visibility contract).
-8. Given no OTLP endpoint configured, when the control server boots, then the
-   exporter is inert (disabled) and nothing is shipped. Given an endpoint is
-   configured but the URL/TLS/auth config is invalid, then the control server
-   **fails to boot loudly** rather than starting with silently-broken export (a
-   silently-disabled compliance feed is a finding, not a convenience).
-9. Given the export connection, when the worker ships a batch, then it connects
+8. Given no OTLP endpoint configured, when the dedicated exporter service boots,
+   then it remains inert and healthy and nothing is shipped. Given an endpoint
+   is configured but the URL/TLS/auth config is invalid, then the exporter
+   service **fails to boot loudly** while control remains unaffected.
+9. Given the export connection, when the exporter ships a batch, then it connects
    over TLS, presents any configured auth header sourced from encrypted-at-rest
-   config, and no secret (auth header, event secret material) appears in server
-   logs.
+   config, and no secret (auth header, event secret material) appears in exporter
+   or control logs.
+10. Given the endpoint returns an authentication rejection (HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied`), when
+    the attempt completes, then the cursor holds, the exporter enters an
+    operator-visible unhealthy `auth-blocked` state, logs one redacted error per
+    state transition, and probes again only at the maximum backoff until
+    authentication recovers or the service is restarted with corrected config.
 
 ## Out of scope
 
@@ -145,27 +155,25 @@ future read-only `GetExportStatus` RPC surfacing cursor lag is deferred.)
 
 ### Database changes
 
-- The exporter's cursor (last-exported `sequence_num`) persists in **Valkey**
-  (the exporter already connects to it, matching the indexer), keeping its
-  Postgres access strictly READ-ONLY on `events` — no migration, no write role
-  on the event store. (Alternative: a singleton `otlp_export_cursor` table if
-  durability beyond Valkey is wanted; decide at implementation. Any identifier
-  stays text/bigint — no uuid, F-15.)
+- The exporter's cursor (last-acknowledged `sequence_num`) persists in **Valkey**
+  under one fixed service key. Losing the cursor may replay acknowledged events
+  but cannot create a gap; OTLP remains at-least-once. Postgres access stays
+  strictly read-only on `events`, so no migration or event-store write role is
+  added.
+- Every export cycle uses the existing PostgreSQL advisory-lock mechanism under
+  a dedicated key before reading, sending, or advancing the cursor. The lock is
+  mandatory for one replica and many replicas alike.
 - No new event types. The exporter is a read-only consumer of existing streams.
 
 ### New dependencies
 
 - OTel logs SDK + OTLP exporter: `go.opentelemetry.io/otel/log`, `.../sdk/log`,
-  and `.../exporters/otlp/otlplog/otlploghttp` (OTLP/HTTP is the default
-  transport; `otlploggrpc` is an optional toggle). Justification: OTLP is the
-  chosen wire standard and there is no stdlib OTLP logs encoder; hand-rolling
-  protobuf/transport/batching/retry reimplements a maintained library. **The
-  dependency is confined to `cmd/otlp-export` + `internal/otlpexport`** — it
-  never enters the control or gateway binaries.
-- Minimal-dependency alternative (decide at implementation): emit OTLP/HTTP with
-  a JSON body via stdlib `net/http`, avoiding the OTel SDK at the cost of
-  hand-building batching/retry. A Connect client to OTLP/gRPC is possible but
-  offers no advantage over the SDK for an external sink.
+  `.../exporters/otlp/otlplog/otlploghttp`, and `otlploggrpc`. Justification:
+  OTLP is the chosen wire standard and there is no standard-library OTLP logs
+  encoder; hand-rolling protobuf, transport, and batching would duplicate a
+  maintained implementation. The dependency is confined to
+  `cmd/otlp-export` and `internal/otlpexport`; it never enters the control or
+  gateway binaries.
 
 ### Configuration (exporter service)
 
@@ -180,19 +188,31 @@ Absent endpoint ⇒ the service is inert (or simply not deployed):
 - `OTLP_EXPORT_TLS_CA` / insecure toggle — endpoint trust.
 - `OTLP_EXPORT_HEADERS` — auth header(s) (bearer/API key), encrypted at rest via
   `internal/crypto` like other config secrets.
-- `OTLP_EXPORT_INTERVAL` (default e.g. 5s) and batch size.
+- `OTLP_EXPORT_INTERVAL` (default 5s) and batch size.
+- `OTLP_EXPORT_TIMEOUT` (default 10s) — hard deadline for one endpoint attempt.
+- `OTLP_EXPORT_MAX_BACKOFF` (default 5m) — retry ceiling; jitter is always on.
+- `OTLP_EXPORT_HEALTH_LISTEN_ADDR` — liveness/readiness endpoint; readiness is
+  false while `auth-blocked` or while configuration is invalid.
 
 ### Service shape
 
-A ticker loop in the `cmd/otlp-export` binary — one instance by default. Each
-tick: load committed events with `sequence_num >` cursor and `<=` the visibility
-checkpoint (AC 7); apply the exclusion filter; redact via `redactEventData`; map
-to OTLP `LogRecord`s; export the batch; on endpoint ack, advance + persist the
-cursor. Endpoint failure ⇒ no cursor advance, retry next tick with backoff.
-Being a separate process, it is inherently decoupled from control's
-request/append path — a slow or hostile endpoint only makes the cursor lag,
-never stalls control (AC 5). A single instance needs no advisory lock (AC 6);
-running more than one opts into the lock.
+A ticker loop in the `cmd/otlp-export` binary. Every cycle first acquires the
+shared PostgreSQL advisory lock; a replica that does not acquire it remains
+standby for that cycle. The lock holder loads committed events with
+`sequence_num >` cursor and `<=` the visibility checkpoint (AC 7), locally
+acknowledges exclusions, redacts and maps exportable records, and sends them
+under the configured deadline. A malformed or unknown payload maps to a minimal
+metadata-only record, so it cannot leak secret data or wedge or skip the stream.
+The cursor advances to the checkpoint only when every exportable record through
+it is acknowledged, or immediately when that checkpoint contains exclusions
+only.
+
+Transient endpoint failure leaves the cursor unchanged and retries with bounded
+exponential backoff plus jitter. HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied` enters `auth-blocked`, makes
+readiness fail, logs the transition once without header data, and probes only at
+the maximum backoff until recovery. Being a separate process, the exporter is
+inherently decoupled from control's request and boot paths; a slow or hostile
+endpoint only makes the cursor lag, never stalls control (AC 5).
 
 ### OTLP mapping
 
@@ -228,10 +248,10 @@ clean attributes.
 - **Audit**: enabling/disabling export is a config change (deployment-level), not
   a runtime state-changing RPC, so it is captured by deployment change control
   rather than an in-app audit event. Delivery is at-least-once; the SIEM dedupes
-  on `event.id` as a backstop to AC 6.
+  on `event.id` for the crash-after-ack replay window.
 - **Availability**: export MUST NOT be able to stall the append path or the
-  request plane (AC 5) — the event store is the buffer, and a hostile/slow
-  endpoint only makes the cursor lag.
+  request plane (AC 5) — the separate process, attempt deadline, and bounded
+  backoff ensure a hostile or slow endpoint only makes the cursor lag.
 
 ## Test requirements
 
@@ -243,25 +263,34 @@ implementing the OTLP logs service):
 - happy path (AC 1): append a security event → assert the `LogRecord` arrives
   with the expected attributes within the interval.
 - exclusion filter (AC 2): an excluded type (e.g. a heartbeat) is not delivered
-  while a normal domain event is; the exported set (all-minus-exclusions) is
-  non-empty and a brand-new type defaults to exported.
-- redaction (AC 3): a secret-bearing event is delivered with secrets stripped —
-  reuse the audit-redactor fixtures; assert no secret substring in the payload.
-- at-least-once + replay (AC 4): kill/restart mid-stream → no gap; reset cursor →
-  replays.
-- endpoint down (AC 5): collector offline → cursor holds, appends still succeed,
-  bring collector up → backlog drains, no loss.
-- single-flight (AC 6): two workers sharing one Postgres/Valkey → each event
-  delivered once (advisory lock).
+  while a normal domain event is; an exclusions-only checkpoint advances; the
+  exported set (all-minus-exclusions) is non-empty and a brand-new type defaults
+  to exported.
+- redaction and mapping fallback (AC 3): a secret-bearing event is delivered with
+  secrets stripped; malformed/unknown payload data produces one minimal
+  metadata-only record with no secret substring and is not skipped.
+- at-least-once + replay (AC 4): kill/restart mid-stream → no gap; simulate a
+  crash after collector acknowledgement but before cursor persistence → duplicate
+  is allowed; reset cursor → replay.
+- endpoint down/slow (AC 5): collector offline or hanging → attempt deadline
+  fires, cursor holds, appends still succeed, retries stay within the backoff
+  bounds, and the backlog drains with no loss after recovery.
+- single-flight (AC 6): one worker still acquires the advisory lock; with two
+  workers sharing Postgres/Valkey, only the lock holder reads/sends in each
+  cycle and there is no intentional fan-out.
 - visibility (AC 7): concurrent appends around the checkpoint → no skipped event.
-- config fail-closed (AC 8): invalid endpoint/TLS → boot fails; absent endpoint →
-  inert.
+- config fail-closed (AC 8): invalid endpoint/TLS → exporter boot fails while
+  control stays available; absent endpoint → exporter inert and healthy.
+- auth-blocked (AC 10): HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied` holds the cursor, flips readiness unhealthy,
+  logs one redacted state transition, probes only at maximum backoff, and
+  recovers after endpoint authorization is restored.
 
 ### Property-based or generative tests
 
-- Over random interleavings of appends and worker ticks, the multiset of
-  delivered `event.id`s equals the set of appended security-relevant ids (no
-  loss, at-least-once), and the cursor is monotonic.
+- Over random interleavings of appends, acknowledgements, cursor writes, crashes,
+  and worker ticks, every appended exportable `event.id` appears at least once,
+  every delivered ID belongs to the source set, duplicates are allowed, and the
+  persisted cursor is monotonic.
 
 ### Archtest
 
@@ -271,14 +300,15 @@ implementing the OTLP logs service):
 
 ## Rejection paths
 
-| Scenario | Outcome | Operator-visible signal | Logged context |
-|----------|---------|------------------------|----------------|
-| Endpoint configured, URL/TLS/auth invalid | Control **fails to boot** (fail closed) | boot error naming the invalid knob | config field (never the secret value) |
-| No endpoint configured | Exporter inert (disabled) | info: "OTLP export disabled" | — |
-| Endpoint unreachable at runtime | Retry w/ backoff; cursor holds; append path unaffected | warn: export lagging, cursor behind | endpoint host, attempt, backoff, lag |
-| Auth rejected (401/403 from collector) | Retry; cursor holds | warn/error: export auth rejected | endpoint host, status (no header value) |
-| Event payload un-mappable | Log at error + counter, advance past it (one bad event never wedges the stream) | error + `otlp_export_skipped` counter | event id, type (no secret material) |
-| Two replicas race the tick | Advisory lock → one exports; other no-ops | — | — |
+| Scenario | Error/state | Operator-visible message | Logged context |
+|----------|-------------|--------------------------|----------------|
+| Endpoint configured, URL/TLS/auth config invalid | Exporter startup failure | boot error names the invalid knob; control remains available | config field, never the secret value |
+| No endpoint configured | Healthy/inert | `OTLP export disabled` | disabled state only |
+| Endpoint unreachable or attempt deadline exceeded | Transient degraded retry; cursor holds | export lag/backoff metric and warning | endpoint host, attempt, bounded backoff, lag |
+| Collector returns HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied` | Unhealthy `auth-blocked`; cursor holds | readiness failure and one state-transition error | endpoint host and status, never header value |
+| Event payload is malformed or unknown | Minimal metadata-only record; no skip | mapping-error counter/attribute | event ID and type, no raw payload |
+| Advisory lock is held by another replica | Standby for this cycle | healthy standby state | lock key and standby transition at debug level |
+| Collector acknowledges but cursor persistence fails | Retry from old cursor; duplicate allowed | cursor-write error and lag | checkpoint and event count, no payload |
 
 ## Rollout and migration
 
@@ -288,15 +318,15 @@ implementing the OTLP logs service):
 - **New service + image**: one new binary/image (`otlp-export`) in the reference
   compose alongside indexer, plus its CI/release lane. Cursor lives in Valkey —
   no schema migration.
-- **New dependency**: OTel logs SDK + OTLP exporter, confined to the exporter
-  binary (or the `net/http` OTLP-JSON alternative).
+- **New dependency**: OTel logs SDK + OTLP exporters, confined to the exporter
+  binary.
 - **Reference bridge (docs, not code)**: ship an example OTel Collector config in
   the deploy docs (`otlp` receiver → `syslog`/`splunk_hec` exporter) so the
   `OTLP → syslog` path is documented and supported without Power Manage carrying
   format code. The operator owns and runs the Collector.
-- **Sequencing**: independent of other in-flight work. Running as one dedicated
-  instance, it needs no cross-replica coordination — simpler than an in-control
-  advisory-lock worker.
+- **Sequencing**: independent of control rollout. Every replica uses the mandatory
+  advisory lock from its first release, so scaling the exporter later cannot
+  silently introduce intentional fan-out.
 
 ## References
 
