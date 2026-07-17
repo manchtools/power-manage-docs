@@ -1,6 +1,6 @@
 ---
 title: "Complete authorization-coverage verification"
-status: draft
+status: implemented
 created: 2026-07-11
 ---
 
