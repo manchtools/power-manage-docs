@@ -1,6 +1,6 @@
 ---
 title: "control doctor — stack health & security posture checks"
-status: draft
+status: implemented
 created: 2026-06-26
 ---
 

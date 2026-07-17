@@ -1,6 +1,6 @@
 ---
 title: "List-page sort & filter via valkey-search"
-status: draft
+status: implemented
 created: 2026-06-23
 ---
 

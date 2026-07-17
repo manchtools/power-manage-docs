@@ -1,6 +1,6 @@
 ---
 title: "Configurable redirect-following for the SDK remote source"
-status: draft
+status: implemented
 created: 2026-06-27
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "At-rest encryption: single AAD format + ULID consolidation"
-status: approved
+status: implemented
 created: 2026-07-04
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "Scoped object visibility (assignment-keyed RBAC scope for actions, sets, definitions, policies)"
-status: draft
+status: implemented
 created: 2026-06-25
 ---
 

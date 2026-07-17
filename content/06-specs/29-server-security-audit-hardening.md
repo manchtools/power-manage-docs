@@ -349,3 +349,25 @@ None.
 - ADR 0005: Gateway↔control device-origin binding.
 - `https://github.com/Tecnativa/docker-socket-proxy` — proxy policy and isolation recommendations.
 - Traefik Docker provider documentation: `https://doc.traefik.io/traefik/providers/docker/`.
+
+## Implementation status (verified 2026-07-17)
+
+Most of this spec has shipped; it stays `draft` because two acceptance criteria
+are met as operator guidance rather than code, and two follow-on findings remain
+open by design.
+
+**Shipped — first batch:** task-HMAC envelope (AC1-4), trusted-proxy XFF
+right-to-left resolution (AC5-7), control-URL validation (AC8-9), audit deny-set
+redaction (AC10-12).
+
+**Shipped — second pass (S1-S12):** object-scope on `List*`/`Dispatch*`, OIDC
+auto-link takeover guard, SSO throttle + `auth_states` sweep, SSRF denylist,
+inbox action→device resolution, `OutputChunk`/batch-ID bounds, actor attribution
+on versioned appends and settings updates, `sealPII` fail-closed, existence-oracle
+reorder, `enc:v1` comment drift.
+
+**Intentionally docs-only (AC13-14):** Traefik still bind-mounts the Docker
+socket read-only; the docker-socket-proxy is operator guidance, not shipped
+compose. **Open by design:** S13 (gateway-published internal URL validation,
+folded into the gateway↔Traefik-KV ADR) and S14 (SCIM cross-provider email link
+of a passwordless SSO user).

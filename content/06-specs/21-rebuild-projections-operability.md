@@ -1,6 +1,6 @@
 ---
 title: "RebuildAll operability & cascade-safety"
-status: approved
+status: implemented
 created: 2026-07-04
 ---
 

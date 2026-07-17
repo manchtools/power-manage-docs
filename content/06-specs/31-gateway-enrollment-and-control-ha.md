@@ -559,3 +559,28 @@ None. Everything reuses `internal/ca`, `internal/crl`, `internal/mtls`,
   approval, write only the superseding gateway-identity ADR required above to
   reconcile shared-token enrollment, ephemeral identity, DNS/CN/SPIFFE authority,
   the shared CA/action-signing-key reality, and handshake/live-session CRL behavior.
+
+## Implementation status (verified 2026-07-17)
+
+The pre-existing enrollment/renewal/CRL/HA baseline this spec builds on is
+shipped and regression-covered: `gwenroll` client, `EnrollGateway` (constant-time
+token compare + 5/min/IP rate limit), gateway cert issuance (ClientAuth/ServerAuth
++ gateway-class SAN), `RenewGatewayCertificate` (PoP + superseded-fingerprint
+revocation), CRL publish/consume, advisory-locked stale-execution expiry,
+shared-Postgres OIDC state, and the agent handshake-time CRL gate.
+
+The spec's own hardening deltas are **not yet landed** — it stays `draft`:
+
+1. **Control-authoritative DNS SAN (AC1):** `EnrollGateway` still trusts the
+   caller-supplied `hostname`; the canonical host is not derived from
+   `CONTROL_GATEWAY_URL` and IP literals are not rejected.
+2. **Token-hash-prefix log (AC3):** `EnrollGateway` still logs an 8-char
+   token-hash prefix.
+3. **Renewal DNS-SAN rejection (AC7):** renewal warns-and-issues with an empty
+   hostname instead of forcing re-enroll.
+4. **Async inbox retry classification (AC9):** a registry backend lookup failure
+   is collapsed into `asynq.SkipRetry` instead of staying retryable.
+5. **nil/single-gateway registry bypass (AC9/AC14):** still present in the
+   binding resolver and inbox worker.
+6. **Agent live-session revocation cancellation (AC11):** only handshake-time
+   revocation exists; a live session is not cancelled on CRL refresh.

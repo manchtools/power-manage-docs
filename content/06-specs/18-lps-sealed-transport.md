@@ -1,6 +1,6 @@
 ---
 title: "LPS sealed password transport (end-to-end agent→control encryption)"
-status: draft
+status: implemented
 created: 2026-07-01
 ---
 

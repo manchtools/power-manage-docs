@@ -1,6 +1,6 @@
 ---
 title: "Datastore authentication hardening (Valkey + Postgres)"
-status: draft
+status: implemented
 created: 2026-07-12
 ---
 

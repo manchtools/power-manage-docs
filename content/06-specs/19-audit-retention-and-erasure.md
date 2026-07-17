@@ -1,6 +1,6 @@
 ---
 title: "Audit-log retention, archival & PII erasure"
-status: approved
+status: implemented
 created: 2026-07-04
 ---
 
