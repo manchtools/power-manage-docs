@@ -48,9 +48,13 @@ single-flight via advisory lock).
 
 1. Given the exporter enabled and a reachable OTLP endpoint, when a
    security-relevant event is appended, then within the configured flush
-   interval it is delivered as one OTLP `LogRecord` carrying at least the
-   event's id, `stream_type`/`event_type`, actor (type+id), target, outcome,
-   and `occurred_at` as attributes.
+   interval it is delivered as one OTLP `LogRecord` carrying the event's id,
+   `stream_type`/`event_type`, actor (type+id), target, outcome, and
+   `occurred_at` as attributes — drawn EXCLUSIVELY from the fixed allow-listed
+   attribute set (plus deployment identity). The raw or redacted `data`
+   payload blob is never shipped as an attribute or body: a novel payload
+   field can never leak by default, because only allow-listed attributes are
+   emitted at all.
 2. Given the export filter, every known event type is exported EXCEPT an
    explicit, small exclusion set (heartbeats/liveness and high-churn non-audit
    noise). The exported set is derived as *all known types minus exclusions*, so
@@ -63,7 +67,11 @@ single-flight via advisory lock).
    exported, then the `LogRecord` carries identifiers and metadata only, never
    secret material — the export reuses the `redactEventData` audit redactor, and
    an unknown or malformed payload is emitted as a minimal metadata-only record
-   with a mapping-error marker rather than skipped or copied through.
+   with a mapping-error marker rather than skipped or copied through. Every
+   payload-derived value — the `Body` summary and every `target.*` attribute —
+   is built from the POST-redaction payload, never the raw one; a test asserts
+   a secret planted in a payload field that feeds `Body`/`target.*` does not
+   appear in the delivered record.
 4. Given at-least-once delivery, when the exporter ships a batch, then the
    persisted cursor advances only after the endpoint acknowledges every
    exportable record through the checkpoint and locally acknowledges exclusions;
@@ -98,6 +106,31 @@ single-flight via advisory lock).
     operator-visible unhealthy `auth-blocked` state, logs one redacted error per
     state transition, and probes again only at the maximum backoff until
     authentication recovers or the service is restarted with corrected config.
+11. Given any event whose payload carries sealed PII (`pii:v1:` values), when it
+    is exported, then the ciphertext ships OPAQUE: the export path performs no
+    PII unseal — it MUST NOT call `OpenPayloadPII`, wire a `PIIOpener`, or
+    unwrap any DEK, and the exporter binary does not link the PII-opening
+    machinery at all. A mandated test proves a PII-bearing event reaches a mock
+    collector with the `pii:v1:` ciphertext intact and no DEK unwrapped.
+    (Sealing — not redaction — is what protects PII; `redactEventData` scrubs
+    secrets and must not be mistaken for PII protection.)
+12. Given the exporter's credentials, its Postgres role (`pm_otlp_export`) can
+    `SELECT` on `events` and NOTHING else — a test asserts `SELECT` on
+    `user_encryption_keys` is denied for the role — and the exporter process
+    never receives `CONTROL_ENCRYPTION_KEY`: the OTLP auth header is supplied
+    via a mode-0600 secret file, not KEK-decrypted config. This structurally
+    guarantees AC 11 even against an exporter code bug: without KEK and without
+    the DEK table there is nothing to unseal with.
+13. Given the plaintext (insecure) endpoint toggle, when the exporter boots,
+    then it accepts the toggle only for a loopback or unix-socket endpoint; an
+    insecure endpoint with any non-loopback host fails boot loudly. The whole
+    audit record must never cross a network segment in plaintext.
+14. Given GDPR erasure, the export model is: exported records carry sealed
+    `pii:v1:` ciphertext, so the spec-19 DEK shred also erases the meaning of
+    every previously exported copy. Legacy pre-spec-19 events that carry
+    plaintext PII are exported AS-IS (operator decision, 2026-07-18): the
+    residual exposure is accepted and documented — see Security
+    considerations for the flagged NIS2↔GDPR tension.
 
 ## Out of scope
 
@@ -145,8 +178,11 @@ out-of-process safe.
   does. This shared reuse is the whole reason a separate service stays safe.
 - `server/internal/eventtypes` — an explicit `exportExclusions` set +
   `ExportedTypes()` = all-known-minus-exclusions, with the AC-2 guard.
-- `server/internal/crypto` — decrypt the endpoint auth-header config (the
-  exporter holds `CONTROL_ENCRYPTION_KEY`, as control/indexer already do).
+- **Deliberately absent**: `server/internal/crypto` and the PII opener. The
+  exporter never holds `CONTROL_ENCRYPTION_KEY` and never links the
+  `OpenPayloadPII`/`PIIOpener` machinery (AC 11/12) — sealed `pii:v1:` values
+  pass through as opaque ciphertext, and the auth header comes from a secret
+  file, not KEK-decrypted config.
 
 ### Proto changes
 
@@ -160,6 +196,12 @@ future read-only `GetExportStatus` RPC surfacing cursor lag is deferred.)
   but cannot create a gap; OTLP remains at-least-once. Postgres access stays
   strictly read-only on `events`, so no migration or event-store write role is
   added.
+- **Dedicated Postgres role** (AC 12): a new initdb script creates
+  `pm_otlp_export` with `SELECT` on `events` ONLY — explicitly NOT the blanket
+  `pm_readonly` `SELECT ON ALL TABLES` grant, which includes
+  `user_encryption_keys` and would hand a KEK-holding process mass PII
+  decryption. A guard test connects as the role and asserts `SELECT` on
+  `user_encryption_keys` is denied.
 - Every export cycle uses the existing PostgreSQL advisory-lock mechanism under
   a dedicated key before reading, sending, or advancing the cursor. The lock is
   mandatory for one replica and many replicas alike.
@@ -177,17 +219,22 @@ future read-only `GetExportStatus` RPC surfacing cursor lag is deferred.)
 
 ### Configuration (exporter service)
 
-The service reads a read-only Postgres DSN, Valkey (for the cursor), and
-`CONTROL_ENCRYPTION_KEY` (to decrypt the auth header), plus `OTLP_EXPORT_*`.
-Absent endpoint ⇒ the service is inert (or simply not deployed):
+The service reads an events-only Postgres DSN (the `pm_otlp_export` role,
+AC 12), Valkey (for the cursor), and `OTLP_EXPORT_*`. It never receives
+`CONTROL_ENCRYPTION_KEY`. Absent endpoint ⇒ the service is inert (or simply
+not deployed):
 
 - `OTLP_EXPORT_ENDPOINT` — OTLP endpoint URL (e.g. `https://collector:4318/v1/logs`).
   Presence enables it.
 - `OTLP_EXPORT_PROTOCOL` — `http` (default — OTLP/HTTP, the most broadly
   supported and proxy/firewall-friendly transport) or `grpc`.
-- `OTLP_EXPORT_TLS_CA` / insecure toggle — endpoint trust.
-- `OTLP_EXPORT_HEADERS` — auth header(s) (bearer/API key), encrypted at rest via
-  `internal/crypto` like other config secrets.
+- `OTLP_EXPORT_TLS_CA` / insecure toggle — endpoint trust. The insecure toggle
+  is valid ONLY for a loopback or unix-socket endpoint; insecure + non-loopback
+  fails boot (AC 13).
+- `OTLP_EXPORT_HEADERS_FILE` — path to a mode-0600 secret file holding the auth
+  header(s) (bearer/API key), mounted like the deploy stack's TLS keys. The
+  boot check rejects a world- or group-readable file. No KEK-decrypted env
+  variant exists (AC 12).
 - `OTLP_EXPORT_INTERVAL` (default 5s) and batch size.
 - `OTLP_EXPORT_TIMEOUT` (default 10s) — hard deadline for one endpoint attempt.
 - `OTLP_EXPORT_MAX_BACKOFF` (default 5m) — retry ceiling; jitter is always on.
@@ -217,10 +264,13 @@ endpoint only makes the cursor lag, never stalls control (AC 5).
 ### OTLP mapping
 
 Each event → one `LogRecord`: `Timestamp = occurred_at`, `SeverityNumber` by
-event class (alerts > audit-info), `Body` a short human summary, and a set of
-**stable, granular attributes** — `event.id`, `event.stream_type`,
-`event.type`, `actor.type`, `actor.id`, `target.*`, `outcome`, plus the
-deployment identity. The attributes are deliberately structured (never a
+event class (alerts > audit-info), `Body` a short human summary built from the
+post-redaction payload (AC 3), and the **fixed allow-listed attribute set** —
+`event.id`, `event.stream_type`, `event.type`, `actor.type`, `actor.id`,
+`target.*` (post-redaction), `outcome`, plus the deployment identity. Nothing
+outside the allow-list is emitted; the `data` blob never ships (AC 1). A
+sealed `pii:v1:` value that reaches an allow-listed field ships as the opaque
+ciphertext string (AC 11). The attributes are deliberately structured (never a
 collapsed blob) so a downstream consumer can normalise them to OCSF or any other
 schema without Power Manage re-instrumenting.
 
@@ -242,9 +292,25 @@ clean attributes.
   validated at boot; invalid config fails closed (AC 8). Nothing untrusted is
   ingested — the exporter only reads the local event store.
 - **Secrets**: export reuses `redactEventData` so no secret material leaves in a
-  `LogRecord` (AC 3); the endpoint auth header is a secret, encrypted at rest and
-  never logged (AC 9); TLS to the endpoint is required unless an explicit
-  insecure toggle is set for a trusted local Collector.
+  `LogRecord` (AC 3); the endpoint auth header is a mode-0600 secret file,
+  never logged (AC 9/12); TLS to the endpoint is required unless the explicit
+  insecure toggle is set — and that toggle only accepts a loopback/unix-socket
+  endpoint (AC 13).
+- **PII and crypto-shred (AC 11/12/14)**: PII is protected by SEALING, not
+  redaction — `redactEventData` scrubs secrets and must never be treated as
+  the PII barrier. The exporter therefore ships `pii:v1:` values as opaque
+  ciphertext and is structurally unable to do otherwise: no KEK, no PII
+  opener linked, and a Postgres role that cannot read `user_encryption_keys`.
+  Under this model the spec-19 DEK shred also erases the meaning of every
+  exported copy sitting in the operator's SIEM.
+- **Flagged NIS2↔GDPR tension (decision 2026-07-18)**: legacy pre-spec-19
+  events carry PLAINTEXT PII that DEK destruction cannot reach. The operator
+  decision is to export them AS-IS (completeness of the compliance feed wins);
+  the residual exposure — plaintext PII of since-erased users living on in the
+  external SIEM beyond Power Manage's erasure reach — is accepted and must be
+  covered by the operator's own SIEM retention/erasure process. This cuts
+  against the spec-19 crypto-shred posture and is recorded here deliberately
+  rather than hidden.
 - **Audit**: enabling/disabling export is a config change (deployment-level), not
   a runtime state-changing RPC, so it is captured by deployment change control
   rather than an in-app audit event. Delivery is at-least-once; the SIEM dedupes
@@ -284,6 +350,18 @@ implementing the OTLP logs service):
 - auth-blocked (AC 10): HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied` holds the cursor, flips readiness unhealthy,
   logs one redacted state transition, probes only at maximum backoff, and
   recovers after endpoint authorization is restored.
+- sealed PII opaque (AC 11): a user event with a sealed `pii:v1:` given_name
+  reaches the mock collector with the ciphertext byte-identical to the at-rest
+  value; the test environment carries no KEK and asserts no DEK row was read.
+- least privilege (AC 12): connecting as `pm_otlp_export`, `SELECT` on
+  `events` succeeds and `SELECT` on `user_encryption_keys` fails with a
+  permission error; the exporter boots and exports without
+  `CONTROL_ENCRYPTION_KEY` in its environment.
+- insecure-loopback (AC 13): insecure toggle + `127.0.0.1`/unix-socket
+  endpoint boots; insecure + any non-loopback host fails boot with a named
+  error while control is unaffected.
+- redacted derivation (AC 3): a secret planted in the payload field that feeds
+  `Body`/`target.*` does not appear anywhere in the delivered record.
 
 ### Property-based or generative tests
 
@@ -307,6 +385,8 @@ implementing the OTLP logs service):
 | Endpoint unreachable or attempt deadline exceeded | Transient degraded retry; cursor holds | export lag/backoff metric and warning | endpoint host, attempt, bounded backoff, lag |
 | Collector returns HTTP `401`/`403` or gRPC `Unauthenticated`/`PermissionDenied` | Unhealthy `auth-blocked`; cursor holds | readiness failure and one state-transition error | endpoint host and status, never header value |
 | Event payload is malformed or unknown | Minimal metadata-only record; no skip | mapping-error counter/attribute | event ID and type, no raw payload |
+| Insecure toggle with a non-loopback endpoint | Exporter startup failure | boot error names the toggle and the host | endpoint host, no header material |
+| Auth-header secret file absent, unreadable, or too permissive (not 0600) | Exporter startup failure | boot error names the path and required mode | path and file mode, never the contents |
 | Advisory lock is held by another replica | Standby for this cycle | healthy standby state | lock key and standby transition at debug level |
 | Collector acknowledges but cursor persistence fails | Retry from old cursor; duplicate allowed | cursor-write error and lag | checkpoint and event count, no payload |
 
@@ -317,7 +397,9 @@ implementing the OTLP logs service):
   backward-compatible; control is unchanged.
 - **New service + image**: one new binary/image (`otlp-export`) in the reference
   compose alongside indexer, plus its CI/release lane. Cursor lives in Valkey —
-  no schema migration.
+  no schema migration, but a new initdb script adds the events-only
+  `pm_otlp_export` role (AC 12) and the compose service mounts the mode-0600
+  auth-header secret file.
 - **New dependency**: OTel logs SDK + OTLP exporters, confined to the exporter
   binary.
 - **Reference bridge (docs, not code)**: ship an example OTel Collector config in
@@ -388,3 +470,28 @@ Strengths to keep: no-drop-on-failure (cursor holds), backpressure isolation,
 at-least-once + `event.id` dedup, advisory-lock single-flight, fail-closed boot,
 non-empty exported-set archtest. SSRF does not apply (endpoint is deploy-config, no
 request-path input).
+
+### Remediation (2026-07-18)
+
+All findings above are folded into the spec body:
+
+- **[High] no-unseal** → AC 11 (opaque `pii:v1:` ciphertext, no
+  `OpenPayloadPII`/`PIIOpener`/DEK unwrap, mandated ciphertext-at-collector
+  test; the exporter binary does not link the opener).
+- **[High] over-privilege** → AC 12 (dedicated `pm_otlp_export` role with
+  `SELECT` on `events` only + denied-DEK-table guard test; no
+  `CONTROL_ENCRYPTION_KEY`; auth header via mode-0600 secret file). This
+  structurally guarantees AC 11 against exporter code bugs.
+- **[Medium] fail-open novel fields** → AC 1 amended: only the fixed
+  allow-listed attribute set is emitted, the `data` blob never ships.
+- **[Medium] raw-payload Body/target** → AC 3 amended: all payload-derived
+  values come from the post-redaction payload, with a planted-secret test.
+- **[Medium] insecure toggle** → AC 13: loopback/unix-socket only, boot
+  rejection otherwise.
+- **[Medium] erasure model** → AC 14 + Security considerations: sealed
+  ciphertext export keeps crypto-shred effective for spec-19-era events;
+  **legacy plaintext-PII events are exported AS-IS per operator decision
+  (2026-07-18)** with the NIS2↔GDPR tension explicitly flagged.
+- **[Low] auth-header contract** → file-based secret (mode checked at boot,
+  rejection row added); the KEK-decrypted env contract was removed with the
+  KEK itself.
