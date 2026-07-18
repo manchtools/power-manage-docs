@@ -584,3 +584,61 @@ The spec's own hardening deltas are **not yet landed** — it stays `draft`:
    binding resolver and inbox worker.
 6. **Agent live-session revocation cancellation (AC11):** only handshake-time
    revocation exists; a live session is not cancelled on CRL refresh.
+
+## Audit findings (2026-07-18)
+
+Audit (`integration/alpha3`, sdk `fix/pmsec-001…`, agent `main`) confirms the
+gateway boot self-enrollment rewrite, renewal, Part-C sync binding, revocation
+(Part D), and control HA have all landed — the spec correctly stays `draft`
+because hardening deltas remain. Two are **currently-active, reachable weaknesses**
+(inside an already-privileged trust boundary); the rest are dormant or availability
+issues. The historic gateway-cert SAN/EKU defect is fixed and regression-pinned
+(`ca_test.go:349-399`).
+
+Active weaknesses:
+- **[Medium] Enrollment-token holder can mint a fleet-CA cert for any hostname
+  (AC 1 unimplemented).** The handler passes the caller-supplied hostname straight
+  into issuance ([gateway_auth_handler.go:101](../../../server/internal/api/gateway_auth_handler.go));
+  the sdk proto `hostname` is `omitempty`, not `required`. Any
+  `PM_GATEWAY_ENROLL_TOKEN` holder obtains a ServerAuth cert for an arbitrary DNS
+  name → gateway impersonation toward agents. Fix: derive the DNS SAN from
+  `CONTROL_GATEWAY_URL`, exact-equality check, reject IP literals; flip the proto
+  field to `required`; add IP / mixed-case / trailing-dot / unlisted-name tests.
+- **[Medium] Revoked gateway keeps its live agent sessions (AC 11 gap).** New
+  handshakes fail closed within ~5 min, but there is no live-session cancellation —
+  a revoked gateway's connected agents keep streaming until natural disconnect.
+  Fix: retain peer fingerprints and cancel live sessions on CRL-refresh revocation
+  / cache expiry, with an injected-clock test.
+
+Other remaining deltas (spec's own list + this audit):
+- **[Medium, design-integrity] Gateway identity uses the mTLS CommonName**
+  ([gateway_binding.go:31](../../../server/internal/api/gateway_binding.go)), which
+  ADR 0025 explicitly rejects in favor of SPIFFE URI SANs — and no reconciling ADR
+  exists (dir ends at 0031). Spec 34 also names this reconciliation as a
+  prerequisite. Fix: write the superseding gateway-identity ADR blessing per-gateway
+  CN as *instance* identity alongside the SPIFFE *class* SAN before further work.
+- **[Low] `token_hash_prefix` (8 hex of the token SHA-256) is logged**
+  ([gateway_auth_handler.go:91](../../../server/internal/api/gateway_auth_handler.go))
+  and pinned by a test asserting its presence. Fix: remove the log and flip the
+  assertion.
+- **[Low] Renewal warns-and-issues on absent/non-canonical DNS SAN instead of
+  rejecting** ([internal_gateway_renewal.go:81-86](../../../server/internal/api/internal_gateway_renewal.go));
+  no DNS-SAN renewal test. Superseded-fingerprint revocation is best-effort log-only.
+- **[Low] Inbox worker collapses transient registry lookup failures into
+  `SkipRetry`** ([inbox_worker.go:78-84](../../../server/internal/control/inbox_worker.go)) —
+  event loss under transient backend failure. Reserve `SkipRetry` for the permanent
+  sentinels; keep transient lookups retryable.
+- **[Low, dormant] nil-registry allow-bypass**
+  ([registry/binding.go:50-53](../../../server/internal/gateway/registry/binding.go),
+  pinned by `TestInternalHandler_NilResolverBypass`) — safe only in the documented
+  single-gateway posture; in HA the registry is wired. Fix: make an absent registry
+  a startup failure in HA mode.
+- **[Low] Gateway boot verifies only cert CN, not the returned DNS SAN / class URI /
+  EKUs** ([gwenroll/enroll.go:119-139](../../../server/internal/gwenroll/enroll.go));
+  AC 6's "wrong returned profile → startup failure" is unimplemented.
+- **[Low] Gateway does not halt-and-alert on observing its own revocation** (renewal
+  loop retries forever, `gateway_renewal.go:49-57`).
+- **[Info] Per-replica in-memory enroll rate limiter** gives ~5N guesses/min/IP
+  across N HA replicas (documented, compensated by the constant-time compare).
+- **[Todo] The multi-replica production-shaped deployment E2E proof (spec 37 gate)
+  and the superseding gateway-identity ADR are still outstanding.**

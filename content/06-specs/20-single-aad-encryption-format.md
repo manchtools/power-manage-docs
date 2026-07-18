@@ -166,3 +166,17 @@ None.
 - server#504 (this spec); server#507 (F-05 typed payloads — coordinate/sequence
   together); WS10 deferral.
 - spec 19 (depends on this).
+
+## Audit findings (2026-07-18)
+
+Verified fully implemented (`integration/alpha3`): all 8 ACs, one encryption
+entrypoint pair, every production caller migrated, wrong-AAD / tamper /
+retired-format tests assert intent, and both self-discovering guards carry
+matches-zero checks. One low hardening note, not an AC violation:
+
+- **[Low, accepted] Non-`enc:`-prefixed values pass through `DecryptWithContext`
+  unchanged** ([crypto.go:158-160](../../../server/internal/crypto/crypto.go),
+  documented beta-compat for pre-encryption plaintext). A DB-write-capable attacker
+  can substitute attacker-chosen plaintext for a stored ciphertext and the read
+  succeeds — but that capability already defeats most guarantees. Worth requiring
+  the `enc:` prefix once reprovisioning is universal (post-beta).

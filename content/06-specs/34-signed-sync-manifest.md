@@ -887,3 +887,53 @@ gate, and clean-break rollout.
   per-gateway certificate and peer-CN binding prerequisite.
 - Spec 37: exhaustive deployment E2E gate and `agent-signed-sync` lane.
 - Spec 38: management-device binding and identity-bound store classifier.
+
+## Audit findings (2026-07-18)
+
+Pre-implementation security review. The cryptographic core is **sound** —
+device-bound monotonic `generation` signed inside the manifest, 15-min TTL, double
+device binding, a disjoint `power-manage-sync-manifest` signing domain, strict
+manifest↔transport bijection (no selective envelope suppression), and no unsigned
+fallback. No forgery, replay, rollback, or selective-suppression path survives the
+described guards, even treating a compromised gateway as the attacker. But it is
+**not implementable as written** until these are resolved:
+
+- **[Medium] Unmet hard prerequisite: the superseding trust-model ADR does not
+  exist, and current gateway identity contradicts ADR 0025.** The gateway→device
+  binding reads the mTLS CommonName
+  ([gateway_binding.go:31](../../../server/internal/api/gateway_binding.go)); ADR 0025
+  rejects CN identity in favor of SPIFFE URI SANs, and no ADR (dir ends at 0031)
+  reconciles them. Spec lines 240-242 name this reconciliation as a prerequisite.
+  Fix: write that ADR first (shared with spec 31).
+- **[Medium] Cleanup-on-omission is fail-open for security types.** "Ambiguity → skip
+  cleanup" (AC 12) is the *insecure* direction for `USER` / `GROUP` / `SSH` / `SSHD` /
+  `ADMIN_POLICY` / `LPS`: a deprovisioned admin/sudoer/SSH key persists on the device
+  and is only "reported." Fix: for cleanup-eligible security types, ambiguity must
+  raise a loud operator/compliance alert (not just log), and consider blocking
+  acceptance of the whole snapshot rather than committing one that knowingly leaves
+  an un-reverted privileged account. Add an AC + rejection row asserting the alert.
+- **[Medium] Server `generation` rollback silently wedges the fleet with no
+  recovery.** The anti-replay counter is server-authoritative in Postgres with no
+  epoch/reset authority; a backup restore or lagging-replica promotion sets it below
+  agents' `last_applied_generation`, and every subsequent manifest is rejected
+  fail-closed — devices cannot receive any new policy (including an emergency revoke)
+  until the counter organically climbs back. Fix: add an `epoch` bound inside the
+  signed manifest (ordering key `(epoch, generation)`) that a documented operator/DR
+  action bumps, plus an AC, rejection row, and DR runbook.
+- **[Low-Medium] "CA-signed" terminology is wrong and dangerous.** The manifest is
+  signed with the **action-signing key** (`ActionSigner.SignDomain`), a distinct
+  authority from the two TLS CAs (ADR 0025). Calling it "Control-CA signature" (AC 2,
+  proto comment line 349) could steer an implementer to sign with a TLS CA key. Fix:
+  replace all "CA-signed" with "signed with the action-signing key under the
+  `power-manage-sync-manifest` domain"; add a test asserting it verifies under the
+  action-signing key and fails under either TLS CA key.
+- **[Low] No protocol/schema version is bound inside the signed bytes.**
+  `SignedSyncManifest` has no version field and the domain string is unversioned
+  (contrast the LPS domain `…:v1`). Cross-version confusion is prevented only by
+  rollout policy, not cryptographically. Fix: bind `protocol_version` inside the
+  manifest; add an AC that the agent rejects a bound-version mismatch and that
+  response construction is unreachable without a validated discriminator.
+- **[Low] Compound ACs.** AC 12 / 13 / 20 bundle 5-8 assertions each — atomize
+  before approval so each maps to one test. Also add a max-staleness decision for an
+  already-applied manifest (AC 14) and a distinct rejection category for clock-skew
+  vs tampering.

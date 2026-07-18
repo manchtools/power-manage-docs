@@ -336,3 +336,35 @@ independently.
 - `server/internal/config/env.go` — CSV parsing.
 - `server/deploy/compose.yml` — `CORS_ORIGINS` to `CONTROL_CORS_ORIGINS` mapping.
 - `server/deploy/setup.sh` — current guided writes and both `.env` source sites.
+
+## Audit findings (2026-07-18)
+
+Pre-implementation review — **the proposed CORS default is safe.** The default is a
+single static HTTPS origin matched by exact full-string comparison (not `*`, not
+Origin reflection, not a Host-derived / spoofable value), credentialed CORS is
+granted only to that exact origin, empty config fails closed (allow-none), and the
+WS5 allow-all-no-credentials guard, the production boot-refusal of
+`CONTROL_CORS_ALLOW_ALL`, and the WS13 Cookie-omission / Bearer-only model are all
+preserved. The middleware delta is pure cache-correctness hardening (`Vary` on denied
+responses). Three notes to fold in before implementation:
+
+- **[Low→Medium] Origin order selects the SSO callback authority.** When
+  `CONTROL_SSO_CALLBACK_BASE_URL` is unset, `SSOCallbackBaseURL = CORSOrigins[0]`
+  ([flags.go:105-106](../../../server/cmd/control/flags.go)). A self-hosted SSO
+  operator who forgets to set it gets OIDC authorization codes redirected to the
+  *vendor* origin by default (mitigated by the IdP-side redirect-URI allow-list). Fix:
+  the guided prompt must state that origin order selects the SSO redirect target and
+  steer SSO operators to set `CONTROL_SSO_CALLBACK_BASE_URL` explicitly.
+- **[Low] The default delegates credentialed cross-origin trust to a vendor-controlled
+  origin** (`app.power-manage.manchtools.com`) even for operators who self-host their
+  own frontend. Bounded by Bearer-only auth (no ambient cookie/token to steal) and
+  operator-overridable. Fix: prompt copy recommending self-hosters enter their own
+  origin.
+- **[Info] The whole design is safe *because* auth is Bearer-only with no ambient
+  cookies.** Add one Security-considerations line naming this as a load-bearing
+  invariant, so any future cookie-auth change is forced to revisit CORS (the
+  denied-origin actual request still executes server-side; only CORS read headers are
+  withheld).
+
+Also atomize the compound ACs (3, 7 bundle installer-digest, `.env` byte-identity,
+Docker-stub, and header assertions into one criterion).

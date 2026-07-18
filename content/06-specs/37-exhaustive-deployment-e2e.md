@@ -455,3 +455,57 @@ preflight underneath the exhaustive suite.
 - `server/.github/workflows/release.yml`
 - Generated protobuf descriptors and `pmv1connect` clients in `sdk/`
 - Existing handler/authz/stream-arm parity guards
+
+## Audit findings (2026-07-18)
+
+Pre-implementation review. The **offline** half of this gate is genuinely strong: it
+discovers every procedure from `protoregistry.GlobalFiles`, classifies each exactly
+once, fails CI on zero-matches / duplicates / stale / unclassified, and an
+anti-rubber-stamp fingerprint transition blocks bumping an expected hash to hide
+descriptor drift. It correctly targets the real `release.yml` provenance gaps
+(matching-tag SDK substitution, non-atomic alias push, non-draft release, untested
+arm64). But the **deployed-execution** half is under-specified relative to that
+airtight offline contract, so as written the gate could report green while an
+uncovered or mis-wired RPC ships:
+
+- **[High / must-fix] Registration ≠ execution: no runtime guard that every
+  registered scenario actually ran and asserted against the booted stack.** The
+  exact-set / matches-zero authority governs the offline classification registry, not
+  the execution path; a registered scenario that early-returns, `t.Skip`s, or is
+  dropped under the runtime budget leaves its RPC uncovered while offline CI stays
+  green. Fix: add an AC requiring a post-suite guard that the set of mounted
+  procedures with a recorded real-assertion pass equals the registered mounted set
+  (exact equality; any skip or zero-match fails CI), budget-independent.
+- **[Medium] Descriptor discovery is only as complete as the E2E binary's import
+  graph.** `GlobalFiles` is populated by linked-in generated packages, not by what the
+  deployed servers serve; a served-but-unimported new service is invisible and the
+  matches-zero guard still passes. Fix: mandate cross-checking the offline descriptor
+  set against the deployed servers' reflection / served-procedure set, failing CI on
+  any served procedure absent from the registry.
+- **[Medium] The deployed gate omits cross-actor / scope-existence (NotFound)
+  rejection** — exactly the mis-wiring handler tests (which bypass the deployed
+  interceptor chain) cannot see. AC 4 asserts only anonymous→Unauthenticated and
+  zero-perm→PermissionDenied. Fix: require at least one deployed out-of-scope NotFound
+  probe per object family (not per RPC).
+- **[Medium] The "no unclassified TLS/NOPERM error" log gate can launder real
+  regressions through the intentional-negative-probe exception.** Fix: each negative
+  probe carries a unique correlator and matches exactly one expected log line; any
+  TLS / NOPERM / bad-cert line not matched 1:1 fails the gate.
+- **[Medium] The 4-7 min / 15 min runtime budget is in tension with typed-success
+  exhaustiveness for ~170 RPCs**, pushing toward the one-happy-path shortcut the spec
+  bans. Fix: relax the budget or add a per-scenario assertion-count / state-delta
+  requirement so "returned OK without asserting the effect" cannot satisfy
+  typed-success.
+- **[Low-Medium] TLS key ownership/mode/UID-drop fidelity is not restated as an AC**
+  for the new TLS surfaces this spec adds (Traefik termination, gateway passthrough,
+  per-replica CRL mTLS). Moot while control/gateway run as root, latent if they ever
+  adopt a non-root `USER`. Fix: add an AC asserting mounted key/cert material
+  reproduces production ownership/mode and internal dials verify both dial-address and
+  TLS identity.
+- **[Low, quality] Non-atomic ACs; AC 17/18 (release provenance) are a separate
+  feature** bolted onto the E2E gate and should be split into their own spec. Also
+  reword the Overview: this *supersedes as the release gate* but *retains* the smoke
+  test as a preflight (additive, not a replacement).
+
+Close the first two (runtime execution-completeness guard + reflection reconciliation)
+before this becomes the release authority.

@@ -267,3 +267,43 @@ For each of the four RPCs:
   `EnforceDeviceScopeOnBaseTier` pattern this reuses.
 - `auth.EnforceDeviceScopeOnBaseTier` (`server/internal/auth/scope.go`).
 - spec 24 (secret-read audit events, unchanged), spec 25 (LUKS sealed transport).
+
+## Audit findings (2026-07-18)
+
+Pre-implementation review (`integration/alpha3`). The mechanical change is
+fail-closed and correct — flip the four permission rows to `TargetDevice`, add
+`EnforceDeviceScopeOnBaseTier` before each `Device.Get`, keep the assigned-owner
+gate — and the existence-oracle handling, migration direction (strictly
+tightening), and audit-of-denied-reads are all correct. One gap must be resolved
+before approval, because this spec confines the most sensitive secret in the system:
+
+- **[Medium, crown-jewel] The device-group boundary is attacker-influenceable via
+  labels → dynamic groups; the spec never addresses it.** `SetDeviceLabel` is
+  org-tier (`TargetUnspecified`) with no device-scope gate
+  ([device_handler.go:195-208](../../../server/internal/api/device_handler.go));
+  dynamic device-group membership is derived from a label query and read live by the
+  scope resolver. An operator scoped to a *dynamic* group who also holds org-tier
+  `SetDeviceLabel` can relabel any out-of-scope device into their scope, then
+  `GetDeviceLuksKeys` / `GetDeviceLpsPasswords` (or `RevokeLuksDeviceKey`) on it. The
+  static-group injection path is already closed (`AddDeviceToGroup` gates both group
+  AND device scope — [device_group_handler.go:375-395](../../../server/internal/api/device_group_handler.go),
+  with a "scope escape" comment), but the label→dynamic-group path is not. Fix (pick
+  one, add AC + test): restrict LUKS/LPS scope to **static** groups only; or reject
+  co-holding org-tier `SetDeviceLabel` with a scoped LUKS/LPS grant; or document
+  acceptance with a detection control.
+- **[Low] Scope-denied writes leave no audit trail.** Denied reads are audited
+  (spec 24), but `RevokeLuksDeviceKey` / `CreateLuksToken` denials append no event
+  (design forbids new event types). Systematic write-surface recon on the
+  crown-jewel path is invisible — against the "every state-changing RPC is
+  audit-logged" rule. Fix: add denied-write audit events, or document the read/write
+  asymmetry with a compensating detection.
+- **[Low, latent fail-open] Reads have no owner-filter fallback.** `GetDeviceLuksKeys`
+  / `GetDeviceLpsPasswords` do a bare `Device.Get` with no `OwnerScope`. Today the
+  `:assigned` passthrough branch ([auth/scope.go:284-285](../../../server/internal/auth/scope.go))
+  is dead for these RPCs, but if the deferred self-service tier is added by only
+  registering an `:assigned` permission string, an `:assigned`-only holder would read
+  every device's LUKS key. Fix: add an AC that any future self-service tier for these
+  RPCs must add an owner-scope SQL filter, not just a permission string.
+
+Spec quality is otherwise high (numbered ACs, cross-scope rejection row,
+real-Postgres tests, red-check instructions, self-discovering parity guard).

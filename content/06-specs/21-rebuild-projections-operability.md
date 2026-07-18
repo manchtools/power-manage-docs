@@ -125,3 +125,17 @@ None.
 - `server/TECH_DEBT_AUDIT.md` F-01 (#505), F-03 (#506), F-04, F-14.
 - ADR 0029 (recovery guarantee), ADR 0026 (audit model — wording to correct).
 - spec 19 (depends on this).
+
+## Audit findings (2026-07-18)
+
+Verified fully implemented (`integration/alpha3`): all 7 ACs, cascade-safe partial
+rebuild reads the live FK graph (self-discovering), single-transaction /
+REPEATABLE READ rebuild never serves a half-built projection, Go-applier-missing
+fails loudly, and byte-identical round-trip fidelity is proven. One minor
+test-quality note:
+
+- **[Low] The `control rebuild-projections` subcommand has no happy-path test.**
+  Only exit-2 arg/usage paths are covered at the CLI layer; the destructive
+  semantics are fully tested one layer down in `internal/store`. The CLI wrapper
+  wiring (including the `auth.ReconcileSystemRoles` re-seed) is smoke-level. Fix:
+  add one test driving `runRebuildProjections` end-to-end.

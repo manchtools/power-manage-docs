@@ -1,7 +1,8 @@
 ---
 title: "Audit-log retention, archival & PII erasure"
-status: implemented
+status: partially-implemented
 created: 2026-07-04
+audited: 2026-07-18
 ---
 
 # Audit-log retention, archival & PII erasure
@@ -620,3 +621,42 @@ None.
   (IdP/TOTP AAD, via the enc rename); absorbed F-02 (drift doctor), F-04
   (full-fidelity round-trip), F-07 (guard→SCIM).
 - spec 18 (LPS sealed transport — sibling crypto pattern).
+
+## Audit findings (2026-07-18)
+
+A spec-vs-implementation audit (`integration/alpha3`) found the crypto-shred
+erasure, PII envelope, retention/archival, and observability surfaces genuinely
+implemented with strong intent-asserting tests. Status corrected to
+`partially-implemented`: ~93% of the acceptance criteria ship, but these gaps
+remain and must close before this spec backs a compliance claim.
+
+- **[Medium] AC 36 doctor safety-net missing → erased user's OS account persists
+  silently.** `CleanupDeletedUserActions` failure is log-only while `DeleteUser`
+  still returns OK ([user_handler.go:524](../../../server/internal/api/user_handler.go))
+  and no `internal/doctor` check flags an `is_deleted` user with
+  `user_provisioning_enabled` or a live PRESENT system USER action. A teardown
+  failure (offline device, DB blip) leaves the deleted person's provisioned Linux
+  account on devices with no alarm — a GDPR/NIS2 gap. Fix: add the AC 36 doctor
+  check and/or make the reconcile sweep cover `is_deleted` orphan system actions.
+- **[Low] AC 13 idempotent-delete half not shipped; test name overclaims.**
+  `DeleteUser` calls `GetUser`, which filters `is_deleted = FALSE`, so an
+  already-deleted visible user returns NotFound, not the specified idempotent OK.
+  `TestDeleteUser_IdempotentAndNoOracle` tests only the absent case. Fix: amend
+  AC 13 + the rejection table to the shipped uniform-NotFound behavior, or route
+  already-deleted targets to the (existing, tested) idempotent store flow.
+- **[Low] AC 14 rollback path has no failure-injection test.** The all-or-nothing
+  DEK-delete + `UserDeleted` guarantee is untested against an injected DEK-delete
+  failure. Fix: inject a failure on `DeleteUserEncryptionKey` and assert no
+  `UserDeleted` event and an unredacted projection.
+- **[Low, doc] The retention/crypto-shred ADR (AC 21a) was never written, and
+  in-code comments cite "ADR 0030" which is actually the single-AAD ADR.** For an
+  operator restoring `events` without `user_encryption_keys` (= permanent mass
+  erasure), this is the most dangerous missing document. Fix: write the crypto-shred
+  / jointly-authoritative-backup ADR and correct the two stale in-code references.
+- **[Note] AC 35 teardown ordering is functional but best-effort** — the pre-delete
+  snapshot preserves plaintext, but cleanup runs after the shred and is log-only on
+  failure (feeds the AC 36 gap above).
+
+Accurate as-implemented: PII sealing fail-closed, crypto-shred unreadability
+(proven by `restore_test.go`), pseudonymized audit attribution, the prune trigger
+(migration 013), and no attacker-with-audit-permission path to destroy evidence.

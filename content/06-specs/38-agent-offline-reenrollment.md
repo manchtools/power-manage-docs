@@ -1372,3 +1372,51 @@ proof, and deployment evidence for historical/fleet-wide revocation.
 - ADR 0013: enrollment trust model.
 - ADR 0014: secrets-at-rest hardening.
 - Spec 37: exhaustive deployment E2E gate.
+
+## Audit findings (2026-07-18)
+
+Pre-implementation security review (the largest and highest-stakes spec). **The
+design is sound: no Critical/High revocation-bypass or identity-takeover path.** The
+ULID is server-minted, re-enrollment requires proving the prior local binding, the
+candidate must differ from the incumbent, and a revoked cert never re-authorizes (it
+is used only for local structural validation). It also **fixes three real current
+weaknesses** — reason enough to implement it:
+
+1. Revoke-*before*-delete over *all* historical fingerprints, `Internal` on failure
+   (today `DeleteDevice` emits `DeviceDeleted` first, then best-effort revokes only
+   the latest projected fingerprint — [device_handler.go:311-330](../../../server/internal/api/device_handler.go)
+   — so a CRL-write failure or superseded renewal cert stays live to ~1-year expiry).
+2. Atomic token-consume + device-register (today they are two non-atomic appends →
+   orphan-consumed-token on partial failure).
+3. Kills the enroll fall-through that replaces identity when `Exists()` is true but
+   `Load()` fails ([agent enroll.go:147-157](../../../agent/internal/deviceauth/enroll.go)).
+
+Blockers are quality/rollout, not design holes:
+- **[Medium] Acceptance criteria are compound and non-atomic on a fleet-impersonation
+  boundary.** ACs 1-32 bundle 5-10 separable guarantees each (AC 22 alone:
+  lifecycle-lock ordering, DER-derived fingerprint/validity persistence, retention
+  exemption, revoke-before-delete ordering, certless-delete replay,
+  partial-metadata→Internal, retry). They can't map 1:1 to fail-closed tests, and on
+  this boundary ambiguity *is* the risk. Fix: decompose into atomic, test-mapped
+  criteria; add a rejection-table row + named `Test<Method>_<Scenario>` for every
+  "…not classified as absence/unenrolled" edge.
+- **[Medium] The rollout couples a security-critical HA event-sourcing migration
+  (atomic token admission + per-device lifecycle lock + stop-the-world activation)
+  with the agent re-enroll CLI behind an operationally-enforced drain.** A leaked
+  fence (one un-drained legacy replica) re-exposes the legacy partial-commit path.
+  Fix: split the server token-admission / lifecycle-lock migration into its own
+  spec/PR reviewed and gated independently; make the fence mechanically enforced
+  (schema/flag gate the legacy binary refuses to serve past), not drain-only.
+- **[Low] Add two residual-risk paragraphs to Security considerations:** (a) revocation
+  is per-certificate, not a durable per-machine block — an attacker with root + a
+  valid token can rejoin as a *new* server-minted identity (no privilege gain over
+  first-enroll, which is less restrictive); (b) re-enroll deliberately adopts a new CA
+  (TOFU), so consider making `-ca-sha256` **mandatory** for re-enroll since a
+  CA-replacement operator has an out-of-band fingerprint channel.
+- **[Low] `cleanup-backup --acknowledge-delete-device-success` trusts an operator
+  attestation, not a verified fact** — bounded (deletes only local rollback material;
+  server-side `DeleteDevice` is the sole revocation authority). Document that it is a
+  UX guard.
+
+Guarantee check: revocation **preserved and improved**; device-identity **preserved**
+(no takeover, no cross-device secret pull).

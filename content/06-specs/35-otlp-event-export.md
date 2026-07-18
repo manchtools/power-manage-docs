@@ -337,3 +337,54 @@ implementing the OTLP logs service):
   Framework) for attribute alignment.
 - ADR: (to be written) "Export over OTLP only; format translation is a Collector
   concern, not product code."
+
+## Audit findings (2026-07-18)
+
+Pre-implementation security review. The design is salvageable — exporting *sealed*
+PII ciphertext keeps crypto-shred effective — but as written the spec leaves the
+highest-consequence path unpinned. **Two HIGH holes must close before
+implementation:**
+
+- **[High] The spec never mandates "read sealed bytes, never unseal PII."** The
+  safety story rests on `redactEventData`, which scrubs *secrets*, not PII (PII is
+  protected by sealing, not redaction). An implementer tailing the event store like
+  the indexer would naturally reuse the projector unseal path (`pii.Opener.OpenDecoded`)
+  and ship **plaintext email / name / linux_username of every user** to an external
+  SIEM — permanently defeating GDPR crypto-shred. Fix: add an AC forbidding any
+  `OpenPayloadPII` / `PIIOpener` / `UnwrapDEK` call on the export path (`pii:v1:`
+  values shipped as opaque ciphertext) and a mandated test proving a PII-bearing
+  event reaches a mock collector as ciphertext, with no DEK ever unwrapped.
+- **[High] The exporter is structurally over-privileged: KEK + SELECT on the DEK
+  table.** Spec lines 149/181 give it `CONTROL_ENCRYPTION_KEY` plus a `pm_readonly`
+  DSN, and `pm_readonly` gets `SELECT ON ALL TABLES` including `user_encryption_keys`
+  ([initdb.d/01-indexer-user.sh:32](../../../server/deploy/initdb.d/01-indexer-user.sh)).
+  KEK + SELECT on the wrapped DEKs = mass PII decryption **regardless of the
+  exporter's own code**. Fix: scope the exporter's DB role to `events` only (this
+  also structurally guarantees the fix above); better, supply the auth header via a
+  file/secret so the exporter never holds the KEK.
+
+Also fix before implementation:
+- **[Medium] Export-by-default + name-pattern redaction is fail-open on novel
+  fields.** A new event type with a secret/PII field whose key doesn't match
+  `matchesSecretKey` is exported unredacted. Fix: emit an allow-listed attribute set
+  and do not ship the raw/redacted `data` blob; or add a redaction-completeness CI
+  guard.
+- **[Medium] `Body` summary and `target.*` attributes may be built from the raw (not
+  redacted) payload.** Add an AC + test that every payload-derived attribute comes
+  from the post-redaction payload.
+- **[Medium] The plaintext-OTLP "insecure toggle" is not loopback-constrained** (spec
+  line 247) — nothing prevents shipping the whole audit record in plaintext to a
+  remote host. Fix: permit insecure only for a loopback / unix-socket endpoint;
+  reject `insecure + non-loopback` at boot.
+- **[Medium] The GDPR-erasure ↔ external-export tension is never acknowledged.** State
+  the model (export ships sealed ciphertext; DEK shred erases exported copies) and
+  decide the legacy-plaintext-PII case (pre-spec-19 events carry plaintext PII that
+  DEK destruction cannot reach).
+- **[Low] Auth-header secret handling underspecified** (env var is plaintext at the
+  deploy layer; pin the `enc:v1` ciphertext-in-env contract + a dedicated crypto
+  purpose/AAD) and **add the missing PII-specific test**.
+
+Strengths to keep: no-drop-on-failure (cursor holds), backpressure isolation,
+at-least-once + `event.id` dedup, advisory-lock single-flight, fail-closed boot,
+non-empty exported-set archtest. SSRF does not apply (endpoint is deploy-config, no
+request-path input).

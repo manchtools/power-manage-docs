@@ -1,7 +1,8 @@
 ---
 title: "Datastore authentication hardening (Valkey + Postgres)"
-status: implemented
+status: partially-implemented
 created: 2026-07-12
+audited: 2026-07-18
 ---
 
 # Datastore authentication hardening (Valkey + Postgres)
@@ -305,3 +306,45 @@ Testing datastore auth needs a **real Valkey and real Postgres**
   [008_seeds.sql](../../../server/internal/store/migrations/008_seeds.sql)).
 - New ADR to write on approval: **ADR datastore auth** (per-service ACL model,
   the shared-Asynq-keyspace residual, the mTLS + ACL/role model).
+
+## Audit findings (2026-07-18)
+
+Status corrected `implemented` → `partially-implemented`. The substance is real
+and merged into `integration/alpha3` (**PR #561 is still OPEN — not on `main`**):
+mTLS-only transport on both datastores with fail-closed boots on all four
+binaries, DNS-SAN-correct verification, root-owned-0600-key / dropped-UID handling
+reproduced in compose and tests, per-service ACLs with the shared password
+removed, and a real-CA testcontainer + CI-gated smoke test story. But AC 4
+(namespace confinement) deviates in two ways that re-open the exact threats the
+Motivation section names:
+
+- **[High] Gateway can un-revoke any cert fleet-wide.** The gateway ACL is
+  `~pm:crl:* … +@all` ([valkey.conf.template:65](../../../server/deploy/valkey.conf.template)) —
+  write access, not read-only. Control writes the CRL via `crl.Store.Revoke`; the
+  gateway reads the same key directly ([gateway/main.go:674](../../../server/cmd/gateway/main.go)).
+  A compromised gateway still holding its (unrevoked) mounted Valkey password can
+  `ZREM pm:crl:revoked <any-fingerprint>` and un-revoke any agent or gateway cert.
+  Fix: `%R~pm:crl:*` read-only pattern for pm-gateway; add a smoke assertion that
+  pm-gateway gets NOPERM on a `pm:crl:revoked` write.
+- **[Medium] Indexer holds the full keyspace.** `user pm-indexer … ~* +@all`
+  ([valkey.conf.template:70](../../../server/deploy/valkey.conf.template)) gives a
+  compromised indexer write to `traefik/*`, `pm:gateway:*`, `pm:device:*`, and
+  `pm:crl:*` — no cross-namespace NOPERM is even possible. Fix: scope to
+  `~asynq:* ~idx:* ~search:* ~reverse:* ~members:*`; grant a specific FT command
+  if genuinely needed, not `~*`. Add a cross-namespace NOPERM assertion.
+- **[Low] `control doctor` can emit the Valkey ACL password in cleartext** when all
+  `CONTROL_VALKEY_TLS_*` vars are empty ([doctor.go:75-90](../../../server/cmd/control/doctor.go)):
+  the credential-drop guard fires only on a partial cert set, not when TLS is
+  entirely absent. Fix: drop credentials whenever `valkeyTLS == nil`.
+- **[Low] setup.sh accepts a `CHANGE_ME*` placeholder as an ACL password**
+  ([setup.sh:63-65,356-366](../../../server/deploy/setup.sh) — `ensure_acl_passwords`
+  tests only emptiness). AC 8 requires rejecting placeholders. One-line fix.
+- **[Missing deliverables]** doctor does not *report* the datastore posture (user,
+  mTLS on/off, cert CN) as the design requires (reachable/unreachable only); the
+  `04-security/08-deployment-hardening.md` ACL/mTLS extension was never written; the
+  promised **ADR datastore auth** was never authored.
+
+Either tighten the ACL grants to match AC 4 (preferred) or amend AC 4 to state and
+justify the widened grants as an accepted, documented residual — but do not leave
+the spec claiming full namespace confinement while the code grants `~*` and CRL
+write.
