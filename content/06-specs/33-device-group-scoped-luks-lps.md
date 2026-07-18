@@ -87,6 +87,23 @@ Numbered, testable.
    has an in-scope positive control that reaches the protected side effect: the
    token caller is assigned to the target device and uses a valid encryption
    action, while revocation has a valid signer/action and recording enqueuer.
+10. Given either write RPC (`CreateLuksToken`, `RevokeLuksDeviceKey`) is denied
+    by device scope, then exactly one denied-write audit event
+    (`LuksTokenCreateDenied` / `LuksKeyRevokeDenied` — new event types mirroring
+    the spec 24 denied-read payloads) is attempted with the caller-supplied
+    device ULID and the generic `device outside authorized scope` reason. Audit
+    append failure remains best-effort and must not alter the denial; no
+    mutation event, token, or queue task is produced. Systematic write-surface
+    recon on the crown-jewel path must be visible in the audit stream, matching
+    the "every state-changing RPC is audit-logged" rule.
+11. Given a future self-service tier (`:self`/`:assigned`) is ever added for any
+    of the four RPCs, then registering the permission string alone is
+    insufficient: the handler MUST add an owner-scope SQL filter
+    (`OwnerScope` on the device/credential read) in the same change, and an
+    architecture guard fails if an `:assigned`-variant permission literal for
+    these RPCs exists while the same-named handler performs a bare
+    `Device.Get`. (Today the `:assigned` passthrough branch is dead for these
+    RPCs; this AC pins that adding the string without the filter cannot ship.)
 
 ## Out of scope
 
@@ -102,8 +119,11 @@ Numbered, testable.
   mTLS binding (WS2), not by user RBAC. Unchanged.
 - **Any proto change.** The RPCs and request/response messages already exist;
   this only changes the Go-side permission classification and handler gating.
-- **New event types or payloads.** Scope-denied reads reuse the existing spec 24
-  `LpsPasswordsViewDenied` / `LuksKeysViewDenied` events and payloads.
+- ~~**New event types or payloads.**~~ *(Amended 2026-07-18, AC 10.)*
+  Scope-denied reads reuse the existing spec 24 `LpsPasswordsViewDenied` /
+  `LuksKeysViewDenied` events and payloads; scope-denied WRITES now add the two
+  mirroring denied-write event types `LuksTokenCreateDenied` /
+  `LuksKeyRevokeDenied` (same payload shape, new-event-type checklist applies).
 
 ## Technical design
 
@@ -181,8 +201,23 @@ logged. They are not mislabeled as authorization denials.
   remains mandatory after scope passage.
 - **Audit.** Permitted reads retain their existing view events. Scope-denied
   secret reads reuse the existing denied events so moving the authorization gate
-  earlier does not create an audit blind spot. No mutation event is emitted for
-  a scope-denied write.
+  earlier does not create an audit blind spot. Scope-denied writes emit the new
+  denied-write events (AC 10) — a denial trail, never a mutation event.
+- **Label→dynamic-group pierce: ACCEPTED BY DESIGN (decision 2026-07-18).** An
+  operator who holds org-tier `SetDeviceLabel` can relabel any device into a
+  dynamic group and thereby pull it into a dynamic-group-scoped LUKS/LPS grant.
+  This is deliberate: labeling is an org-wide, high-privilege permission by
+  design ("Labeling should only be an org-wide permission"), and a scoped
+  LUKS/LPS grant does not promise confinement against a caller who ALSO holds
+  org-wide relabel authority — composing those two grants is an operator
+  responsibility, the same class of decision as granting org-tier permissions
+  directly. The static-group injection path stays closed
+  (`AddDeviceToGroup` gates both group and device scope). Operators who want
+  hard confinement scope LUKS/LPS grants to static groups and withhold
+  org-tier `SetDeviceLabel` from scoped admins; the denied-write/read audit
+  events (AC 3/10) make probing visible either way. Confinement of dynamic
+  groups against org-wide relabelers is NOT a goal of this spec and must not
+  be re-litigated per-RPC.
 - **No `context.Background()`** in these paths; the enforcer uses the request
   context.
 
@@ -240,6 +275,7 @@ For each of the four RPCs:
 | Existing out-of-scope device or scoped unknown ULID | PermissionDenied | "permission denied" | RPC log contains procedure/request ID/code/message; reads additionally attempt exactly one generic denied-read audit with actor and caller-supplied device_id; writes append no domain event |
 | Device-scope membership lookup fails | Internal | "scope resolution failed" | method/status plus opaque failure; the underlying resolver error is not retained; no credential data |
 | Global caller uses an unknown device ULID | NotFound | "device not found" | RPC log contains procedure/request ID/code/message; reads additionally attempt the existing denied-read audit; writes append no domain event |
+| Scope-denied write (`CreateLuksToken` / `RevokeLuksDeviceKey`) | PermissionDenied | "permission denied" | exactly one `LuksTokenCreateDenied` / `LuksKeyRevokeDenied` audit event with actor and caller-supplied device_id; no token, no revocation event, no queue task |
 | In-scope/global but unassigned `CreateLuksToken` caller | PermissionDenied | Existing assigned-owner message | actor, device_id; no token |
 | Absent or malformed device/action ULID | InvalidArgument | Existing validation message | validation field/category; no scope or domain access |
 | Unauthenticated | Unauthenticated | (interceptor/handler) | method, remote |
@@ -307,3 +343,21 @@ before approval, because this spec confines the most sensitive secret in the sys
 
 Spec quality is otherwise high (numbered ACs, cross-scope rejection row,
 real-Postgres tests, red-check instructions, self-discovering parity guard).
+
+### Remediation (2026-07-18)
+
+- **[Medium] label→dynamic-group pierce** → ACCEPTED BY DESIGN per maintainer
+  decision ("Labeling should only be an org-wide permission"): org-tier
+  `SetDeviceLabel` is high-privilege by design, and a scoped LUKS/LPS grant
+  does not promise confinement against a caller who also holds org-wide
+  relabel. Documented in Security considerations with the operator guidance
+  (static-group scoping + withholding `SetDeviceLabel` for hard confinement);
+  detection is covered by the denial audit events. No static-group restriction,
+  no co-holding rejection.
+- **[Low] silent denied writes** → AC 10: new `LuksTokenCreateDenied` /
+  `LuksKeyRevokeDenied` events (spec 24 payload shape); Out-of-scope bullet
+  amended; rejection row added.
+- **[Low] latent `:assigned` fail-open** → AC 11: any future self-service tier
+  must ship the owner-scope SQL filter in the same change, pinned by an
+  architecture guard that fails on a registered `:assigned` literal without
+  the filter.
