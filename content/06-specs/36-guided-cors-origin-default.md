@@ -24,13 +24,16 @@ The reference Compose stack does not host the web application. An empty `CONTROL
    list. Each entry is a canonical origin only: no whitespace, empty entry,
    userinfo, path, query, fragment, trailing slash, wildcard, or shell-significant
    character; the total and entry count are bounded.
-3. Given invalid or non-canonical origin input, when the top-level installer runs,
-   then the CORS prompt executes before the first guided `write_env_var`; setup
-   rejects with `.env` byte-identical to the baseline captured after `init_env` and
-   release-tag `IMAGE_TAG` handling, immediately before `run_setup`. It never
-   evaluates the answer as shell input and never invokes `docker compose pull` or
-   `docker compose up`. A recording Docker stub proves the no-start result through
-   the real installer entry point, not only by calling `guided_setup()` directly.
+3. Given invalid or non-canonical origin input, when the top-level installer
+   runs, then each of the following holds as its own testable guarantee:
+   a. the CORS prompt executes before the first guided `write_env_var`;
+   b. setup rejects with `.env` byte-identical to the baseline captured after
+      `init_env` and release-tag `IMAGE_TAG` handling, immediately before
+      `run_setup`;
+   c. the answer is never evaluated as shell input;
+   d. no `docker compose pull` or `docker compose up` is invoked;
+   e. a recording Docker stub proves the no-start result through the real
+      installer entry point, not only by calling `guided_setup()` directly.
 4. Given an existing `CORS_ORIGINS` assignment, when guided or non-interactive
    setup starts, then it extracts and validates that literal from raw `.env` bytes
    before the first `source`. A valid non-empty value is retained without
@@ -45,16 +48,20 @@ The reference Compose stack does not host the web application. An empty `CONTROL
    authoritative; custom multi-origin lists document that order matters.
 7. Given the real deployment gate, when `install.sh` receives a blank answer at
    the real guided CORS prompt while the parent environment deliberately exports
-   conflicting `CORS_ORIGINS` and `CONTROL_CORS_ORIGINS`, then the installer
-   sanitizes those variables for every Compose invocation and the exact generated
-   `.env` remains authoritative. Control exposes exactly
-   `CONTROL_CORS_ORIGINS=https://app.power-manage.manchtools.com`. A real browser
-   actor serves test code from the allowed origin, performs the setup page's
-   `fetch(<control>/health, {method: "GET", mode: "cors"})`, and uses the generated
-   TypeScript SDK client from the reviewed `sdk_sha` for credentialless
-   `ListAuthMethods`, real login, and one protected request with the issued admin
-   JWT. All succeed. Supplemental raw probes assert the exact method-appropriate
-   CORS header sets.
+   conflicting `CORS_ORIGINS` and `CONTROL_CORS_ORIGINS`, then each of the
+   following holds as its own testable guarantee:
+   a. the installer sanitizes both variables for every Compose invocation and
+      the exact generated `.env` remains authoritative;
+   b. Control's effective environment contains exactly
+      `CONTROL_CORS_ORIGINS=https://app.power-manage.manchtools.com`;
+   c. a real browser actor serving test code from the allowed origin performs
+      the setup page's `fetch(<control>/health, {method: "GET", mode: "cors"})`
+      successfully;
+   d. the same browser actor uses the generated TypeScript SDK client from the
+      reviewed `sdk_sha` for credentialless `ListAuthMethods`, real login, and
+      one protected request with the issued admin JWT, and all succeed;
+   e. supplemental raw probes assert the exact method-appropriate CORS header
+      sets.
 8. Given the same deployment, when the exact unlisted origin, the near-match
    `https://app.power-manage.manchtools.com.evil.example`, and an unlisted sibling
    subdomain each perform equivalent browser requests and raw preflight/actual
@@ -71,6 +78,15 @@ The reference Compose stack does not host the web application. An empty `CONTROL
    supplies a tarball generated from exactly `server_sha`, verifies the extracted
    deploy-file digests against that commit, and forbids network fallback. A stale
    tag/branch archive or digest mismatch fails before setup or Compose.
+10. Given the guided CORS prompt and the `.env.example` documentation, then both
+    state, and a setup test asserts the emitted prompt text contains:
+    a. the default is the **vendor-hosted** web-app origin, and accepting it
+       grants credentialed cross-origin trust to a vendor-controlled origin —
+       operators who self-host their own frontend should enter their own origin
+       instead;
+    b. with multiple origins, origin **order** selects the implicit SSO
+       callback base (the first configured origin), and operators using SSO
+       should set `CONTROL_SSO_CALLBACK_BASE_URL` explicitly to decouple it.
 
 ## Out of scope
 
@@ -167,9 +183,13 @@ also cleared even though the current mapping ignores it, preventing future mappi
 drift from silently reintroducing host authority. Other operator environment
 variables retain the existing contract. When `CONTROL_SSO_CALLBACK_BASE_URL` is
 absent, Control intentionally inherits the first parsed CORS origin. The prompt
-and `.env.example` state that multi-origin order therefore selects the default
-SSO redirect origin (the first configured origin); operators can set
-`CONTROL_SSO_CALLBACK_BASE_URL` explicitly to decouple it.
+and `.env.example` carry the AC 10 copy: the default is the vendor-hosted
+origin and self-hosters should enter their own (accepting the default grants
+credentialed cross-origin trust to a vendor-controlled origin), and multi-origin
+order selects the default SSO redirect origin (the first configured origin), so
+SSO operators should set `CONTROL_SSO_CALLBACK_BASE_URL` explicitly to decouple
+it — a forgotten override would otherwise redirect OIDC authorization codes to
+the vendor origin by default (bounded by the IdP-side redirect-URI allow-list).
 
 ### Proto, database, and dependencies
 
@@ -196,6 +216,12 @@ None.
   actual request receives no browser-readable CORS grant even when the underlying
   authenticated RPC succeeds; an invalid setup value prevents every Compose
   pull/up invocation.
+- **Load-bearing invariant — Bearer-only authentication:** this entire design is
+  safe *because* auth is Bearer-only with no ambient cookies. A denied-origin
+  actual request still executes server-side; only the CORS read grant is
+  withheld, which is harmless only while the browser holds no ambient credential
+  to attach. Any future cookie- or session-based authentication change MUST
+  revisit this spec's CORS model before shipping.
 
 ## Test requirements
 
@@ -244,6 +270,11 @@ pre-seeded:
   content becomes authoritative, and the installer invokes no Compose pull/up.
 - With callback base unset, a config-level test proves Control selects the first
   parsed origin; an explicit callback base wins.
+- The emitted guided CORS prompt text contains both AC 10 statements — the
+  vendor-default/self-host-your-own recommendation and the
+  origin-order-selects-SSO-callback steer toward
+  `CONTROL_SSO_CALLBACK_BASE_URL` — asserted on stable key phrases, and
+  `.env.example` carries the same two notes adjacent to `CORS_ORIGINS=`.
 
 ### Middleware regression tests
 
@@ -368,3 +399,18 @@ responses). Three notes to fold in before implementation:
 
 Also atomize the compound ACs (3, 7 bundle installer-digest, `.env` byte-identity,
 Docker-stub, and header assertions into one criterion).
+
+### Remediation (2026-07-18, WS-E amendment)
+
+- **SSO callback order (Low→Medium)** → AC 10b + prompt/`.env.example` copy +
+  a setup test asserting the emitted prompt text: origin order selects the
+  implicit SSO callback base; SSO operators are steered to set
+  `CONTROL_SSO_CALLBACK_BASE_URL` explicitly.
+- **Vendor-origin default trust (Low)** → AC 10a + the same copy/test:
+  self-hosting operators are told to enter their own origin because the default
+  grants credentialed cross-origin trust to a vendor-controlled origin.
+- **Bearer-only invariant (Info)** → Security considerations now names
+  Bearer-only/no-ambient-cookie auth as the load-bearing invariant; any future
+  cookie-auth change must revisit this spec's CORS model before shipping.
+- **Non-atomic ACs** → ACs 3 and 7 decomposed into lettered single-guarantee
+  sub-criteria.
