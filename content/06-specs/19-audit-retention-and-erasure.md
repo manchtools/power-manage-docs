@@ -199,8 +199,12 @@ F-04 (full-fidelity round-trip = AC 17), F-02 (drift detection in doctor), F-07
 13. **No existence oracle.** Given a caller whose scope does not unconditionally
     cover the target, when deletion targets a non-existent ULID, then the
     response is `NotFound` — indistinguishable from an out-of-scope existing
-    target. Given a target the caller can see that is already deleted, the call
-    is idempotent (OK, no orphaned writes, DEK stays absent).
+    target. An already-deleted target resolves identically: `GetUserByID`
+    filters `is_deleted = false`, so a repeat delete of an erased user is
+    `NotFound` too — the response is uniform across absent, out-of-scope, and
+    already-erased targets, and never confirms that a given ULID ever existed.
+    (No orphaned writes and the DEK stays absent regardless, since the delete
+    flow is never reached.)
 14. Given deletion where the DEK delete fails (DB error), when it runs, then the
     transaction rolls back — no `UserDeleted` event, no projection change
     (all-or-nothing; no half-erased state).
@@ -516,7 +520,7 @@ None.
 
 - Deletion (API + SCIM): correct / absent / malformed ULID; unauthenticated;
   wrong role; out-of-scope → NotFound; absent → NotFound (no oracle);
-  visible-already-deleted → idempotent OK; DEK destroyed + PII redacted on
+  already-deleted (was visible) → NotFound (uniform, AC 13); DEK destroyed + PII redacted on
   success (both paths, AC 8); DB-fail rolls back (AC 14); audit event on success,
   none on rejection.
 - SCIM: `active=false` → `UserDisabled`, DEK **retained**; `DELETE` with links
@@ -581,7 +585,7 @@ None.
 | Delete wrong role / out of scope | NotFound | "user not found" | actor, target, denied perm |
 | Delete absent target (scope not universal) | NotFound | "user not found" | actor, target |
 | Delete malformed ULID | InvalidArgument | "invalid user id" | actor, raw value |
-| Delete visible + already deleted | OK (idempotent) | success, no-op | actor, target, "already deleted" |
+| Delete already-deleted (was visible) | NotFound | "user not found" | actor, target |
 | Delete: DEK delete fails (DB) | Internal | "failed to delete user" | actor, target, error; **tx rolled back** |
 | Append: live user DEK missing/unwrappable | Internal | "cannot encrypt PII — key unavailable" | user ULID; **no plaintext written** |
 | Projector: DEK present but unwrap fails | (abort, surfaced) | — | user ULID, "DEK unwrap failed — not projecting" |
@@ -653,12 +657,14 @@ remain and must close before this spec backs a compliance claim.
   the original finding was withdrawn as a non-signal: AC 32's fail-closed
   provisioning choke point already makes a stale flag on an erased user harmless,
   so flagging it would only generate alarm-fatigue noise.
-- **[Low] AC 13 idempotent-delete half not shipped; test name overclaims.**
-  `DeleteUser` calls `GetUser`, which filters `is_deleted = FALSE`, so an
-  already-deleted visible user returns NotFound, not the specified idempotent OK.
-  `TestDeleteUser_IdempotentAndNoOracle` tests only the absent case. Fix: amend
-  AC 13 + the rejection table to the shipped uniform-NotFound behavior, or route
-  already-deleted targets to the (existing, tested) idempotent store flow.
+- **[Low] AC 13 idempotent-delete half not shipped; test name overclaims. FIXED
+  (2026-07-18).** `DeleteUser` calls `GetUser`, which filters `is_deleted = FALSE`,
+  so an already-deleted visible user returns NotFound, not the (then-)specified
+  idempotent OK. Resolved by amending AC 13 + the rejection table + test
+  requirements to the shipped **uniform-NotFound** behavior (the stronger
+  anti-oracle posture — an already-erased target is indistinguishable from an
+  absent or out-of-scope one). Test renamed to `TestDeleteUser_UniformNotFound`
+  and extended to pin the already-deleted → NotFound case. No code change.
 - **[Low] AC 14 rollback path has no failure-injection test.** The all-or-nothing
   DEK-delete + `UserDeleted` guarantee is untested against an injected DEK-delete
   failure. Fix: inject a failure on `DeleteUserEncryptionKey` and assert no
