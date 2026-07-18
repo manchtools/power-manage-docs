@@ -8,7 +8,17 @@ created: 2026-07-16
 
 ## Overview
 
-Replace health-based and hand-picked deployment probes with a self-discovering, generated-client E2E contract suite that boots the real current-commit images from the real Compose artifacts and exercises every deployed Power Manage RPC, stream message arm, listener/authentication plane, and critical cross-service state machine before a release can publish version tags or manifests.
+Supersede health-based and hand-picked deployment probes **as the release gate**
+with a self-discovering, generated-client E2E contract suite that boots the real
+current-commit images from the real Compose artifacts and exercises every
+deployed Power Manage RPC, stream message arm, listener/authentication plane,
+and critical cross-service state machine before a release can publish version
+tags or manifests. This is additive, not a replacement: the existing smoke test
+is retained as a fast infrastructure preflight that runs beneath this suite.
+Release provenance and publication authority (the reviewed change-set manifest,
+single-build attestation, digest ledger, tag/alias promotion) are specified
+separately in spec 39; this suite is the deployed-execution gate that spec 39's
+publication authority requires to be green.
 
 ## Motivation
 
@@ -84,36 +94,27 @@ Alpha3 reached healthy container status while real features remained broken: Val
     exact method-appropriate CORS header sets and usable responses expected by the
     hosted web app; unlisted and suffix-near-match origins receive no browser grant.
 16. Given certificate renewal/revocation and an old certificate that remains TLS-valid for the proof window, when the credential is superseded while the entity remains active, then fresh connections complete TLS and receive the exact Gateway CRL-middleware HTTP 403/log before Connect handling. One production-shaped public probe plus per-replica internal trust probes prove every Gateway cache; later handler failures and TLS time/chain errors do not count. The renewed certificate succeeds.
-17. Given a PR or coordinated clean-break candidate changing SDK,
-    server/deploy/E2E, or agent, then its reviewed change-set manifest records
-    exactly `sdk_sha`, `server_sha`, and `agent_sha`. Generated clients are part of
-    `sdk_sha`; deploy, Compose, workflow, and E2E source are part of `server_sha`.
-    CI builds current-source amd64 binaries/images from that immutable candidate
-    set, verifies server and agent dependency graphs resolve the recorded
-    `sdk_sha`, and never substitutes a branch, matching tag, or published default.
-18. Given a release, when each coordinated change has merged, then the coordinator
-    records the exact resulting commit object for that reviewed change as
-    `sdk_sha`, `server_sha`, or `agent_sha`; CI never re-resolves ambient branch
-    heads. Reachability from configured release branches and SDK dependency
-    resolution are verified before the complete gate reruns. Each
-    service/architecture binary is built once, hashed, attested, and used as both
-    the image input and GitHub Release asset; each image is built once under a
-    run-scoped staging reference and every later test/publication uses its captured
-    digest. AMD64 exhaustive E2E and an arm64 boot probe run against those exact
-    digests. A green mutable PR-head result does not authorize publication, and a
-    changed SHA requires a new reviewed manifest and full rerun. The green
-    manifest-triggered gate—not a pre-existing `v*` tag—is the only actor allowed
-    to create repository tags/releases or promote OCI tags. Repository Git tags
-    map to their own SHA (`sdk_sha`, `server_sha`, or `agent_sha`); OCI tags map to
-    tested manifest digests whose provenance records all applicable Git identities.
-    The GitHub Release remains draft while immutable version manifests and then
-    floating aliases are published and verified. Because registry alias updates are
-    not atomic across services, partial failure triggers best-effort rollback to the
-    captured prior aliases and keeps the Release draft. The reviewed digest ledger,
-    not a floating alias, is publication authority; the Release becomes public only
-    after every intended alias matches that ledger.
+17. Given any run of this suite (PR candidate or release rerun), when the stack
+    is built, then every binary and image derives from the reviewed immutable
+    `sdk_sha` / `server_sha` / `agent_sha` change-set manifest defined in spec
+    39; the E2E startup ledger records those exact identities, and a run whose
+    stack was built from an ambient branch head, matching tag, or published
+    default image fails before any scenario executes.
+18. *(Split 2026-07-18.)* Reviewed change-set manifest structure, single-build
+    binary/image provenance, digest-ledger publication authority, draft-Release
+    ordering, and floating-alias promotion/rollback are specified in spec 39.
+    This suite is spec 39's consumer and precondition: publication requires a
+    green run of this suite — including the AC 23 execution-completeness guard —
+    against the exact captured digests.
 19. Given an E2E failure, then CI uploads complete redacted Compose state, health/restart counts, service logs, scenario ledger, and JUnit output before teardown; secrets, `.env`, private keys, tokens, and raw secret-bearing payloads are never uploaded.
-20. Given intentional negative probes, then final post-suite checks still require healthy containers, no unexpected restarts, and no unclassified panic/fatal/internal/ACL/TLS errors.
+20. Given intentional negative probes, when the final post-suite health/log gate
+    runs, then every negative probe carries a unique run-scoped correlator
+    (certificate CN, header, request ID, or source tuple) recorded in the
+    scenario ledger, and every expected rejection log line is matched **1:1** to
+    exactly one probe correlator. Any panic/fatal/internal/ACL/`NOPERM`/TLS/
+    bad-certificate line matched to zero probes — or to more than one — fails
+    the gate, as do unhealthy containers and unexpected restarts, so a real
+    regression cannot be laundered through the negative-probe exception.
 21. Given the real-agent lane registry, then its stable exact keys are
     `agent-socket`, `agent-signed-sync`, and `agent-reenrollment` with no aliases or
     placeholders. Descriptor presence of either `DeviceAuthService` method
@@ -133,6 +134,46 @@ Alpha3 reached healthy container status while real features remained broken: Val
     from that merge-base. Replacing only the expected descriptor fingerprint, or
     changing a scenario comment/format without changing its typed contract source,
     fails review enforcement.
+23. Given a completed deployed run, when the post-suite execution-completeness
+    guard evaluates the scenario ledger, then the set of mounted procedures with
+    a recorded real-assertion pass equals the registered mounted set (exact
+    equality). A registered scenario that early-returned, skipped, was filtered
+    by a selector, or was dropped for budget reasons counts as missing; any
+    missing procedure, any duplicate ledger claim, and a zero-entry ledger fail
+    CI. The guard is budget-independent: no runtime budget, retry policy, or
+    lane selector may exempt a mounted procedure from deployed execution.
+24. Given the booted stack, when reflection reconciliation runs before
+    scenarios, then each deployed server's served-procedure set (gRPC/Connect
+    reflection where mounted, otherwise the canonical production route catalog)
+    is enumerated and its union is compared against the offline discovered
+    registry; any served procedure absent from the registry fails CI. This
+    closes the import-graph gap: `protoregistry.GlobalFiles` contains only
+    linked-in generated packages, so a served-but-unimported service must be
+    caught here — the offline matches-zero guard cannot see it.
+25. Given each object family with owner/scope semantics (discovered from the
+    permission/object-family registry with a matches-zero guard, never a
+    hardcoded list), when a deployed out-of-scope probe runs with a real
+    scope-limited JWT against an existing object outside that scope, then the
+    response is `NotFound` — never `PermissionDenied` and never object data.
+    At least one such probe per object family is mandatory; a family without a
+    registered probe fails the exactness guard. Handler tests bypass the
+    deployed interceptor chain, so this existence-oracle property must be
+    proven against the booted stack.
+26. Given a typed semantic success scenario, when it records its pass, then its
+    ledger entry includes at least one method-specific effect assertion beyond
+    a non-error status (returned field value, read-after-write, state delta, or
+    convergence observation) plus the recorded assertion count; an entry with
+    zero effect assertions does not count as a real-assertion pass for AC 23.
+    "Returned OK" alone never satisfies typed-success, regardless of runtime
+    budget pressure.
+27. Given the TLS surfaces this suite deploys (Traefik termination, gateway TCP
+    passthrough, internal mTLS listeners, per-replica CRL probes), when the
+    stack boots, then mounted key/cert material reproduces production
+    ownership, file modes (including root-owned `0600` private keys), and image
+    UID drops, and every internal dial asserts both the dial address and the
+    TLS verification identity; a world-readable test key, or an IP dial target
+    verified against a DNS-only certificate, fails the run even when both
+    endpoints are otherwise reachable.
 
 ## Out of scope
 
@@ -140,6 +181,7 @@ Alpha3 reached healthy container status while real features remained broken: Val
 - Direct database writes, synthetic JWTs/auth contexts, handler instantiation, privileged CA/control private-key mounts, or direct Valkey business-state seeding.
 - Treating one happy path and one generic rejection as semantic exhaustiveness for a complex RPC.
 - Enabling a partial release gate with skipped/placeholding RPC entries. The release dependency activates only when exact coverage is complete.
+- Release provenance and publication machinery — reviewed change-set manifest structure, single-build attestation, digest-ledger authority, tag/alias promotion and rollback. Split to spec 39 (2026-07-18); this suite consumes the recorded candidate identities (AC 17) and is spec 39's publication precondition.
 
 ## Technical design
 
@@ -291,54 +333,42 @@ the same booted stack, but its scenario ledger and ownership remain distinct.
 
 Public Control calls from the host runner traverse Traefik TLS termination. Agent/Gateway calls traverse Traefik TCP passthrough and dynamic Redis routing. Only the separate internal actor may dial internal mTLS listeners. Include one browser Connect JSON/CORS flow, and fail if a public scenario target resolves to a Compose-internal service address.
 
-### CI/release architecture
+### Execution ledger and completeness guard
 
-The reviewed change-set manifest contains exactly three Git identities:
-`sdk_sha`, `server_sha`, and `agent_sha`. SDK-generated clients belong to
-`sdk_sha`; Compose, deploy scripts, workflows, and E2E source belong to
-`server_sha`. Descriptor fingerprints, binary hashes, image digests, and
-provenance attestations are separate non-Git identities and never masquerade as
-repository SHAs. Non-identity metadata includes one manifest-owned `stable` or
-`prerelease` channel so repositories do not infer channel independently from tag
-spelling.
+Every executed scenario writes a ledger entry at execution time: procedure/arm
+key, negative-probe correlator (where applicable), credential class, observed
+outcome, and effect-assertion count. After diagnostics are captured, the
+completeness guard recomputes the registered mounted set from the same registry
+the offline guard uses and requires exact equality with the set of ledger
+entries recording a real-assertion pass (AC 23, 26). Skips are first-class
+failures: `t.Skip`, early return, selector filtering, and budget drops all
+leave the procedure out of the passed set and fail the gate — the offline
+exactness registry proves classification, this guard proves execution, and
+neither may substitute for the other.
 
-An ordinary PR uses a reviewed compatible candidate set. A coordinated clean
-break supplies all three candidates so no member is tested against an old
-incompatible default. PR CI runs offline exactness plus current-source amd64 E2E
-from that recorded set. After each coordinated merge, the coordinator records the
-exact resulting commit object for that reviewed change; release CI never resolves
-a mutable branch or matching tag. It verifies each commit is reachable from the
-configured release branch and that server/agent dependency graphs resolve
-`sdk_sha`, then reruns the complete gate. A changed SHA invalidates the manifest
-and requires review plus a full rerun.
+Reflection reconciliation runs against the booted stack before scenarios: each
+server's served-procedure set (Connect/gRPC reflection where mounted, otherwise
+the canonical production route catalog) is enumerated and any served procedure
+missing from the offline registry aborts the run (AC 24). Negative probes derive
+a unique run-scoped correlator embedded in the request (certificate CN, header,
+request ID, or source tuple) so the final log gate can match every expected
+rejection line 1:1 (AC 20).
 
-Each service/architecture binary is built exactly once, hashed, and attested.
-Those exact bytes are both the OCI image input and the GitHub Release binary asset.
-Each OCI image is built exactly once under a run-scoped staging reference; its
-registry digest is captured and all E2E, arm64 boot, provenance, and publication
-steps use `repository@sha256:…`. Version and floating manifests contain only those
-tested digests. Server Git tags/releases dereference to `server_sha`, agent tags to
-`agent_sha`, and both SDK Go-module/calendar tags to `sdk_sha`; tag names need not
-match across repositories. OCI tags point to tested digests whose provenance
-records the Git identities.
+### Candidate identity (consumes spec 39)
 
-The green manifest-triggered final gate—not a pre-existing release tag—is the sole
-publication authority. For a server release unit, CI first creates the server
-GitHub Release as a **draft** with the matching deploy tree, original binaries,
-checksums, reviewed change-set manifest, digest ledger, and provenance. It then
-publishes and verifies immutable control/gateway/indexer version manifests. Before
-changing floating aliases it records each prior alias digest; it updates
-`latest` or `latest-rc` per service, then verifies every alias against the reviewed
-digest ledger. Registry operations cannot make three aliases atomic. If any update
-or verification fails, CI attempts to restore every changed alias to its recorded
-prior digest, keeps the GitHub Release draft, and reports any incomplete rollback
-as a publication incident. Floating aliases are convenience pointers only; the
-reviewed digest ledger remains authoritative. CI publishes the GitHub Release only
-after all immutable manifests and intended aliases verify. The manually operated
-`deploy.sh` path is explicitly non-release: local builds use a source-derived
-`dev-<server_sha>-<sdk_sha>-<arch>` identity and a temporary deployment override,
-never a released version, `latest`, `latest-rc`, or the operator's persisted
-`IMAGE_TAG`. Preserve complete redacted artifacts on failure.
+The reviewed change-set manifest — exactly three Git identities `sdk_sha`,
+`server_sha`, `agent_sha`, their category ownership, the manifest-owned release
+channel, single-build binary/image provenance, digest-ledger publication
+authority, draft-Release ordering, and alias promotion/rollback — is specified
+in spec 39 (split from this spec 2026-07-18). This suite consumes it: PR CI
+runs offline exactness plus current-source amd64 E2E from the recorded
+candidate set; the release rerun executes against the exact recorded
+merge-result SHAs, never ambient branch heads; and the E2E startup ledger
+records the identities the stack was built from so a wrong-source run is
+detectable from artifacts alone (AC 17). A green run of this suite — including
+the AC 23 completeness guard — against the captured digests is the precondition
+spec 39's publication gate requires. The manually operated `deploy.sh` path
+remains explicitly non-release (spec 39).
 
 ## Security considerations
 
@@ -373,6 +403,11 @@ never a released version, `latest`, `latest-rc`, or the operator's persisted
   `DeviceAuthService` descriptor presence, `signed-manifest-v1`, and
   `offline-reenrollment-v1` each map to one stable ready lane; path selectors only
   schedule ready lanes. Missing/duplicate/stale/placeholder lanes fail (AC 21).
+- Completeness-guard red checks: a registered mounted scenario that `t.Skip`s,
+  early-returns, is selector-filtered, or records zero effect assertions must
+  fail the post-suite guard; a synthetic served-but-unregistered procedure must
+  fail reflection reconciliation; the object-family probe registry has a
+  matches-zero guard (AC 23–26).
 - Existing handler-level validation/authz/security suites remain mandatory.
 
 ### Deployed E2E
@@ -384,19 +419,30 @@ never a released version, `latest`, `latest-rc`, or the operator's persisted
 - Bootstrap/search, action execution, terminal, OIDC, SCIM, renewal/revocation,
   ingress, exact gateway-CN/device binding, and browser CORS run as
   production-shaped deep flows (AC 7–16).
-- Candidate and exact reviewed post-merge `sdk_sha`/`server_sha`/`agent_sha`
-  identity, dependency resolution, single-build binary/image provenance,
-  repository-specific tag mapping, draft-Release ordering, immutable-manifest and
-  per-service floating-alias verification, injected partial-alias failure with
-  rollback/kept-draft behavior, and the non-release manual-deploy path are asserted
-  by workflow tests and the E2E startup ledger (AC 17–18).
-- Failure artifacts are redacted and the final health/restart/log gate runs after intentional negative probes (AC 19–20).
+- The E2E startup ledger records the reviewed candidate identities the stack
+  was built from and fails on ambient-source builds; manifest structure,
+  provenance, publication ordering, alias rollback, and the non-release
+  manual-deploy path are asserted by spec 39's workflow tests (AC 17–18).
+- Reflection reconciliation runs against every deployed server before
+  scenarios; the post-suite execution-completeness guard, per-family
+  out-of-scope NotFound probes, effect-assertion counts, and TLS
+  ownership/mode/dial-identity fidelity run as part of every deployed run
+  (AC 23–27).
+- Failure artifacts are redacted, and the final health/restart/log gate runs
+  after intentional negative probes with 1:1 correlator matching (AC 19–20).
 - Every activated stable real-agent lane runs and records its capability trigger in
   the scenario ledger (AC 21).
 
 ### Runtime budget
 
-Target 4–7 minutes warm and 8–12 minutes cold; hard workflow bound 15 minutes. Share the CRL convergence window and protocol actors, but do not disable production timing/security controls solely to speed tests.
+Target 4–7 minutes warm and 8–12 minutes cold; hard workflow bound 15 minutes.
+Share the CRL convergence window and protocol actors, but do not disable
+production timing/security controls solely to speed tests. The budget is
+advisory pacing, never coverage authority: a run that exceeds it is a
+performance regression to fix, while the AC 23 completeness guard fails any run
+that skipped a mounted procedure or recorded an assertion-free success to stay
+inside it. If exhaustive typed-success coverage cannot fit the bound, raise the
+bound — never thin the assertions.
 
 ## Rejection paths
 
@@ -407,10 +453,13 @@ Target 4–7 minutes warm and 8–12 minutes cold; hard workflow bound 15 minute
 | Stream envelope field outside a oneof changes without contract review | CI payload-contract failure | Complete stream method contract changed | Procedure, direction, field, old/new fingerprint |
 | Explicitly unmounted procedure is reachable or lacks listener non-exposure evidence | CI/E2E exactness failure | Declared exclusion contradicts production mount | Procedure, listener/ingress, observed status |
 | Stale or duplicate scenario registration | CI exactness failure | Stale or duplicate procedure | Exact stale/duplicate registration |
-| Change-set manifest has a fourth Git SHA, omits one of the three keys, or confuses a digest/fingerprint with a SHA | CI identity failure | Invalid `sdk_sha`/`server_sha`/`agent_sha` manifest | Exact key/category and safe observed identity |
-| Recorded merged SHA is changed, unreachable, re-resolved from a mutable ref, or dependency graph does not resolve `sdk_sha` | CI provenance failure | Reviewed source set invalid; release blocked | Expected and observed immutable identities/dependency result |
-| A tag-triggered path publishes before the manifest gate, a Git tag targets the wrong repository SHA, or an OCI tag references an untested digest | CI publication failure | Publication identity/order mismatch; GitHub Release remains draft | Repository, tag/channel, expected SHA/digest, safe observed identity |
-| Floating alias update/verification fails after another service alias changed | CI publication failure plus rollback attempt | Release remains draft; changed aliases are restored to captured prior digests where possible, and incomplete rollback is an incident | Service alias, prior/target/observed digest, rollback status; reviewed digest ledger remains authoritative |
+| E2E stack was built from an ambient branch head, matching tag, or published default instead of the recorded candidate set | E2E startup-ledger failure | Run identity does not match reviewed manifest (spec 39) | Expected and observed `sdk_sha`/`server_sha`/`agent_sha` |
+| Mounted procedure has no real-assertion pass in the execution ledger (skip, early return, selector filter, budget drop) | CI completeness failure | Registered scenario did not execute against the deployed stack | Procedure key, scenario ID, ledger state |
+| Deployed server serves a procedure absent from the offline registry | CI reflection-reconciliation failure | Deployed surface exceeds discovered registry | Server, procedure key, reflection/route source |
+| Out-of-scope probe returns `PermissionDenied` or object data instead of `NotFound` | E2E security failure | Scope existence oracle or cross-scope data leak | Object family, actor scope, procedure, observed code |
+| Typed-success ledger entry records zero effect assertions | CI completeness failure | Success scenario asserted nothing beyond status | Procedure, scenario ID, assertion count |
+| Rejection log line matches zero or multiple negative-probe correlators | E2E log-gate failure | Unexplained or ambiguous TLS/ACL/auth rejection in logs | Log line class, matched correlator count, redacted line |
+| Mounted TLS key/cert deviates from production ownership/mode/UID drop, or an internal dial identity mismatches | E2E TLS-fidelity failure | Deployment TLS posture not reproduced | Path, expected/observed owner+mode, dial address, certificate identity |
 | Public pre-JWT procedure is unclassified or assigned both credential classes | CI exactness failure | Missing/duplicate public-procedure contract | Procedure and canonical mount/auth source |
 | Wrong credential authorizes or mutates protected state | E2E security failure | Non-authorizing contract violated | Procedure, method-specific outcome, redacted state delta |
 | Credentialless procedure is tested as requiring a credential, or validation applicability contradicts its request contract | E2E/CI contract failure | Scenario contradicts deployed anonymous/schema contract | Procedure, applicability, validation/rate-limit outcome |
@@ -427,8 +476,9 @@ Target 4–7 minutes warm and 8–12 minutes cold; hard workflow bound 15 minute
 
 ## Rollout and migration
 
-Implement in ordered phases. First land the offline harness, three-key reviewed
-change-set manifest, exact lane/readiness registry, and the complete
+Implement in ordered phases. First land the offline harness, the spec 39
+change-set-manifest consumption, the execution ledger with its
+completeness/reflection guards, exact lane/readiness registry, and the complete
 `agent-socket` baseline atomically because existing `DeviceAuthService` descriptors
 activate it immediately. Second land spec 38's management-device binding and exact
 classifier foundation without registering `offline-reenrollment-v1`. Third complete
@@ -436,8 +486,7 @@ spec 34, its `signed-manifest-v1` contracts, and green `agent-signed-sync`,
 registering readiness only in that completion candidate. Fourth complete spec 38's
 signed-sync-backed reenrollment scenarios and green `agent-reenrollment`, then
 register `offline-reenrollment-v1`. Fifth enable the exhaustive release dependency
-and rerun the final reviewed three-SHA set. Specs 34 and 38 consume the core
-harness, three-key manifest, and lane registry—not only procedure discovery.
+and rerun the final reviewed three-SHA set.
 
 `agent-socket` owns ordinary enrollment/status/non-replacement; the dormant spec-38
 foundation does not activate its lane. “Activated but skipped fails CI” applies
@@ -448,11 +497,15 @@ against exact recorded merge-result `sdk_sha`, `server_sha`, and `agent_sha`, ne
 ambient branch heads. Keep the current smoke test as a fast infrastructure
 preflight underneath the exhaustive suite.
 
+Specs 34 and 38 consume the core harness, the spec 39 manifest, and the lane
+registry — not only procedure discovery.
+
 ## References
 
 - `server/deploy/smoke-test.sh`
 - `server/.github/workflows/deploy-smoke.yml`
 - `server/.github/workflows/release.yml`
+- Spec 39 — release provenance and publication authority (split from this spec)
 - Generated protobuf descriptors and `pmv1connect` clients in `sdk/`
 - Existing handler/authz/stream-arm parity guards
 
@@ -509,3 +562,35 @@ uncovered or mis-wired RPC ships:
 
 Close the first two (runtime execution-completeness guard + reflection reconciliation)
 before this becomes the release authority.
+
+### Remediation (2026-07-18, WS-E amendment)
+
+All findings above are closed in this draft:
+
+- **Registration ≠ execution (High)** → AC 23 + the "Execution ledger and
+  completeness guard" design section: post-suite exact equality between the
+  registered mounted set and the ledger's real-assertion passes,
+  budget-independent; `t.Skip`, early return, selector filtering, and budget
+  drops all fail CI.
+- **Import-graph blindness (Medium)** → AC 24: pre-scenario reflection/served-set
+  reconciliation against every deployed server; any served-but-undiscovered
+  procedure aborts the run.
+- **Missing cross-actor NotFound (Medium)** → AC 25: one deployed out-of-scope
+  `NotFound` probe per object family, family list discovered from the registry
+  (matches-zero guarded), never hardcoded.
+- **Negative-probe laundering (Medium)** → AC 20 rewritten: unique run-scoped
+  per-probe correlators with strict 1:1 expected-line matching; zero-matched and
+  multiply-matched rejection lines both fail.
+- **Budget vs. exhaustiveness (Medium)** → AC 26 + Runtime budget reworded:
+  per-scenario effect-assertion counts recorded in the ledger; zero-assertion
+  success never counts toward AC 23; the budget is advisory, never coverage
+  authority — raise the bound rather than thin the assertions.
+- **TLS fidelity (Low-Medium)** → AC 27: production ownership/modes/UID drops
+  (root-owned `0600` keys) and dial-address + TLS-verification-identity
+  assertions restated for this suite's TLS surfaces.
+- **Provenance split + non-atomic ACs (Low)** → old ACs 17/18, the CI/release
+  architecture section, and their rejection rows moved to spec 39 (release
+  provenance and publication authority). AC 17 retains only the consumer
+  contract (build from the recorded immutable candidate set, ledger-recorded
+  identities); AC 18 is the split pointer. The Overview now states
+  supersede-as-release-gate with the smoke test retained as preflight.
