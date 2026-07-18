@@ -257,7 +257,7 @@ F-04 (full-fidelity round-trip = AC 17), F-02 (drift detection in doctor), F-07
     completes but **all** users' PII reproduces as the redaction sentinel —
     permanently unreadable, indistinguishable from mass erasure. The recovery
     contract is therefore explicit: **`events` and `user_encryption_keys` are
-    jointly authoritative**; both must be restored together, and the doc/ADR 0030
+    jointly authoritative**; both must be restored together, and the doc/ADR 0033
     states the event log is no longer a self-sufficient source of truth for PII.
 22. Given an archive produced by a prune, when its integrity seal is verified,
     then tampering with any archived byte is detected, and the archive can be
@@ -620,7 +620,7 @@ None.
 
 ## References
 
-- ADR 0030 (new) — audit-log retention + crypto-shred erasure contract; the sole
+- ADR 0033 (new) — audit-log retention + crypto-shred erasure contract; the sole
   durable-non-recoverable Postgres exception (amends ADR 0029).
 - ADR 0029 — Postgres state is event-sourced or derived.
 - ADR 0009 — at-rest AAD binding (superseded by the single-format rename).
