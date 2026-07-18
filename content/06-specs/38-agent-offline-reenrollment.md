@@ -32,23 +32,28 @@ agent to a replacement control plane.
 Registration is not an idempotent operation. Today Control commits token
 consumption and device registration separately, so an explicit server error can
 arrive after the token has been consumed; its retrying event append also does not
-serialize concurrent one-time/max-use admission. This spec makes those two events
-one token-serialized atomic batch, but a lost response or post-response local
-failure can still leave an orphan remote identity. Reenrollment therefore
-preserves the known-working local identity on every pre-commit failure and never
-hides possible or confirmed remote side effects behind an automatic retry.
+serialize concurrent one-time/max-use admission. Spec 40 (split from this spec
+2026-07-18) makes those two events one token-serialized atomic batch, but a lost
+response or post-response local failure can still leave an orphan remote
+identity. Reenrollment therefore preserves the known-working local identity on
+every pre-commit failure and never hides possible or confirmed remote side
+effects behind an automatic retry.
 
 ## Acceptance criteria
 
 1. Given valid existing credentials, no retained backup or reenrollment attempt, and a
    stopped daemon, when root runs `reenroll` with the installed data directory,
-   valid HTTPS Control URL, and protected token file, then exactly one SDK
-   registration invocation is made with no application-level retry or redirect,
-   the candidate is fully validated and differs from the incumbent ULID, the
-   incumbent is backed up, the
-   candidate is atomically committed, the local management-state binding is
-   transitioned from the old to the new device ULID, and the command reports both
-   ULIDs.
+   valid HTTPS Control URL, and protected token file, then each of the following
+   holds as its own testable guarantee:
+   a. exactly one SDK registration invocation is made, with no
+      application-level retry and no followed redirect;
+   b. the candidate is fully validated and its ULID differs from the incumbent
+      ULID;
+   c. the incumbent is backed up before the candidate becomes canonical;
+   d. the candidate is committed by exactly one atomic rename;
+   e. the local management-state binding is transitioned from the old to the
+      new device ULID;
+   f. the command reports both ULIDs.
 2. Given a custom installed `--data-dir`, then the credential lock, canonical
    credential/salt files, SQLite store, temporary files, and backups all derive
    from that directory. An explicit CLI value is authoritative; the environment is
@@ -75,33 +80,63 @@ hides possible or confirmed remote side effects behind an automatic retry.
    type, root ownership, and modes are verified before network effects. Ancestor
    or final symlinks, FIFOs/sockets/devices, wrong metadata, replacement races, or
    I/O errors fail closed without blocking.
-6. Given canonical credentials, salt, `credentials.enc.next`, retained backups,
-   the durable reenrollment-attempt row, and either the entire agent database or
-   every management binding/identity-bound row and setting are all truly absent,
-   when `reenroll` is invoked, then it directs the operator to ordinary enrollment.
-   Stat, permission, I/O, decrypt, parse, salt, or identity errors are not
-   classified as unenrolled.
-7. Given valid local inputs, the durable transition to attempt state `invoking`
-   is the conservative remote-side-effect boundary. It then makes one
-   `sdk.RegisterAgent` invocation under a 45-second deadline, rejects every
-   redirect on the final client, and performs no application-level retry. An
-   arbitrary caller transport may perform protocol-level replay that the SDK
-   cannot suppress; the contract never claims one wire write. Any failure, signal,
-   or crash after the `invoking` commit is `remote unknown`; a returned success
-   followed by local candidate/commit rejection is
-   `remote registration confirmed`. The current SDK does not claim byte-level
-   proof that a failed request never reached Control.
+6. Confirmed absence is an exact conjunction, and every failure to prove it is
+   fail-closed. Each edge carries a named mandatory test:
+   a. `reenroll` directs the operator to ordinary enrollment only when
+      canonical credentials, salt, `credentials.enc.next`, both retained
+      backups, and the durable reenrollment-attempt row are all truly absent,
+      and either the entire agent database is absent or read-only inspection
+      proves no management binding and no identity-bound row or setting;
+   b. a stat error is never classified as unenrolled
+      (`TestReenroll_StatErrorNotAbsence`);
+   c. a permission error is never classified as unenrolled
+      (`TestReenroll_PermissionErrorNotAbsence`);
+   d. an I/O error is never classified as unenrolled
+      (`TestReenroll_IOErrorNotAbsence`);
+   e. a decrypt failure is never classified as unenrolled
+      (`TestReenroll_DecryptErrorNotAbsence`);
+   f. a parse failure is never classified as unenrolled
+      (`TestReenroll_ParseErrorNotAbsence`);
+   g. a salt error (missing, wrong-length, unreadable) is never classified as
+      unenrolled (`TestReenroll_SaltErrorNotAbsence`);
+   h. an identity or binding mismatch is never classified as unenrolled
+      (`TestReenroll_IdentityErrorNotAbsence`);
+   i. the same classifier and the same edge guarantees apply at every other
+      registration entry point — daemon flag/environment startup and
+      local-socket enrollment — each with its own named tests
+      (`TestDaemonStartup_<Error>NotAbsence`,
+      `TestSocketEnroll_<Error>NotAbsence`).
+7. The remote boundary decomposes into:
+   a. given valid local inputs, the durable transition to attempt state
+      `invoking` is the conservative remote-side-effect boundary — nothing
+      before it can have a remote effect, everything after it may;
+   b. exactly one `sdk.RegisterAgent` invocation is made, under a 45-second
+      deadline, with no application-level retry;
+   c. every redirect is rejected on the final client;
+   d. an arbitrary caller transport may perform protocol-level replay the SDK
+      cannot suppress; the contract claims one invocation, never one wire
+      write, and the SDK does not claim byte-level proof that a failed request
+      never reached Control;
+   e. any failure, signal, or crash after the `invoking` commit is classified
+      `remote unknown`;
+   f. a returned success followed by local candidate/commit rejection is
+      classified `remote registration confirmed`.
 8. Given registration returns a candidate, then exactly one CA `CERTIFICATE` PEM
    block with no extra block/garbage is parsed, pinned, and used as the sole root.
    The leaf has the returned ULID in CN/subject serial, exact agent URI SAN and
    ClientAuth-only EKU sets, no DNS/IP/email SAN, `IsCA=false`, exact production
    key usage, matching local key, and a current-time-valid chain to that CA.
    Canonical Control/Gateway HTTPS base URLs and the optional CA pin also pass.
-9. Given any registration/validation/local-persistence failure before the active
-   rename, then `credentials.enc` and `salt` remain byte-for-byte unchanged. The
-   result separately reports: no remote call, remote outcome unknown, or confirmed
-   remote registration requiring cleanup. It also reports whether the incumbent
-   is structurally restart-safe; neither remote-side-effect class recommends retry.
+9. Pre-commit failure preservation decomposes into:
+   a. given any registration/validation/local-persistence failure before the
+      active rename, `credentials.enc` and `salt` remain byte-for-byte
+      unchanged;
+   b. the result separately reports exactly one remote class: no remote call,
+      remote outcome unknown, or confirmed remote registration requiring
+      cleanup;
+   c. the result independently reports whether the incumbent is structurally
+      restart-safe;
+   d. neither remote-side-effect class ever recommends retry.
 10. Given candidate validation succeeds, when local replacement begins, then the
     active `salt` is re-read through the anchored descriptor, must equal preflight
     bytes, and remains byte-for-byte unchanged. Reenrollment never rotates salt.
@@ -115,44 +150,56 @@ hides possible or confirmed remote side effects behind an automatic retry.
     one atomic rename of `credentials.enc.next` over `credentials.enc` is the
     active commit point. Directory fsync/open/close failures propagate; no
     candidate becomes canonical before backup verification succeeds.
-13. Given a process crash before the active rename, then canonical incumbent and
-    its management-state binding remain authoritative while the durable attempt
-    row, staged candidate, and partial/complete backups classify the exact resume
-    or abort path. Given a crash after the active rename but before local state
-    rebinding, then startup recognizes the exact canonical-candidate/
-    backup-incumbent/bound-old-ULID tuple and completes the idempotent retirement
-    transaction before runtime starts.
-    No crash point exposes a new salt with old ciphertext, old salt with new
-    ciphertext, or old-identity scheduler/results state to the new identity.
+13. Crash consistency decomposes into:
+    a. given a process crash before the active rename, canonical incumbent and
+       its management-state binding remain authoritative while the durable
+       attempt row, staged candidate, and partial/complete backups classify the
+       exact resume or abort path;
+    b. given a crash after the active rename but before local state rebinding,
+       startup recognizes the exact canonical-candidate/backup-incumbent/
+       bound-old-ULID tuple and completes the idempotent retirement transaction
+       before runtime starts;
+    c. no crash point exposes a new salt with old ciphertext, an old salt with
+       new ciphertext, or old-identity scheduler/results state to the new
+       identity.
 14. Given an error after the active rename during directory durability or
     post-commit reload validation, then the command attempts anchored atomic
     restore from the verified backup. It reports either confirmed incumbent
     restoration or a critical ambiguous-local-state outcome; it never falsely
     claims the old identity is active.
-15. Given successful replacement, then the command reloads/revalidates the
-    canonical candidate, re-verifies backup bytes/metadata, and retains backup
-    until explicit root cleanup. It does not automatically delete the old remote
-    device. Backup cleanup is allowed only after hardened `DeleteDevice` records
-    deletion after processing every certificate issued to the old device. Mandatory
-    real-handler/Postgres tests use injected clocks and authoritative event fixtures
-    to cover current, expired, not-yet-valid, and legacy missing-`NotBefore`
-    histories. Deployment E2E separately proves CRL HTTP rejection for a newly
-    issued still-valid old certificate through the public route and every Gateway
-    replica; synthetic certificate-time branches never substitute for that
-    middleware proof.
-16. Given startup finds a valid canonical identity plus a correlated
-    reenrollment attempt state (`prepared`, `invoking`, `returned`, or `staged`),
-    then that canonical identity remains the only runtime identity when the SQLite
-    binding matches it; every attempt state blocks registration and every credential
-    writer, including certificate rotation, so incumbent ciphertext and attempt
-    hashes cannot drift before root performs the state-specific resume or abort.
-    Management runtime may continue with credential state read-only and an explicit
-    recovery warning. A retained committed-replacement backup without an attempt row
-    does not itself disable credential writers when canonical credentials and the
-    SQLite binding agree. Given canonical credentials are absent/invalid while an
-    attempt or backup artifact exists, then startup fails closed, does not open the
-    mode-`0666` enrollment socket, and never automatically rolls back or retries a
-    network operation.
+15. Post-replacement obligations decompose into:
+    a. given successful replacement, the command reloads/revalidates the
+       canonical candidate, re-verifies backup bytes/metadata, and retains the
+       backup until explicit root cleanup;
+    b. the old remote device is never deleted automatically;
+    c. backup cleanup is allowed only after spec 40's hardened `DeleteDevice`
+       records deletion after processing every certificate issued to the old
+       device;
+    d. mandatory real-handler/Postgres tests (spec 40) use injected clocks and
+       authoritative event fixtures to cover current, expired, not-yet-valid,
+       and legacy missing-`NotBefore` histories;
+    e. deployment E2E separately proves CRL HTTP rejection for a newly issued
+       still-valid old certificate through the public route and every Gateway
+       replica; synthetic certificate-time branches never substitute for that
+       middleware proof.
+16. Startup under attempt/backup state decomposes into:
+    a. given a valid canonical identity plus a correlated attempt state
+       (`prepared`, `invoking`, `returned`, or `staged`), that canonical
+       identity remains the only runtime identity when the SQLite binding
+       matches it;
+    b. every attempt state blocks registration and every credential writer,
+       including certificate rotation, so incumbent ciphertext and attempt
+       hashes cannot drift before root performs the state-specific resume or
+       abort;
+    c. management runtime may continue with credential state read-only and an
+       explicit recovery warning;
+    d. a retained committed-replacement backup without an attempt row does not
+       itself disable credential writers when canonical credentials and the
+       SQLite binding agree;
+    e. given canonical credentials are absent/invalid while an attempt or
+       backup artifact exists, startup fails closed, does not open the
+       mode-`0666` enrollment socket, and never automatically rolls back or
+       retries a network operation.
 17. Given any ordinary registration entry point—daemon flag/environment startup
     or local-socket enrollment—sees credential state other than confirmed absence,
     then the classified error is returned and no registration/replacement call
@@ -164,20 +211,27 @@ hides possible or confirmed remote side effects behind an automatic retry.
     incumbent (`13`), and no remote call but no restart-safe incumbent (`14`; the
     `cleanup-backup` subcommand reuses `14` for unmet cleanup preconditions with
     backups retained). Installer behavior uses only these classes, never human text.
-19. Given normal `install.sh` receives a token, then after syntax validation it
-    records service activity, stops a previously active daemon, runs fd-anchored
-    upgrade preparation plus root-only `credential-status` against the exact
-    configured data directory, and acts only on its machine class. A startable
-    canonical identity is restarted unchanged and reports the token unused;
-    confirmed absence proceeds to ordinary enrollment; any correlated interrupted
-    attempt or invalid/indeterminate state performs no registration and follows its
-    specified safe restart/stop result. Explicit `--reenroll` first completes that same ordinary
-    upgrade/migration phase when the installed state predates this spec, but the
-    strict reenrollment command never calls path-based `create_directories` or
-    repairs metadata. It requires `--token-file`, forwards the one resolved
-    `--data-dir`, starts the candidate on `0`, restarts the incumbent only on
-    `10`/`11`/`13`, and leaves stopped on `12`/`14` or unclassified interruption.
-    Class `2` is handled before stop.
+19. Installer behavior decomposes into:
+    a. given normal `install.sh` receives a token, syntax validation runs
+       first, and class `2` is handled before any service stop;
+    b. it records service activity, stops a previously active daemon, runs
+       fd-anchored upgrade preparation plus root-only `credential-status`
+       against the exact configured data directory, and acts only on the
+       returned machine class — never on human text;
+    c. a startable canonical identity is restarted unchanged and the token is
+       reported unused;
+    d. confirmed absence proceeds to ordinary enrollment;
+    e. any correlated interrupted attempt or invalid/indeterminate state
+       performs no registration and follows its specified safe restart/stop
+       result;
+    f. explicit `--reenroll` first completes the same ordinary
+       upgrade/migration phase when the installed state predates this spec, but
+       the strict reenrollment command never calls path-based
+       `create_directories` or repairs metadata;
+    g. `--reenroll` requires `--token-file`, forwards the one resolved
+       `--data-dir`, starts the candidate on `0`, restarts the incumbent only
+       on `10`/`11`/`13`, and leaves the service stopped on `12`/`14` or
+       unclassified interruption.
 20. Given the compatible agent artifact registers capability
     `offline-reenrollment-v1` together with complete scenarios, then spec 37 observes
     that readiness and makes the stable `agent-reenrollment` lane blocking. The lane
@@ -196,39 +250,35 @@ hides possible or confirmed remote side effects behind an automatic retry.
     regular paths before service start. Symlink/non-regular paths are never
     repaired. The explicit reenrollment branch performs no repair and observes the
     existing state unchanged.
-22. Given any device-targeted mutation whose eligibility depends on a live device,
-    then it acquires one shared per-device lifecycle advisory lock before any queue,
-    token, secret, session, persistence, or event effect; replays authoritative
-    lifecycle state; and rejects after `DeviceDeleted`. Registration and renewal
-    derive fingerprint plus second-precision `NotBefore`/`NotAfter` from the emitted
-    DER and persist them in immutable authority events; deletion never trusts the
-    fallible device projection. Retention preserves the exact lifecycle authority
-    event set and a transactional stream head/version, so pruning unrelated events
-    cannot erase identity/certificate history or reuse a version. `DeleteDevice`
-    first appends an immutable deletion-requested audit event, then processes every
-    issued certificate under exact current/not-yet-valid/expired/legacy-time
-    branches, and appends `DeviceDeleted` only after all mandatory CRL writes
-    succeed. A certless device is deletable only when replay proves no certificate
-    was ever issued; partial/corrupt metadata fails opaque `Internal`. Revocation or
-    final append failure leaves a retryable non-deleted stream with durable attempt
-    evidence.
-23. Given a populated agent store bound to the old device ULID, when reenrollment
-    commits the candidate, then one SQLite transaction deletes every
-    server-authored scheduler/action/work/result row, maintenance window, and
-    persisted LPS public key classified as management-identity-bound,
-    then updates the binding to the new ULID. It preserves explicitly classified
-    machine-local LUKS/LPS history and local-admin settings, executes no cleanup,
-    and a self-discovering exact registry with a matches-zero guard prevents a new
-    table or setting key from bypassing classification. Runtime sends or dispatches
-    nothing until the binding equals canonical credentials.
-24. Given a crash after successful registration but before the active credential
-    rename, then the exact journal/file tuple determines recovery. `returned`
-    without a verified `credentials.enc.next` cannot resume and requires confirmed-
-    remote abort/cleanup; a durable verified next plus any partial/complete backup
-    state is `staged`, not corrupt, and may resume without another network call or
-    explicitly abort. Either operation proves canonical incumbent bytes, salt, and
-    store binding unchanged, is lease-held/fd-anchored/durable, and reports the
-    candidate ULID when known.
+22. *(Split 2026-07-18.)* The shared per-device lifecycle lock, DER-derived
+    certificate authority events, retention exemptions, and the
+    revoke-before-delete `DeleteDevice` contract are specified as atomic
+    criteria in spec 40 (its ACs 1–12). This spec consumes them: AC 15c's
+    backup-cleanup precondition and the old-device deletion flow depend on
+    spec 40 being active.
+23. Identity retirement decomposes into:
+    a. given a populated agent store bound to the old device ULID, one SQLite
+       transaction deletes every server-authored scheduler/action/work/result
+       row, maintenance window, and persisted LPS public key classified as
+       management-identity-bound, then updates the binding to the new ULID;
+    b. explicitly classified machine-local LUKS/LPS history and local-admin
+       settings are preserved, and no cleanup callback executes;
+    c. a self-discovering exact registry with a matches-zero guard prevents a
+       new table or setting key from bypassing classification;
+    d. runtime sends or dispatches nothing until the binding equals canonical
+       credentials.
+24. Post-registration crash recovery decomposes into:
+    a. given a crash after successful registration but before the active
+       rename, the exact journal/file tuple determines recovery — never a
+       heuristic;
+    b. `returned` without a verified `credentials.enc.next` cannot resume and
+       requires confirmed-remote abort/cleanup;
+    c. a durable verified next plus any partial/complete backup state is
+       `staged`, not corrupt, and may resume without another network call or
+       explicitly abort;
+    d. either operation proves canonical incumbent bytes, salt, and store
+       binding unchanged, is lease-held/fd-anchored/durable, and reports the
+       candidate ULID when known.
 25. Given ordinary installation needs to decide whether a token is usable, then a
     root-only offline `credential-status` command acquires the configured-directory
     lease and returns machine classes for startable canonical identity, confirmed
@@ -243,15 +293,11 @@ hides possible or confirmed remote side effects behind an automatic retry.
     enforces a 256 KiB decompressed registration-response limit through Connect's
     read limit before candidate validation. Any oversized response after the
     `invoking` boundary is remote outcome unknown and leaves the incumbent unchanged.
-27. Given concurrent schema-valid registration requests using one one-time or
-    max-use token, then Control serializes every post-creation token mutation by
-    token, replays retention-preserved authoritative token events under that lock,
-    and atomically appends an irreversible `TokenConsumed` plus `DeviceRegistered`.
-    `TokenEnabled` can reverse an administrative disable but never consumption;
-    malformed or ambiguous history fails opaque `Internal`. Exactly the allowed
-    number succeeds even when projections are stale or unrelated events were
-    pruned; failed batches commit neither stream. Real-handler/Postgres tests prove
-    concurrency, projection-failure, retention, and insert-failure paths.
+27. *(Split 2026-07-18.)* Serialized token admission and the atomic
+    `TokenConsumed` + `DeviceRegistered` batch are specified as atomic criteria
+    in spec 40 (its ACs 13–17). Reenrollment's single-invocation contract
+    (AC 7) presumes that server behavior but does not depend on it for local
+    safety: every local guarantee here holds against the current server too.
 28. Given first enrollment has durably published valid canonical credentials but
     crashes before creating the SQLite binding, then startup completes only the
     provable first-enrollment tuple under the lease before runtime. A pre-existing
@@ -271,20 +317,27 @@ hides possible or confirmed remote side effects behind an automatic retry.
     self-discovering call-site guard covers daemon startup, socket/flag enrollment,
     rotation, self-test/updater, status, reenrollment, and future credential paths,
     with explicit matches-zero failure.
-31. Given root invokes `reenroll cleanup-backup` after the candidate has recorded a
-    successful connection, then the command requires the exact old ULID plus an
-    explicit acknowledgement that an administrator's hardened `DeleteDevice`
-    succeeded, validates the retained backup certificate, and removes backups only
-    under the lease with durable fd-anchored operations. Fleet-wide CRL enforcement
-    and historical-certificate membership are release/deployment evidence, not
-    unverifiable per-host live-probe prerequisites; missing proof or mismatch leaves
-    every backup intact.
-32. Given the server authority model is activated, then no old Control replica may
-    serve registration, renewal, deletion, or another guarded device/token writer.
-    Rollout preserves the existing renewal lock namespace, transactionally installs
-    retention-safe stream heads, and scans existing histories for malformed token
-    events or post-delete device events before traffic resumes. Unreconciled history
-    fails activation rather than being silently accepted.
+31. Backup cleanup decomposes into:
+    a. given root invokes `reenroll cleanup-backup` after the candidate has
+       recorded a successful connection, the command requires the exact old
+       ULID plus an explicit acknowledgement that an administrator's hardened
+       `DeleteDevice` (spec 40) succeeded, validates the retained backup
+       certificate, and removes backups only under the lease with durable
+       fd-anchored operations;
+    b. the delete-success acknowledgement is an operator attestation, not a
+       verified fact — deliberately a **UX guard**. Its blast radius is bounded:
+       cleanup deletes only local rollback material, and server-side
+       `DeleteDevice` remains the sole revocation authority, so a false
+       attestation cannot un-revoke anything;
+    c. fleet-wide CRL enforcement and historical-certificate membership are
+       release/deployment evidence, not unverifiable per-host live-probe
+       prerequisites; missing proof or mismatch leaves every backup intact.
+32. *(Split 2026-07-18.)* Server authority-model activation — including the
+    **mechanical** database-level fence a legacy binary cannot write past
+    (drain is hygiene, not the safety mechanism), stream-head installation, and
+    the pre-traffic history scan — is specified in spec 40 (its ACs 18–20).
+    Spec 40 lands and activates in production before this spec's agent artifact
+    releases.
 
 ## Out of scope
 
@@ -314,10 +367,10 @@ hides possible or confirmed remote side effects behind an automatic retry.
    atomic write/rename primitive; add a canonical HTTPS base-URL parser; enforce
    redirect refusal plus a 256 KiB Connect read limit on the final
    `RegisterAgent` client only.
-2. **server** — serialize authoritative token admission and atomically append
-   token/device registration events; add authoritative device-lifecycle replay,
-   one shared lifecycle lock for post-registration device-stream writers, a
-   deletion-requested audit event, and certificate-time-aware revoke-before-delete.
+2. **server** — spec 40 (serialized token admission, device lifecycle
+   authority, revoke-before-delete, mechanical activation fence). Split
+   2026-07-18; reviewed and released independently, and active in production
+   before this spec's agent artifact ships.
 3. **agent** — configured-data-directory lifetime lease, anchored classified
    credential state at every registration entry point, management-identity-bound
    SQLite state and retirement, backup-aware replacement, exact
@@ -327,13 +380,14 @@ hides possible or confirmed remote side effects behind an automatic retry.
    old-device revocation, and backup cleanup procedures.
 
 No protobuf change is required. The existing public `Register` RPC is invoked
-exactly once. Spec 37's core harness, reviewed three-key manifest, stable
-lane/readiness registry, and already-active `agent-socket` baseline land first;
-this spec supplies the credential-state fix and separate root-only lane. The
-SDK/server/agent candidates are tested as one immutable spec-37 change set. The
-agent artifact registers `offline-reenrollment-v1` only together with complete
-`agent-reenrollment` scenarios, and no member is released before the resulting
-manifest-triggered gate is green.
+exactly once. Spec 37's core harness, the spec 39 reviewed three-key manifest,
+stable lane/readiness registry, and already-active `agent-socket` baseline land
+first, and spec 40's server authority model activates before the agent artifact
+ships; this spec supplies the credential-state fix and separate root-only lane.
+The SDK/agent candidates are tested as one immutable change set through the
+spec 37/39 gate. The agent artifact registers `offline-reenrollment-v1` only
+together with complete `agent-reenrollment` scenarios, and no member is
+released before the resulting manifest-triggered gate is green.
 
 ### Command and local input rules
 
@@ -773,97 +827,18 @@ is different. Startup may then run the same idempotent retirement transaction;
 any other missing/partial/mismatched proof is class `12` and leaves the service
 stopped.
 
-### Authoritative device lifecycle and revoke-before-delete
+### Server authority model (split to spec 40)
 
-Add one shared per-device PostgreSQL lifecycle-guard callback. Every device-
-targeted mutation whose authority requires a live device acquires it before any
-queue, pending-row, token, secret, terminal/session, other persistence, or event
-effect; audit-only appenders are classified separately. Under the lock it replays
-the immutable lifecycle subset (`DeviceRegistered`, `DeviceCertRenewed`, deletion-
-requested, and `DeviceDeleted`) in stream-version order and rejects after deletion.
-A self-discovering guard discovers mutation entry points plus every direct/wrapped
-append API, requires the guarded callback before the first effect, fails on zero
-matches, and keeps creation/rebuild/audit-only exceptions explicit. Thus a mutation
-already holding the lock finishes before deletion, while a later heartbeat,
-inventory, queue, token, terminal, or other writer observes deletion and cannot
-create side effects or overtake it.
-
-Registration and renewal parse the emitted leaf DER before constructing events or
-responses and derive exact fingerprint plus second-precision `NotBefore` and
-`NotAfter`; renewal validates the presented certificate against authoritative
-history, appends `DeviceCertRenewed`, and returns only after the event is durable.
-Projection listener failure, cancellation, or a higher-sequence projection update
-cannot change which certificate was issued; projections remain rebuildable read
-models, not revocation authority. The retention layer exempts exactly
-`DeviceRegistered`, `DeviceCertRenewed`, `DeviceDeletionRequested`, and
-`DeviceDeleted` and updates a transactional stream-head row on every append, so
-pruning unrelated events cannot erase authority or reset the next version. This
-security replay, retention, and lock discipline is recorded in a server ADR.
-
-`DeleteDevice` performs normal request validation/authz/scope before acquiring the
-lifecycle lock. Under it, authoritative replay must prove a registered,
-non-deleted device and enumerate every unique issued fingerprint plus encoded leaf
-expiry. The handler first appends a new non-projecting `DeviceDeletionRequested`
-audit event with safe actor/target metadata, then applies these exact branches:
-
-- **No certificate ever issued:** delete without CRL only when replay proves the
-  certless state; partial/malformed certificate payloads return opaque `Internal`.
-- **Currently valid:** `!now.Before(NotBefore) && !now.After(NotAfter)`, matching
-  Go X.509's inclusive boundaries. Require the production CRL store and successful
-  idempotent revocation before deletion. Deployment E2E proves one public Traefik
-  request plus fresh production-SNI internal requests to every discovered Gateway
-  replica; each completes TLS and receives the exact CRL HTTP 403/log before
-  Connect handling. TLS failure or later `VerifyDevice` rejection does not count.
-- **Not yet valid:** `now.Before(NotBefore)`. Require CRL-store membership plus
-  attributable current TLS time rejection; make no false middleware claim before
-  the validity window.
-- **Expired:** `now.After(NotAfter)`. Ordinary TLS already rejects before CRL
-  middleware and the current CRL store intentionally omits expired entries.
-  Deletion records the branch and backup cleanup requires attributable certificate-
-  expiry rejection, not a false CRL claim.
-- **Legacy future-expiry event without `NotBefore`:** require idempotent revocation
-  and authoritative CRL membership, but do not claim whether current TLS should
-  succeed. A separate newly issued TLS-valid certificate always supplies the
-  mandatory public/per-replica middleware proof.
-
-All mandatory certificate branches succeed before `DeviceDeleted` is appended.
-A partial CRL success or final append failure leaves the authoritative stream
-non-deleted with its immutable deletion-request event; retry replays and repeats
-idempotent revocation. Success means every certificate ever issued to that device
-has been handled, not merely the latest projected fingerprint. This closes both
-renewal/deletion races and prior best-effort superseded-certificate revocation
-failures without depending on projection application order.
-
-### Serialized registration admission
-
-After token-hash lookup identifies the token stream, `Register` enters the
-reference-counted local gate and dedicated PostgreSQL advisory lock derived from the
-token ULID that every post-creation token writer shares, then replays the retention-
-preserved authority set under the lock. A self-discovering mutation/append-site
-guard enforces the callback with creation/rebuild-only exceptions. Admission state—
-disabled, irreversible consumption, current uses, maximum uses, and expiry—is
-derived from events, not stale projection counters. New success emits
-`TokenConsumed{device_id}`. Historical `TokenDisabled` with a valid non-empty
-`device_id` is interpreted as consumed; empty payload is administrative disable;
-malformed/ambiguous payload is opaque `Internal`. `TokenEnabled` reverses only
-administrative disable. Schema/request/CSR checks remain before the lock where safe;
-the authoritative decision, certificate issuance, and persistence remain inside it
-so concurrent registration/admin mutation cannot reserve or restore the final use.
-
-One `AppendEvents` batch atomically writes `TokenConsumed` and `DeviceRegistered`
-bound to the same newly generated device ULID, with registration-derived
-fingerprint/`NotBefore`/`NotAfter`. Batch insert, deadlock, or version failure
-commits neither stream; post-commit projector failure cannot make the token reusable
-because the next admission replays authority. Retention exempts exactly
-`TokenCreated`, historical `TokenUsed`, `TokenConsumed`, `TokenDisabled`,
-`TokenEnabled`, and `TokenDeleted`; `TokenRenamed` is not admission authority. The
-transactional stream head remains even when unrelated events are pruned. Real-
-Postgres tests
-pause concurrent requests at the same-key lock seam, prove different token/device
-keys run concurrently, and force failure on each batch insert. The stale source
-comment claiming ordinary retrying `AppendEvent` rejects concurrent consumption is
-removed. This preserves conservative remote-unknown treatment without preserving
-the current token-only partial-commit bug.
+The authoritative device lifecycle (shared per-device lock, DER-derived
+certificate authority events, retention exemptions, revoke-before-delete
+`DeleteDevice`) and serialized registration admission (per-token lock, event
+replay, atomic `TokenConsumed` + `DeviceRegistered` batch), together with their
+mechanical activation fence, are specified and tested in spec 40. This spec's
+agent-side contracts consume those guarantees — the backup-cleanup
+precondition (AC 15c, 31), old-device deletion evidence, and the assumption
+that a lost registration response never half-commits token consumption — but
+contain no server authority logic. Spec 40 is active in production before this
+spec's agent artifact releases.
 
 ### Startup and installer behavior
 
@@ -933,16 +908,8 @@ missing/unparseable status. It never infers state from message text.
 
 ### Database, proto, and dependencies
 
-- **Server database:** add a forward migration for transactional
-  `event_stream_heads`; exempt exactly `TokenCreated`, historical `TokenUsed`,
-  `TokenConsumed`, `TokenDisabled`, `TokenEnabled`, `TokenDeleted`,
-  `DeviceRegistered`, `DeviceCertRenewed`, `DeviceDeletionRequested`, and
-  `DeviceDeleted` from retention. Add irreversible `TokenConsumed` and
-  non-projecting `DeviceDeletionRequested` events plus authoritative lifecycle/token replay
-  helpers. Replace the process-global advisory-lock pre-gate with reference-counted
-  per-key local gates while retaining one dedicated PostgreSQL session lock; same
-  keys serialize and unrelated device/token keys run concurrently. Write a server
-  ADR for retention-safe security replay and the stop-the-world activation.
+- **Server database:** spec 40 (stream heads, retention exemptions, new event
+  types, replay helpers, per-key gates, append-guard fence, server ADR).
 - **Agent SQLite:** add the single-row stateful management-device binding, single-row safe
   reenrollment-attempt journal, exact table/setting classification, and
   transactional retirement path. The migration marks existing databases
@@ -983,9 +950,8 @@ missing/unparseable status. It never infers state from message text.
   path substitution and racy existence checks.
 - **Race prevention:** the process-lifetime lease excludes rotation, local
   enrollment, startup, and reenrollment. Anchored reopens and byte comparisons
-  reject replacement races. Server lifecycle and token mutations share their
-  respective aggregate locks and derive admission/revocation state from immutable
-  events rather than projections.
+  reject replacement races. Server-side lifecycle/token serialization is
+  spec 40's contract.
 - **Crash consistency:** immutable active salt plus one atomic ciphertext rename
   yields old-or-new canonical identity. A durable attempt row and reopened staged
   candidate precede durable verified backups, so every pre-commit crash has an
@@ -1012,9 +978,28 @@ missing/unparseable status. It never infers state from message text.
   membership and release evidence.
   Already-admitted streams are not claimed terminated.
 - **Audit:** atomic registration events and `DeviceDeletionRequested`/
-  `DeviceDeleted` provide immutable remote evidence, including revoke-success/
-  delete-append-failure attempts. The local attempt row and command logs contain
-  only safe states, hashes, validated ULIDs, and counts—never credential material.
+  `DeviceDeleted` (spec 40) provide immutable remote evidence, including
+  revoke-success/delete-append-failure attempts. The local attempt row and
+  command logs contain only safe states, hashes, validated ULIDs, and
+  counts—never credential material.
+- **Residual risk — revocation is per-certificate, not per-machine:** deleting
+  and revoking the old device blocks every certificate ever issued to it, but
+  nothing durably blocks the *machine*. An attacker with root on the device and
+  possession of a valid registration token can rejoin as a new server-minted
+  identity. This grants no privilege beyond what first enrollment already
+  grants — and reenrollment is strictly more demanding (root plus the lease
+  plus a structurally valid incumbent) — so it is accepted by design. Operators
+  who need machine-level exclusion must withhold registration tokens; token
+  admission control, not certificate revocation, is the machine-level boundary.
+- **Residual risk — reenrollment is trust-on-first-use toward the new CA:** the
+  candidate CA is adopted from the registration response, so a
+  machine-in-the-middle holding the token could substitute its own CA. The
+  optional `-ca-sha256` pin closes this, and a CA-replacement operator by
+  definition has an out-of-band channel (the same one that carries the token)
+  that can carry the fingerprint. **Recommendation, decision needed before
+  implementation:** make `-ca-sha256` mandatory for `reenroll`, keeping TOFU
+  only for ordinary first enrollment. Until decided, documentation and
+  installer output must steer operators to always pass the pin.
 
 ## Test requirements
 
@@ -1162,75 +1147,12 @@ missing/unparseable status. It never infers state from message text.
   proof. Success durably removes only backups; every mismatch/probe/fsync failure
   returns `14`, preserves bytes, and does not claim fleet-wide historical proof.
 
-### Server registration regression tests
+### Server regression tests (split to spec 40)
 
-- Real `Register` handler plus real Postgres runs concurrent schema-valid calls for
-  one-time tokens and max-use boundaries; exactly the allowed count succeeds and
-  each success has one irreversible `TokenConsumed` atomically paired with one
-  `DeviceRegistered` carrying the same device ULID and DER-derived certificate
-  times.
-- Concurrent token disable/enable/update and registration prove every post-creation
-  token writer shares the same-key lock, different keys progress concurrently, and
-  authoritative replay wins over stale projection `disabled/current_uses` values.
-  `TokenEnabled` never reverses `TokenConsumed`; historical consumed/admin-disabled
-  payloads and malformed ambiguity cover their exact branches. The self-discovering
-  mutation/append-site guard has stale, missing, duplicate, and matches-zero red-
-  checks.
-- Deterministic insert hooks fail the token and device member of the atomic batch in
-  turn; both streams remain unchanged and the RPC reports the mapped failure. A
-  token-projector failure after a committed batch cannot admit another use.
-- Retention tests prune unrelated old token/device events and run pruning
-  concurrently with registration/deletion. Authority events and transactional
-  stream heads survive, versions never rewind, and a pruned projection/history
-  cannot admit another token use or lose a certificate.
-- Registration/renewal CA tests parse the emitted DER and assert exact CN/subject
-  serial, one agent URI SAN, empty DNS/IP/email SANs, exact ClientAuth-only EKU,
-  exact key usage, `IsCA=false`, key match, and response/event fingerprint,
-  `NotBefore`, and `NotAfter` equality using a clock with non-zero nanoseconds.
-
-### Server deletion regression tests
-
-- Real `DeleteDevice` handler plus real Postgres and CRL backend covers correct,
-  absent, malformed, unauthenticated, wrong-permission, out-of-scope, and unknown
-  device requests under existing auth conventions.
-- Authoritative replay covers one/multiple renewals, duplicate fingerprints,
-  certless registration, partial/malformed fingerprint/`NotBefore`/`NotAfter`
-  payloads, current, expired, not-yet-valid, and legacy future-expiry events lacking
-  `NotBefore`, both exact time equality boundaries, prior deletion request, and
-  already-deleted state. These time classes use injected clocks and authoritative
-  event fixtures rather than impossible public issuance. Certless proof deletes
-  without CRL; malformed/partial authority returns opaque `Internal` and no
-  `DeviceDeleted`.
-- Missing CRL wiring or CRL write failure for any future-expiry certificate returns
-  opaque `Internal`; `DeviceDeletionRequested` remains durable and retryable while
-  `DeviceDeleted` and its projection transition are absent. Expired-only history
-  follows the explicit no-CRL branch.
-- A self-discovered race matrix pauses every live-device mutation at the lifecycle
-  guard, including heartbeat/seen/inventory, renewal, queue/pending work, tokens/
-  secrets, terminal/session setup, and deletion. A mutation already holding the
-  lock completes before deletion; every later path replays `DeviceDeleted`, creates
-  zero queue/token/secret/session/persistence effects, and returns its exact terminal
-  rejection. Deletion revokes every issued future-expiry fingerprint, including a
-  superseded certificate whose earlier best-effort revocation failed.
-- Projector failure/cancellation and a higher-sequence heartbeat projected before
-  an earlier renewal prove deletion still revokes the exact certificate returned
-  by renewal. Zero affected projection rows cannot change authoritative behavior.
-- Injected final deletion-append failure after one/all successful revocations leaves
-  the device stream non-deleted with immutable request evidence; retry is safe and
-  eventually appends deletion. Event ordering proves request → CRL effects → delete.
-- Gateway integration always uses one fresh public Traefik-path probe plus a
-  separate internal actor that discovers each Gateway replica and connects directly
-  with production SNI. A newly issued TLS-valid old certificate completes TLS and
-  receives the exact CRL HTTP 403/log on the public route and every replica. TLS
-  failure or later entity lookup does not count as revocation proof; the other
-  certificate-time classes remain in the real-handler/Postgres matrix above.
-- Activation tests stop all old Control replicas before enabling the authority
-  model, preserve the old renewal-lock namespace, and refuse traffic when history
-  scan finds malformed token authority or renewal/mutation after `DeviceDeleted`.
-  Reconciled legacy histories prove required revocation and version continuity.
-- The self-discovering device-mutation/append guard covers every live-device entry
-  point and append wrapper with stale, missing, duplicate, audit/creation exception,
-  and matches-zero red-checks.
+The server registration, deletion, retention, race-matrix, fence, and
+activation test suites are specified in spec 40. This spec's named
+classification tests (AC 6b–6i) and every agent-side requirement below remain
+here.
 
 ### Installer and deployment E2E
 
@@ -1250,7 +1172,7 @@ missing/unparseable status. It never infers state from message text.
   reenroll on a pre-spec installation completes the same preparation/migration
   phase before strict status/reenroll, while the reenroll command itself never
   repairs. Symlink/nonregular upgrade state fails before service start.
-- Spec 37's core orchestration, reviewed three-key manifest, stable lane/readiness
+- Spec 37's core orchestration, the spec 39 manifest, stable lane/readiness
   registry, and active `agent-socket` baseline land first. Ordinary install,
   `credential-status`, initial enrollment, and non-replacement assertions remain in
   `agent-socket`; this lane reuses status only for reenrollment-specific interrupted
@@ -1280,7 +1202,9 @@ missing/unparseable status. It never infers state from message text.
 | Usage/required-argument/URL/pin/recovery acknowledgement invalid | `2` before stop/state/network | Correct invocation; no state claim | Flag/category only; no token/pin/raw URL |
 | Non-root, unwalkable/unsafe data path, or lock not acquired | `14`; zero token opens/no remote call | No service-state claim; installer leaves stopped only if it stopped the service | Safe stage/path basename and category |
 | Credentials/artifacts/database management state all confirmed absent | `14`; direct to ordinary enrollment | No credential files created | Confirmed-absent state only |
-| Corrupt/inaccessible canonical, salt, database, or binding state | `14`; fail closed | Not unenrolled; explicit recovery required | Safe operation/basename/category; no bytes |
+| Stat, permission, or I/O error while proving absence | `14`; fail closed, never unenrolled | Not unenrolled; explicit recovery required | Safe operation/basename/category; no bytes. Named tests: `TestReenroll_{Stat,Permission,IO}ErrorNotAbsence` (AC 6b–6d) |
+| Decrypt, parse, or salt failure while proving absence | `14`; fail closed, never unenrolled | Not unenrolled; explicit recovery required | Safe category; no bytes. Named tests: `TestReenroll_{Decrypt,Parse,Salt}ErrorNotAbsence` (AC 6e–6g) |
+| Identity/binding mismatch while proving absence | `14`; fail closed, never unenrolled | Not unenrolled; explicit recovery required | Validated ULIDs when available. Named tests: `TestReenroll_IdentityErrorNotAbsence` plus the daemon/socket entry-point matrix (AC 6h–6i) |
 | Startable canonical identity plus committed-replacement backup | Main `10` before registration; status `0` | Token unused for ordinary install; use cleanup-backup only after old-device cleanup | Backup-presence state only |
 | Correlated `prepared` attempt | Main `10`; status `4`; abort→`10` | Abort prior local attempt; no remote acknowledgement | Attempt state and validated incumbent ULID/hash only |
 | Correlated `invoking` attempt | Main `11`; status `4`; acknowledged abort→`11` | Remote outcome unknown; never retry automatically | Attempt state and validated incumbent ULID/hash only |
@@ -1301,35 +1225,31 @@ missing/unparseable status. It never infers state from message text.
 | Identity retirement transaction fails after candidate publication | Restore incumbent and `13`; `12` if unproved | Restart only after state/credential agreement | Validated ULIDs, transaction stage, safe DB category |
 | Service stop/start or child-status handling fails | Installer non-zero; no inferred identity claim | Inspect service and credential-status before manual start | Unit operation and numeric child/status class only |
 | Cleanup-backup proof/acknowledgement/ULID mismatches | `14`; backups unchanged | Candidate/delete proof incomplete; retain rollback | Safe proof category and validated ULIDs only |
-| Token allowance exhausted/consumed/admin-disabled | Connect `PermissionDenied`; no partial batch | Registration token unavailable | Token ID and admission category; no token value |
-| Token lock/replay/decode/batch infrastructure fails | Connect opaque `Internal`; no partial batch | Registration failed safely | Token ID and safe stage/category |
-| Post-deletion user mutation | Existing non-enumerating `NotFound`; zero side effects | Device not found | Actor, method, device ULID; no secret material |
-| Post-deletion heartbeat/seen/inventory | Terminal acknowledged drop; zero side effects | Agent must stop/re-enroll as existing protocol defines | Device ULID, writer class, deleted state |
-| Device lock/replay/decode infrastructure fails | Connect opaque `Internal`; no side effects | Device operation failed safely | Device ULID and safe stage/category |
-| Certless authoritative history | Delete success without CRL | Device deleted; no certificate existed | Device ULID and certless branch |
-| Future-expiry CRL store/revoke fails | Connect `Internal`; deletion request only | Old device remains; retry revocation | Device ULID and opaque certificate index/stage |
-| Partial/malformed authoritative certificate history | Connect `Internal`; no `DeviceDeleted` | Reconcile event history before retry | Device ULID and payload category; no cert material |
-| Revocation succeeds but final deletion append fails | Connect `Internal`; request event remains | Safe to retry deletion | Device ULID and append stage |
+| Server-side token admission and device deletion rejections | *(Split 2026-07-18.)* See spec 40's rejection table | — | — |
 | Successful replacement | `0` with different old/new ULIDs | Candidate bound/active; remote old identity and backups retained | Validated ULIDs, retired-row safe counts, success only |
 
 ## Rollout and migration
 
-Land spec 37's core harness, reviewed three-key manifest, exact lane/readiness
-registry, and complete active `agent-socket` baseline first. Merge the compatible
-SDK component-walk/dirfd/URL/client limits, server retention-safe token/lifecycle
-security authority, and agent lock/classifier/attempt/binding/CLI/installer work.
-Record the exact resulting commit objects from those reviewed changes as `sdk_sha`,
-`server_sha`, and `agent_sha`; never re-resolve a branch head or matching tag.
-Verify release-branch reachability and that the server/agent dependency graphs
-resolve the recorded `sdk_sha`, then rerun the complete gate. Descriptor
-fingerprints, binary hashes, and image digests are recorded separately. Only that
-green manifest-triggered gate may create repository tags/releases or promote the
+Land spec 37's core harness, the spec 39 reviewed three-key manifest, exact
+lane/readiness registry, and complete active `agent-socket` baseline first.
+Spec 40's server authority model (retention-safe token/lifecycle authority plus
+its mechanical activation fence) lands, activates, and is verified in
+production before this spec's agent artifact releases. Then merge the
+compatible SDK component-walk/dirfd/URL/client limits and agent
+lock/classifier/attempt/binding/CLI/installer work. Record the exact resulting
+commit objects from those reviewed changes as `sdk_sha`, `server_sha`, and
+`agent_sha`; never re-resolve a branch head or matching tag. Verify
+release-branch reachability and that the server/agent dependency graphs resolve
+the recorded `sdk_sha`, then rerun the complete gate. Descriptor fingerprints,
+binary hashes, and image digests are recorded separately. Only that green
+manifest-triggered gate may create repository tags/releases or promote the
 tested OCI digests. No member releases early.
 
-Server activation is stop-the-world or equivalently traffic-fenced: every old
-Control replica is drained before the retention-safe stream-head migration/history
-scan enables registration, renewal, deletion, and other guarded writers; the
-existing renewal lock namespace is preserved. The daemon participates in the
+Server activation is fenced mechanically per spec 40: the activation migration
+installs a database-level append guard that an un-drained legacy Control
+replica cannot write past — it fails closed at the storage layer instead of
+serving the legacy partial-commit path. Draining old replicas remains
+operational hygiene, not the safety mechanism. The daemon participates in the
 configured-directory lifetime lease and store-binding gate from the first release
 containing `reenroll`; a command-only/default-path lock is unsafe. Register
 `offline-reenrollment-v1` only in the compatible agent artifact that carries the
@@ -1372,6 +1292,9 @@ proof, and deployment evidence for historical/fleet-wide revocation.
 - ADR 0013: enrollment trust model.
 - ADR 0014: secrets-at-rest hardening.
 - Spec 37: exhaustive deployment E2E gate.
+- Spec 39: release provenance and publication authority.
+- Spec 40: serialized registration authority and device lifecycle (split from
+  this spec 2026-07-18).
 
 ## Audit findings (2026-07-18)
 
@@ -1420,3 +1343,27 @@ Blockers are quality/rollout, not design holes:
 
 Guarantee check: revocation **preserved and improved**; device-identity **preserved**
 (no takeover, no cross-device secret pull).
+
+### Remediation (2026-07-18, WS-E amendment)
+
+- **Compound ACs (Medium)** → the compound criteria on the classification and
+  replacement boundary (ACs 1, 6, 7, 9, 13, 15, 16, 19, 23, 24, 31) are
+  decomposed into lettered atomic sub-criteria; every "…not classified as
+  absence/unenrolled" edge now carries a named mandatory test
+  (`Test<EntryPoint>_<Error>NotAbsence`, AC 6b–6i) and its own rejection-table
+  row. The remaining numbered ACs each state a single guarantee as written.
+- **Coupled HA migration (Medium)** → the server-side serialized token
+  admission, per-device lifecycle lock, revoke-before-delete, and activation
+  moved to spec 40 (user decision 2026-07-18), reviewed and released
+  independently and active before this spec's agent artifact. Old ACs 22/27/32
+  are split pointers. Spec 40's activation fence is **mechanical** — a
+  database-level append guard bound to a per-connection capability declaration
+  that a legacy binary cannot satisfy — not drain-only.
+- **Residual risks (Low)** → two Security-considerations paragraphs added:
+  revocation is per-certificate not per-machine (token admission is the
+  machine-level boundary, accepted by design), and reenrollment is TOFU toward
+  the new CA with the recommendation — decision needed before implementation —
+  to make `-ca-sha256` mandatory for `reenroll`.
+- **`cleanup-backup` attestation (Low)** → AC 31b documents the delete-success
+  acknowledgement as a UX guard bounded to local rollback material; server-side
+  `DeleteDevice` remains the sole revocation authority.
