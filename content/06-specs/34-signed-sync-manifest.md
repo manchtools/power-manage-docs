@@ -9,8 +9,10 @@ created: 2026-07-12
 ## Overview
 
 Authenticate the complete device action-sync snapshot, not only each action's
-execution payload. Control issues a deterministic, CA-signed, per-device
-`SignedSyncManifest` that binds freshness, sync cadence, standalone occurrences,
+execution payload. Control issues a deterministic per-device
+`SignedSyncManifest` — signed with the **action-signing key** under the
+`power-manage-sync-manifest` domain, never a TLS CA key — that binds
+freshness, sync cadence, standalone occurrences,
 group occurrence identity/order/cadence, and the maintenance window to the exact
 signed action envelopes transported with the response. The agent verifies every
 byte and applies the verified snapshot atomically before it changes any durable
@@ -56,12 +58,17 @@ snapshot-level orchestration.
    scheduler mutation**.
 4. Given a valid manifest for another device, an expired manifest, an issuance
    time beyond the allowed clock skew, an invalid 15-minute validity interval, or
-   a `generation` not strictly greater than transactionally persisted
-   `last_applied_generation`, then the agent rejects the entire sync.
+   a signed `(epoch, generation)` not strictly greater than the transactionally
+   persisted `(last_applied_epoch, last_applied_generation)` under lexicographic
+   ordering (higher epoch always wins; equal epoch requires strictly greater
+   generation), then the agent rejects the entire sync. Clock-skew rejections
+   (issuance too far ahead) and tamper rejections (signature/digest failure)
+   carry DISTINCT rejection categories in reports and logs — an operator must be
+   able to tell a drifting clock from an attack without reading payloads.
 5. Given an unchanged resolved action state, when Control successfully issues a
    later sync response, then it still allocates a fresh, strictly increasing
-   per-device generation so reconnect/full-reconcile requests remain usable and
-   delayed lower-generation responses are rejected.
+   per-device generation within the current epoch so reconnect/full-reconcile
+   requests remain usable and delayed lower-generation responses are rejected.
 6. Given Control constructs a response, then it enforces every per-item/count
    bound and the final 16 MiB encoded-response limit before transport. Given the
    agent receives a response, its 16 MiB Connect read limit applies before the
@@ -103,31 +110,56 @@ snapshot-level orchestration.
     scheduler memory, and only then releases the mutex. A rollback leaves the
     complete previous snapshot and generation active; no dispatch observes a
     committed snapshot with stale in-memory policy.
-12. Given generation N+1 removes one occurrence but another occurrence with the
-    same logical action ID survives, then only the removed scheduler occurrence
-    is deleted and no machine-state cleanup is recorded. When the logical action
-    disappears completely, signed whole-snapshot omission is the sole narrow
-    authority for one cleanup work item keyed by logical action ID; it may derive
-    `ABSENT` only for the self-discovered cleanup-eligible partition and only from
-    a verified prior envelope whose cleanup-relevant fields agree across all prior
-    duplicate occurrences. Ambiguity fails closed without executing cleanup.
-13. Given a new, effect-changed, or first-reconcile occurrence requires
-    convergence work, when its snapshot commits, then one generation-owned work
-    row is recorded durably in the same transaction. Pending work for a surviving
-    occurrence with the same effect is atomically re-owned by generation N+1,
-    including when N+1 is otherwise unchanged; cadence/order changes update its
-    due policy but never discard or duplicate it. Work becomes durably `canceled`
-    only when its occurrence is removed or its effect is superseded. A
-    self-discovering exact classifier assigns every supported action/parameter case
-    as idempotent or non-idempotent. Idempotent `started` work is retryable after
-    restart; non-idempotent work must durably transition `pending` → `started`
-    before the executor and becomes operator-visible `uncertain` rather than
-    auto-repeating if restart occurs before `completed`. A failed transition never
-    calls the executor. Exactly-once machine-side effects are not claimed.
+12. Occurrence removal and cleanup authority — each sub-criterion maps to its
+    own test:
+    a. Given generation N+1 removes one occurrence but another occurrence with
+       the same logical action ID survives, then only the removed scheduler
+       occurrence is deleted and no machine-state cleanup is recorded.
+    b. Given the logical action disappears completely from the snapshot, then
+       signed whole-snapshot omission is the sole authority for exactly one
+       cleanup work item keyed by logical action ID.
+    c. Cleanup may derive `ABSENT` only for the self-discovered
+       cleanup-eligible partition and only from a verified prior envelope whose
+       cleanup-relevant fields agree across all prior duplicate occurrences.
+    d. Given cleanup ambiguity (conflicting or invalid prior envelopes) for a
+       NON-security action type, cleanup is blocked and reported; the snapshot
+       still commits.
+    e. Given cleanup ambiguity for a security cleanup type (`USER`, `GROUP`,
+       `SSH`, `SSHD`, `ADMIN_POLICY`, `LPS`), cleanup is blocked AND the agent
+       raises a loud operator/compliance alert through the existing
+       security-alert reporting path — a durable, re-reported alert naming the
+       logical action and the un-reverted privileged state, never only a log
+       line: a deprovisioned admin, sudoer, or SSH key silently persisting on
+       the device is the insecure direction of "fail closed". The snapshot
+       still commits — blocking acceptance would let one ambiguous stale row
+       deny every future policy change, including an emergency revocation —
+       and the alert persists until the operator resolves the machine state.
+13. Convergence work — each sub-criterion maps to its own test:
+    a. Given a new, effect-changed, or first-reconcile occurrence requires
+       convergence work, when its snapshot commits, then one generation-owned
+       work row is recorded durably in the same transaction.
+    b. Pending work for a surviving occurrence with the same effect is
+       atomically re-owned by generation N+1, including when N+1 is otherwise
+       unchanged; cadence/order changes update its due policy but never
+       discard or duplicate it.
+    c. Work becomes durably `canceled` only when its occurrence is removed or
+       its effect is superseded.
+    d. A self-discovering exact classifier assigns every supported
+       action/parameter case as idempotent or non-idempotent, with a
+       matches-zero guard.
+    e. Idempotent `started` work is retryable after restart.
+    f. Non-idempotent work must durably transition `pending` → `started`
+       before the executor runs, and becomes operator-visible `uncertain`
+       rather than auto-repeating if restart occurs before `completed`.
+    g. A failed transition never calls the executor. Exactly-once machine-side
+       effects are not claimed.
 14. Given a manifest is valid when accepted, when its `expires_at` later passes
     while the device is offline, then already committed scheduler state continues
     to operate; expiry limits acceptance of delayed snapshots, not offline action
-    execution.
+    execution. There is deliberately NO in-agent max-staleness kill-switch in
+    v1: offline autonomy is the product's core guarantee, and staleness of
+    applied policy is bounded operationally (sync cadence, gateway-liveness
+    alerting), not cryptographically. Revisit only with a dedicated spec.
 15. Given Control cannot prove the device still exists and is not deleted inside
     the coherent transaction, cannot hydrate/sign any action, or encounters
     malformed persisted standalone/group schedule or maintenance JSON, then it
@@ -154,9 +186,9 @@ snapshot-level orchestration.
     `Unauthenticated`/`PermissionDenied`. Raw messages, metadata, and details are
     never forwarded. Exhausted same-device serialization retries remain
     `Unavailable` end to end.
-18. Given the separately CA-signed LPS public key is present, then its existing
-    independent verification and persistence path remains unchanged and is not
-    treated as unsigned manifest state.
+18. Given the separately action-key-signed LPS public key is present, then its
+    existing independent verification and persistence path remains unchanged and
+    is not treated as unsigned manifest state.
 19. Given identical resolved state and injected time, when Control builds a
     manifest, then canonical sorting produces identical manifest bytes: standalone
     occurrences sort by verified action ID, groups by `group_key`, members retain
@@ -164,22 +196,28 @@ snapshot-level orchestration.
     maintenance days use `mon`…`sun`, maintenance entries sort by `(day-bitset,
     allow)`, and transport indices are assigned standalone-first then group/member
     order. ECDSA signature randomness does not affect this ordering.
-20. Given an accepted occurrence, then its stable local key is
-    `standalone:<action ULID>` or
-    `group:<group_key>:<action ULID>:<effect-sha256-hex>:<duplicate-ordinal>`.
-    The duplicate ordinal is zero-based among members with the same action ID and
-    effect fingerprint in signed order. Transport index, signed position,
-    generation, issuance time, expiry, cadence, and signature bytes are never
-    identity. Duplicate standalone logical IDs or duplicate stable keys reject the
-    snapshot. An `effect_fingerprint` hashes canonical verified executor semantics
-    (type, target, desired state, and action parameters) while excluding cadence,
-    group position, timeout/policy metadata, and signature/issuance metadata. A
-    separate `orchestration_fingerprint` covers the verified envelope plus signed
-    schedule/order context. Cadence-only and order-only changes persist new
-    orchestration without creating convergence work. `run_on_assign` affects the
-    due time only while an occurrence has no completed execution: false→true may
-    make existing pending work immediately due subject to maintenance; it does not
-    create a second work item or re-run an already-completed effect.
+20. Occurrence identity — each sub-criterion maps to its own test:
+    a. Given an accepted occurrence, its stable local key is
+       `standalone:<action ULID>` or
+       `group:<group_key>:<action ULID>:<effect-sha256-hex>:<duplicate-ordinal>`,
+       with the duplicate ordinal zero-based among members with the same action
+       ID and effect fingerprint in signed order.
+    b. Transport index, signed position, generation, issuance time, expiry,
+       cadence, and signature bytes are never identity.
+    c. Duplicate standalone logical IDs or duplicate stable keys reject the
+       snapshot.
+    d. An `effect_fingerprint` hashes canonical verified executor semantics
+       (type, target, desired state, and action parameters) while excluding
+       cadence, group position, timeout/policy metadata, and
+       signature/issuance metadata.
+    e. A separate `orchestration_fingerprint` covers the verified envelope plus
+       signed schedule/order context.
+    f. Cadence-only and order-only changes persist new orchestration without
+       creating convergence work.
+    g. `run_on_assign` affects the due time only while an occurrence has no
+       completed execution: false→true may make existing pending work
+       immediately due subject to maintenance; it does not create a second
+       work item or re-run an already-completed effect.
 21. Given an upgrade from legacy scheduler tables, when the new agent starts
     before its first valid manifest, then legacy standalone/grouped rows are
     structurally quarantined and cannot dispatch. The first valid manifest either
@@ -208,6 +246,29 @@ snapshot-level orchestration.
     work, generation, signed interval/maintenance, LPS public key, and unsent
     results are retired without executing cleanup; the new identity starts with
     generation zero and cannot observe or transmit the old namespace.
+26. Given the persisted `(last_applied_epoch, last_applied_generation)` is
+    `(E, G)`, when a verified manifest arrives bound to epoch `E' > E`, then
+    the agent accepts it regardless of its generation relative to `G`,
+    transactionally persists the new `(E', G')` baseline, and thereafter
+    rejects anything at or below it. The epoch lives INSIDE the signed
+    manifest bytes, so a relay cannot mint or replay an epoch bump; only a
+    documented operator/DR action on Control (backup restore, lagging-replica
+    promotion — see Rollout) increments the server-side epoch. Without this,
+    a restored Postgres backup would set the issuance counter below fleet
+    `last_applied_generation` and permanently wedge every device fail-closed,
+    with no path to deliver even an emergency revocation.
+27. Given the signed manifest's bound `protocol_version` differs from the
+    discriminator the agent sent, or is not a version the agent supports, then
+    the agent rejects the entire sync before any mutation. The bound version is
+    inside the signed bytes, so cross-version confusion is prevented
+    cryptographically, not only by rollout policy; on Control, response
+    construction is unreachable without a validated request discriminator, and
+    the constructed manifest always binds that validated value.
+28. Given the manifest signature, then it verifies under the action-signing
+    key (`power-manage-sync-manifest` domain) and MUST FAIL verification under
+    either TLS CA key (agent-plane CA and server-plane CA) — a test proves
+    both directions, so an implementation that reaches for a TLS CA key
+    cannot pass the suite.
 
 ## Out of scope
 
@@ -237,9 +298,10 @@ issues a unique per-gateway CN/DNS-SAN certificate used as both Gateway server a
 Control client identity, and synchronous `InternalService` binding derives the
 instance ID from the authenticated peer-certificate CN. The compatible candidate
 must preserve and test those properties; spec 31's remaining Control-HA and agent-
-side Gateway-CRL parts are not prerequisites. Spec 31's superseding trust-model ADR
-must also have reconciled the actual shared CA/action-signing-key model and the distinction among
-SPIFFE peer class, CN instance identity, and DNS server name. Spec 38's dormant
+side Gateway-CRL parts are not prerequisites. The superseding trust-model ADR
+prerequisite is **satisfied**: ADR 0032 (ratified 2026-07-18) reconciles the
+shared CA/action-signing-key model and the distinction among SPIFFE peer class,
+CN instance identity, and DNS server name. Spec 38's dormant
 management-device binding/classifier foundation must be present in the compatible
 agent candidate before the persistence work here registers identity-bound state;
 it need not be separately released and must not yet register
@@ -331,6 +393,14 @@ message SignedSyncManifest {
   repeated ManifestGroup groups = 7;
   // @gotags: validate:"omitempty"
   MaintenanceWindow maintenance_window = 8;
+  // Bound protocol version (AC 27): signed, so a relay cannot rewrite it. Must
+  // equal the validated request discriminator.
+  // @gotags: validate:"required,oneof=1"
+  SyncProtocolVersion protocol_version = 9;
+  // Epoch for DR-recovery ordering (AC 26): ordering key is (epoch, generation),
+  // lexicographic. Starts at 1; bumped only by a documented operator action.
+  // @gotags: validate:"required,gte=1"
+  uint64 epoch = 10;
 }
 
 message ActionDispatch {
@@ -346,13 +416,14 @@ message SyncActionsResponse {
   // under the project's V1 clean-break/no-reserved-marker policy.
   // @gotags: validate:"required,min=1,max=1048576"
   bytes manifest = 1;
-  // Control-CA signature over manifest under the dedicated domain.
+  // Action-signing-key signature over manifest under the dedicated
+  // power-manage-sync-manifest domain. NOT a TLS CA key (ADR 0025/0032).
   // @gotags: validate:"required,min=1,max=1024"
   bytes manifest_signature = 2;
   // Indexed by ManifestEnvelopeRef.envelope_index.
   // @gotags: validate:"max=4096,dive"
   repeated ActionDispatch action_dispatches = 3;
-  // Independently CA-signed; not manifest authority.
+  // Independently action-key-signed; not manifest authority.
   // @gotags: validate:"omitempty"
   LpsPublicKey lps_public_key = 6;
 }
@@ -494,13 +565,19 @@ sync-interval, and maintenance-window read uses transaction-bound queries.
 Add operational Postgres state equivalent to:
 
 ```text
-device_sync_state(device_id PRIMARY KEY, generation BIGINT NOT NULL)
+device_sync_state(device_id PRIMARY KEY, epoch BIGINT NOT NULL DEFAULT 1,
+                  generation BIGINT NOT NULL)
 ```
 
 After the in-transaction device check, the transaction atomically increments and
 returns the device's issuance counter before resolving the snapshot. This shared
 database counter is HA-safe across Control replicas and advances for every
-successful issuance, including an unchanged snapshot. It is operational
+successful issuance, including an unchanged snapshot. The `epoch` column backs
+AC 26: a documented operator/DR command (see Rollout) increments every device's
+epoch (and may reset generations) after a backup restore or lagging-replica
+promotion, so a counter that went backwards relative to the fleet cannot wedge
+devices — the next manifest carries the higher signed epoch and re-baselines
+each agent. Routine issuance never touches the epoch. It is operational
 coordination state under ADR 0029, not a domain event or projection version. A
 resolved sync interval of zero is normalized to the signed value `30`; no zero
 sentinel crosses the manifest boundary.
@@ -644,11 +721,20 @@ primitives, PostgreSQL/SQLite, and the existing scheduler store.
   whole-snapshot signed omission authorizing the narrowly classified local
   `ABSENT` cleanup derivation from a verified prior envelope; ambiguity blocks
   cleanup. No transported field has two accepted authorities.
-- **Anti-replay and downgrade resistance:** the device-bound issuance generation
-  is strictly monotonic and persisted with the snapshot. Expiry limits delayed
-  acceptance. The required protocol discriminator prevents a new server from
-  sending an apparently empty authoritative response to an old agent; the new
-  agent independently requires a valid manifest from any server.
+- **Anti-replay and downgrade resistance:** the device-bound `(epoch,
+  generation)` pair is strictly monotonic under lexicographic ordering and
+  persisted with the snapshot; both components live inside the signed bytes, so
+  a relay can neither replay an old generation nor mint an epoch bump. Expiry
+  limits delayed acceptance. The required protocol discriminator — also bound
+  inside the signed manifest (AC 27) — prevents a new server from sending an
+  apparently empty authoritative response to an old agent and prevents
+  cross-version confusion cryptographically; the new agent independently
+  requires a valid manifest from any server.
+- **DR recovery without fail-open:** the epoch mechanism (AC 26) is the sole
+  recovery authority for a rolled-back issuance counter. It is an operator
+  action on Control that produces *signed* manifests with a higher epoch — no
+  agent-side override, no acceptance of unsigned resets, no weakening of the
+  monotonicity check itself.
 - **Caller binding:** Gateway authenticates the agent certificate and exact
   requested device before proxying. Control authenticates the gateway peer
   certificate and requires that device to be live on the calling gateway before
@@ -803,7 +889,11 @@ primitives, PostgreSQL/SQLite, and the existing scheduler store.
 | Public/internal protocol absent or not signed-manifest V1 | `InvalidArgument` before response | Sync call fails; no response or scheduler change | Caller surface and protocol value |
 | New agent receives legacy response / manifest absent | Local manifest-validation failure | Agent retains the complete prior snapshot and reports that authenticated sync data is missing | Device ID and `manifest missing`; no legacy payload |
 | Manifest malformed, oversized, or signature invalid | Local manifest-validation failure | Agent rejects the whole response and retains prior state | Device ID and safe reason category |
-| Wrong device, invalid/expired/future time, or non-increasing generation | Local freshness/binding failure | Agent rejects the whole response and retains prior state | Expected device, generation, last generation; no payload |
+| Wrong device, expired manifest, or non-increasing `(epoch, generation)` | Local freshness/binding failure | Agent rejects the whole response and retains prior state | Expected device, epochs, generations; no payload |
+| Issuance time beyond the allowed clock skew | Local clock-skew failure — category distinct from tampering | Agent rejects the whole response; operator can distinguish clock drift from attack | Issued-at delta and skew bound; no payload |
+| Manifest epoch below the persisted epoch | Local freshness failure | Agent rejects the whole response and retains prior state | Signed and persisted epochs; no payload |
+| Bound `protocol_version` mismatches the sent discriminator or is unsupported | Local manifest-validation failure | Agent rejects the whole response and retains prior state | Bound and expected version values |
+| Signed-omission cleanup ambiguous for a security type (`USER`/`GROUP`/`SSH`/`SSHD`/`ADMIN_POLICY`/`LPS`) | Cleanup blocked + durable compliance alert (AC 12e) | Operator sees a persistent security alert naming the un-reverted state; snapshot still commits | Logical action ID, type, conflicting occurrence keys; no secret params |
 | Reference index/digest/bijection or total-bound violation | Local manifest-validation failure | Agent rejects the whole response and retains prior state | Generation, index/category, safe counts |
 | Action envelope signature or target invalid | Local envelope-validation failure | Agent rejects the whole response and retains prior state | Generation, occurrence index, action ID only after verified decode |
 | Duplicate/invalid group key or grouped envelope has a schedule | Local manifest-validation failure | Agent rejects the whole response and retains prior state | Generation, group key/category |
@@ -854,6 +944,16 @@ This is a coordinated clean break across SDK, server, and agent:
 6. Only the green manifest-triggered gate may create repository tags/releases or
    promote tested OCI digests. Then release/deploy Control, Gateway, and agent
    together; no SDK version tag is published before consumers are proven.
+
+**DR runbook (epoch bump, AC 26).** After any event that can move the issuance
+counter backwards relative to the fleet — restoring a Postgres backup,
+promoting a lagging replica — the operator runs the documented epoch-bump
+command (a Control admin subcommand in the style of `control doctor`) BEFORE
+returning Control to service. It increments `epoch` for every device row (and
+may reset generations to zero). The next sync each device performs carries the
+higher signed epoch and re-baselines the agent; no agent-side action is ever
+required or possible. The runbook ships in the deployment-hardening docs
+alongside the backup/restore procedure, and the restore procedure links to it.
 
 The protocol discriminator is a rejection gate, not a compatibility mode. The
 new agent always requires the manifest. The new server does not retain the old
@@ -937,3 +1037,28 @@ described guards, even treating a compromised gateway as the attacker. But it is
   before approval so each maps to one test. Also add a max-staleness decision for an
   already-applied manifest (AC 14) and a distinct rejection category for clock-skew
   vs tampering.
+
+### Remediation (2026-07-18)
+
+All findings above are folded into the spec body:
+
+- **[Medium] missing trust-model ADR** → SATISFIED externally: ADR 0032
+  (ratified 2026-07-18) reconciles CN instance identity with the SPIFFE class
+  model; the prerequisite paragraph now cites it.
+- **[Medium] security-type cleanup fail-open** → AC 12 atomized (12a-e); 12e
+  mandates a durable, re-reported operator/compliance alert for ambiguous
+  cleanup of `USER`/`GROUP`/`SSH`/`SSHD`/`ADMIN_POLICY`/`LPS`, with the
+  snapshot still committing (blocking acceptance would deny emergency
+  revocations); rejection row added.
+- **[Medium] generation rollback wedge** → AC 26 + `epoch` field (10) inside
+  the signed manifest; ordering key `(epoch, generation)`; `device_sync_state`
+  gains the epoch column; DR runbook added to Rollout; rejection row added.
+- **[Low-Medium] "CA-signed" terminology** → every occurrence replaced with
+  action-signing-key wording; AC 28 mandates verify-under-action-key /
+  fail-under-either-TLS-CA-key tests.
+- **[Low] no version binding** → AC 27 + `protocol_version` field (9) inside
+  the signed manifest, required to equal the validated request discriminator;
+  rejection row added.
+- **[Low] compound ACs** → AC 12/13/20 atomized into lettered sub-criteria;
+  AC 14 records the deliberate no-max-staleness v1 decision; AC 4 and the
+  rejection table now separate clock-skew from tamper categories.
