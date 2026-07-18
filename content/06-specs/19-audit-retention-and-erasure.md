@@ -329,10 +329,20 @@ this spec pins them so a future refactor can't silently break them.
     removed from devices) using the **pre-delete** user snapshot *before* the DEK
     is shredded — the erasure rides on the existing `CleanupDeletedUserActions`
     ordering and must not move the shred ahead of it.
-36. **Doctor safety net.** Given an erased/`is_deleted` user that still has
-    provisioning enabled or a lingering **live** (PRESENT) system USER action
-    targeting them (an incomplete teardown), when doctor runs, then it is reported
-    as a finding to reconcile.
+36. **Doctor safety net + auto-reconcile.** Given an erased/`is_deleted` user
+    whose account teardown was incomplete — a **live** (not deleted, PRESENT)
+    system USER action still targeting them, so their OS account persists on
+    already-provisioned devices — then (a) the `erasure_provisioning` doctor check
+    reports it as a Critical finding, and (b) the periodic system-action reconcile
+    sweep re-runs teardown for it automatically (re-dispatching the account
+    removal), converging a dropped teardown to the succeeded state.
+
+    A lingering `user_provisioning_enabled` flag is deliberately **not** an
+    independent signal: `SyncUserSystemActions` fail-closes on `is_deleted` (AC 32),
+    so an erased user can never re-acquire a provisioning action regardless of that
+    flag, and nothing clears the flag on delete — flagging it would fire on every
+    erased user a provisioning-for-all deployment ever had (alarm fatigue), while
+    protecting against nothing AC 32 does not already close.
 
 ## Out of scope
 
@@ -631,13 +641,18 @@ implemented with strong intent-asserting tests. Status corrected to
 remain and must close before this spec backs a compliance claim.
 
 - **[Medium] AC 36 doctor safety-net missing → erased user's OS account persists
-  silently.** `CleanupDeletedUserActions` failure is log-only while `DeleteUser`
-  still returns OK ([user_handler.go:524](../../../server/internal/api/user_handler.go))
-  and no `internal/doctor` check flags an `is_deleted` user with
-  `user_provisioning_enabled` or a live PRESENT system USER action. A teardown
-  failure (offline device, DB blip) leaves the deleted person's provisioned Linux
-  account on devices with no alarm — a GDPR/NIS2 gap. Fix: add the AC 36 doctor
-  check and/or make the reconcile sweep cover `is_deleted` orphan system actions.
+  silently. — FIXED (integration/alpha3).** `CleanupDeletedUserActions` failure is
+  log-only while `DeleteUser` still returns OK
+  ([user_handler.go:525](../../../server/internal/api/user_handler.go)); a teardown
+  failure (offline device, DB blip) left the deleted person's provisioned Linux
+  account on devices with no alarm — a GDPR/NIS2 gap. **Fixed both as report and
+  auto-remediation:** the `erasure_provisioning` doctor check flags any erased user
+  with a live PRESENT system USER action, and `ReconcileErasedUserTeardown` (run
+  inside the periodic system-action sweep) re-runs teardown for them, converging a
+  dropped teardown to the succeeded state. The `user_provisioning_enabled` half of
+  the original finding was withdrawn as a non-signal: AC 32's fail-closed
+  provisioning choke point already makes a stale flag on an erased user harmless,
+  so flagging it would only generate alarm-fatigue noise.
 - **[Low] AC 13 idempotent-delete half not shipped; test name overclaims.**
   `DeleteUser` calls `GetUser`, which filters `is_deleted = FALSE`, so an
   already-deleted visible user returns NotFound, not the specified idempotent OK.
