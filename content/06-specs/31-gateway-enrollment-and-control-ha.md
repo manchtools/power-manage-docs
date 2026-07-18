@@ -642,3 +642,61 @@ Other remaining deltas (spec's own list + this audit):
   across N HA replicas (documented, compensated by the constant-time compare).
 - **[Todo] The multi-replica production-shaped deployment E2E proof (spec 37 gate)
   and the superseding gateway-identity ADR are still outstanding.**
+
+### Remediation (2026-07-18, WS-D)
+
+Server PR #580 (merged into `integration/alpha3`) and agent PR #194 (merged
+into `main`) close the items above as follows:
+
+- **[Medium] Hostname-controlled SAN (AC 1)** — FIXED. The DNS SAN is now
+  derived once from `CONTROL_GATEWAY_URL` at boot; the enrollee's claimed
+  hostname is only exact-equality cross-checked (IP literal / mixed case /
+  trailing dot / unlisted name all refused, after the token check so probes
+  learn nothing) and the control-authoritative host — never the claim — is
+  stamped. The constructor panics on an empty, IP-literal, or non-canonical
+  (wildcard, underscore, trailing dot, bad RFC1123 label) derived host. The
+  sdk proto `hostname` field is `required,hostname_rfc1123`.
+- **[Medium] Revoked gateway keeps live agent sessions (AC 11)** — FIXED. The
+  agent CRL cache retains the live session's peer fingerprint (registration
+  tokens close the stale-dial race) and cancels the session when a refresh
+  newly revokes the peer or the cached CRL expires without a successful
+  refresh; a successful refresh after transient staleness re-verifies the
+  peer against the fresh snapshot instead of cancelling (regression-pinned).
+- **[Medium] CN identity vs ADR 0025** — RESOLVED by ADR 0032 (per-gateway CN
+  as *instance* identity alongside the SPIFFE *class* URI SAN), merged
+  2026-07-18 (server #576, WS-C).
+- **[Low] `token_hash_prefix` logged** — FIXED. Rejection logs carry only the
+  requester IP and self-reported hostname; the test asserts the token and any
+  digest of it are absent.
+- **[Low] Renewal warns-and-issues on bad DNS SAN** — FIXED. Renewal rejects
+  a missing/non-canonical DNS SAN (`FailedPrecondition`, "re-enroll") and
+  revokes the superseded fingerprint into the CRL on issue; the revocation
+  *failure* path stays best-effort by design (the renewal already committed —
+  a CRL write failure is logged and the next renewal/refresh re-converges).
+- **[Low] Inbox worker `SkipRetry` on transient lookup failures** — FIXED.
+  Only the permanent binding sentinels map to `SkipRetry`; transient registry
+  lookup errors (and the nil-resolver wiring error) stay retryable so no
+  device-origin event is lost.
+- **[Low, dormant] nil-registry allow-bypass** — REMOVED (stronger than the
+  proposed HA-boot flag): `CheckDeviceGatewayBinding` now fails closed on a
+  nil resolver in both the InternalService and inbox paths. The bypass was
+  vestigial — Valkey (and with it the routing registry) is mandatory for any
+  functioning gateway, so a nil lookup can only be a wiring bug. ADR 0005 §3
+  rewritten; regression pinned by `TestInternalHandler_NilResolver_FailsClosed`.
+- **[Low] Gateway boot verifies only the CN (AC 6)** — FIXED. `gwenroll`
+  verifies the full returned profile: gateway class URI SAN, DNS SAN, both
+  ServerAuth + ClientAuth EKUs, and a ULID CN; any deviation is a loud boot
+  failure.
+- **[Low] No halt on self-revocation** — FIXED. The renewal loop halts (and
+  logs at error) after the configured consecutive-`PermissionDenied`
+  threshold instead of retrying forever; the halt count is regression-pinned
+  at the exact threshold.
+- **[Info] per-replica rate limiter** and **[Todo] spec 37 multi-replica E2E
+  gate / spec 38 HA token-admission migration** remain open by design — the
+  limiter is documented and compensated by the constant-time compare, the
+  E2E gate is spec 37's scope, and the HA token-admission split is spec 38.
+
+Verification: full server suite green standalone (39 packages, pinned sdk),
+agent suite green (11 packages), and the deployment smoke gate (real Compose
+stack, real self-enrollment, ACL/TLS log scan) passed with locally built
+images before merge.
