@@ -371,7 +371,7 @@ All findings above are closed on `integration/alpha3`:
   corrected rotation procedure: a plain `setup.sh` re-run preserves set
   values and rotates nothing).
 
-## Amendment A (2026-07-19) — Valkey instance split — PENDING APPROVAL
+## Amendment A (2026-07-19) — Valkey instance split — APPROVED 2026-07-19
 
 Follow-up from the 2026-07-19 production incident: the single valkey-bundle
 instance wedged in-process at the end of a background RDB save (main thread
