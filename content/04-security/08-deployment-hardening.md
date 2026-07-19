@@ -58,3 +58,37 @@ its discovery needs — no daemon writes, no container creation, no host takeove
 This is pure **defense in depth**: it does not prevent a Traefik compromise, it
 bounds the blast radius. Keep Traefik patched regardless — patching lowers the
 likelihood, the proxy (or Option 1) lowers the damage.
+
+## Datastore access: per-service ACLs + mutual TLS
+
+Since [spec 32](../06-specs/32-datastore-auth-hardening.md) the reference
+deployment ships **least-privilege, mTLS-only** datastore access out of the
+box (server ADR 0034). What an operator should know:
+
+- **Every datastore connection is mutual TLS.** Valkey listens TLS-only
+  (`port 0`, `tls-auth-clients yes`); Postgres accepts only
+  `hostssl … cert clientcert=verify-full`, mapping the client-cert CN to the
+  DB role — there are no Postgres passwords anymore. Client certs are issued
+  from the deployment CA by `setup.sh`; a service without its cert fails
+  closed at boot. There is no plaintext fallback to misconfigure back in.
+- **Valkey is split into per-service ACL users** — `pm-control`, `pm-gateway`
+  (CRL **read-only**, so a compromised gateway cannot un-revoke
+  certificates), `pm-indexer` (queue + search namespaces only), and
+  `pm-traefik` (**read-only `traefik/*`** — the internet-facing component
+  holds the smallest credential). Destructive commands (`FLUSHALL`,
+  `CONFIG`, …) are denied to all of them. The complement to the
+  Docker-socket hardening above: even with a Traefik foothold, its Valkey
+  credential yields read-only route discovery, not the CRL or the queues.
+- **`NOPERM` in a service log means an ACL boundary fired.** If it is a
+  legitimate new key namespace, widen *that user's* grant in
+  `valkey.conf.template` narrowly — never back to `~*`. The deployment smoke
+  test asserts the boundaries, so an accidental widening fails the gate.
+- **`control doctor` reports the live posture** (ACL user, mTLS on/off,
+  client-cert CNs) and warns on any plaintext configuration; it withholds
+  credentials when it cannot dial TLS, so running it against a misconfigured
+  environment cannot leak an ACL secret.
+- **Rotation is explicit, not automatic on re-run.** `setup.sh` deliberately
+  preserves set values, so a plain re-run rotates nothing. To rotate an ACL
+  secret: clear its `VALKEY_*_PASSWORD` line in `.env` (or set it to
+  `CHANGE_ME`), re-run `setup.sh` (a fresh secret is minted and
+  `valkey.conf` re-rendered), then restart Valkey and the affected service.

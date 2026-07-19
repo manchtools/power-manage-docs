@@ -348,3 +348,104 @@ Either tighten the ACL grants to match AC 4 (preferred) or amend AC 4 to state a
 justify the widened grants as an accepted, documented residual — but do not leave
 the spec claiming full namespace confinement while the code grants `~*` and CRL
 write.
+
+### Remediation status (2026-07-19)
+
+All findings above are closed on `integration/alpha3`:
+
+- **[High] gateway CRL write + [Medium] indexer `~*`** — fixed in PR #575
+  (WS-A): `%R~pm:crl:*` read-only for `pm-gateway`, `pm-indexer` confined to
+  `~asynq:* ~idx:* ~search:* ~reverse:* ~members:* ~pm:indexer:*`, real-Valkey
+  integration test + smoke-test NOPERM assertions for both boundaries.
+- **[Low] doctor credential leak** — fixed in PR #581: ACL credentials are
+  withheld on ANY nil TLS config (the all-empty cert set yielded nil without
+  an error and probed plaintext WITH the password); red-checked.
+- **[Low] `CHANGE_ME*` accepted as ACL password** — fixed in PR #581:
+  `ensure_acl_passwords` regenerates placeholder values; red-checked via
+  `setup_test.sh`.
+- **[Missing deliverables]** — delivered in PR #581: doctor posture reporting
+  (ACL user, mTLS on/off, client-cert CNs; plaintext posture is a Warning;
+  posture built from safe fields only — never error strings that could embed
+  a DSN password), **ADR 0034** (datastore authentication), and the
+  `04-security/08-deployment-hardening.md` datastore section (including the
+  corrected rotation procedure: a plain `setup.sh` re-run preserves set
+  values and rotates nothing).
+
+## Amendment A (2026-07-19) — Valkey instance split — PENDING APPROVAL
+
+Follow-up from the 2026-07-19 production incident: the single valkey-bundle
+instance wedged in-process at the end of a background RDB save (main thread
+parked in `futex_wait`; the valkey-search writer-pool resume after the fork
+never ran). The container stayed "running" for ~8 h while every consumer got
+dial timeouts — and because that one instance carries the CRL, gateway CRL
+admission went stale and **fail-closed cut off the entire agent fleet** as a
+second-order effect. The module was co-located with all availability-critical
+state, and the RDB save-point fork exercised the module's riskiest path every
+few minutes.
+
+### Design
+
+Split into two instances so no module code and no fork sits under
+availability-critical state:
+
+- **`valkey` (core)** — official module-free `valkey` image. Holds the Asynq
+  queues, CRL (`pm:crl:*`), gateway registry/routing (`pm:gateway:*`,
+  `pm:device:*`), and the Traefik KV (`traefik/*`). Persistence stays on. All
+  `FT.*` commands are structurally absent (no module loaded).
+- **`valkey-search`** — `valkey/valkey-bundle` ≥ **9.1.1** (deployed 9.1.0
+  wedged; upstream valkey-search 1.1.0+ actively fixes the fork/worker-resume
+  area). Holds ONLY the search index namespaces (`idx:*`, `search:*`,
+  `reverse:*`, `members:*`, `pm:indexer:*`, schema fingerprint + reconcile
+  heartbeat). Runs with `save ""` — **no persistence, therefore no background
+  fork, ever**: the index is a projection, rebuilt from Postgres.
+
+Wiring: the Asynq queues (including the search task queue) stay on core — one
+queue system. Control gains a second client config
+(`CONTROL_SEARCH_VALKEY_ADDR` + its ACL user; same CA and client cert — the
+cert is the component identity, per-instance authorization stays with ACLs).
+The indexer consumes Asynq from core and owns the FT index on the search
+instance (it already holds two client objects; they just get different
+addresses). Gateway and Traefik talk to core only. Both instances are
+mTLS-only with per-instance ACL users; boot fails closed if either instance's
+config is missing.
+
+Blast-radius result: a wedged/lost search instance degrades search (List*
+RPCs, as today) but queues, CRL admission, routing, and the agent fleet stay
+healthy; a rebuilt search instance self-heals from Postgres. Alerting on an
+unhealthy instance is spec 35's scope.
+
+### Acceptance criteria (amendment)
+
+9. Given the core instance, then it runs a module-free `valkey` image (no
+   `FT.*` command exists), holds queue/CRL/registry/Traefik keys only, and
+   keeps persistence.
+10. Given the search instance, then it runs `valkey-bundle` ≥ 9.1.1 with
+    `save ""` (no save points, no AOF) and holds only the search namespaces.
+11. Given either instance, then mTLS-only transport and per-instance ACL
+    users apply, with cross-namespace NOPERM asserted per instance in the
+    deployment smoke gate.
+12. Given control and indexer, then each wires both instances from distinct
+    env config and fails closed at boot when either instance's TLS config is
+    absent; gateway and Traefik are wired to core only.
+13. Given a fresh/empty search instance at boot, then the indexer's initial
+    rebuild repopulates the index from Postgres without operator action, and
+    the smoke gate asserts a seeded document is queryable afterwards.
+14. Given `control doctor`, then it probes and reports posture for both
+    instances distinctly.
+
+### Rejection paths (amendment)
+
+| Scenario | Result | Surfaced where |
+|---|---|---|
+| Any client issues `FT.*` against core | unknown command (module absent) | client error; smoke gate asserts |
+| Search-instance ACL user touches a core-only namespace on the search instance (or vice versa) | `NOPERM` | Valkey; smoke gate asserts |
+| Control/indexer boots without the second instance's TLS/ACL config | boot aborts (fail closed) | component boot validation |
+| Search instance down | search degraded (List* RPC errors), queues/CRL/fleet unaffected | doctor Critical on the search instance only |
+
+### Rollout (amendment)
+
+Deploy-artifact change on the alpha lineage (compose service + second conf
+render + certs + ACL split in `setup.sh`), plus the two-address wiring in
+control/indexer, as its own PR — not folded into #561. On upgrade the search
+instance starts empty and self-heals (AC 13); core keeps its existing volume.
+The deployment smoke gate must run before merge.
