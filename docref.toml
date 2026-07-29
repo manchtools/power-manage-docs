@@ -15,6 +15,12 @@ include = [
   "content/05-operations/**/*.md",
 ]
 
+# MIGRATION IN PROGRESS (2026-07-29): code is moving to the `monorepo` alias below,
+# one work unit at a time. The three polyrepo aliases stay until every claim that
+# targets them has been re-claimed against the monorepo — a claim cannot be migrated
+# before the code it references has moved. `docref check` is expected to be green with
+# a MIX of aliases throughout; the zero-polyrepo-claims assertion only applies once the
+# API surface lands (workplan WU-E2). Do not delete these three early.
 [repos.server]
 url = "https://github.com/manchtools/power-manage-server.git"
 
@@ -23,3 +29,6 @@ url = "https://github.com/manchtools/power-manage-agent.git"
 
 [repos.sdk]
 url = "https://github.com/manchtools/power-manage-sdk.git"
+
+[repos.monorepo]
+url = "https://github.com/manchtools/power-manage.git"
