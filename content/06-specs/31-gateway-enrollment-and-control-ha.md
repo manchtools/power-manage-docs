@@ -1,14 +1,29 @@
 ---
 title: "Gateway self-enrollment and control-plane HA"
-status: draft
+status: superseded
+superseded_by: 41-gateway-removal
 created: 2026-07-12
+superseded: 2026-07-30
 ---
 
 # Gateway self-enrollment and control-plane HA
 
 ## Overview
 
-At the reviewed source revision, gateway boot already self-enrolls with a
+> **~~SUPERSEDED IN FULL by [spec 41](41-gateway-removal.md) — implement none of this.~~** Both
+> halves are void, for independent reasons. **Gateway self-enrollment:** spec 41 deletes the
+> gateway tier, so there is nothing to enroll — `GatewayAuthService.EnrollGateway`, the
+> gateway certificate, the gateway-class URI SAN and the device→gateway binding registry all go.
+> **Control-plane HA:** retired by the single-control-instance ruling, which is independent of the
+> gateway and of the datastore.
+>
+> The one live idea below is the **agent CRL**, and it does not survive in this shape either.
+> Re-scoping the list to control's own certificate is **circular** — the agent would fetch it over
+> a connection authenticated by the very certificate the list is about, and the gate fails closed
+> before the first load. Spec 41 replaces it with a control-side revocation lookup at the mTLS
+> handshake: no published list, no distribution RPC, no agent cache.
+
+~~At the reviewed source revision, gateway boot already self-enrolls with a
 per-gateway ULID in the certificate CN/subject serial, a gateway-class URI SAN,
 one agent-facing DNS SAN, and ClientAuth/ServerAuth EKUs. The same certificate
 serves agents and authenticates the Gateway to Control; synchronous
@@ -16,7 +31,7 @@ serves agents and authenticates the Gateway to Control; synchronous
 peer CN. Agents already fetch the gateway CRL and enforce it on new TLS
 handshakes, and `ListGateways` already uses heartbeat-registry liveness with a
 certificate-valid fallback when liveness is unavailable. These are existing
-regression requirements, not unimplemented migration steps.
+regression requirements, not unimplemented migration steps.~~
 
 This spec completes and hardens the **enroll → per-identity cert → renew →
 revoke** lifecycle. Control, not a bootstrap-token holder, owns the certificate's

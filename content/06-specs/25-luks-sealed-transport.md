@@ -1,21 +1,35 @@
 ---
 title: "LUKS passphrase sealed transport (agent→control)"
-status: implemented
+status: superseded
+superseded_by: 41-gateway-removal
 created: 2026-07-04
 updated: 2026-07-09
+superseded: 2026-07-30
 ---
 
 # LUKS passphrase sealed transport
 
 ## Overview
 
-LUKS device passphrases travel agent → gateway → control as **cleartext** inside
+> **~~SUPERSEDED by [spec 41](41-gateway-removal.md) — do not implement or preserve the transport
+> sealing described below.~~** This spec's own premise is *"the identical gateway-cleartext
+> exposure that spec 18 closed"*; `sdk/crypto/luks.go:20` says the seal exists so the relaying
+> gateway "can never read a device's disk-encryption secret". Spec 41 deletes the gateway, so the
+> exposure it defends against no longer exists.
+>
+> **What must survive:** the context AAD binding `(device, action)` preventing blob relocation,
+> and the LPS/LUKS domain separation asserted by `TestLuksLpsDomainSeparation`. Both move to the
+> at-rest path (spec 41, criteria 8–9). `InternalStoreLuksKeyRequest` itself goes with the
+> `InternalService` proxy RPCs.
+
+~~LUKS device passphrases travel agent → gateway → control as **cleartext** inside
 `InternalStoreLuksKeyRequest.passphrase` (mTLS-protected on the wire, but the
 gateway process momentarily holds every passphrase). This is the **identical**
 gateway-cleartext exposure that spec 18 closed for LPS passwords. This spec
 applies the same seal: the agent seals each passphrase to the control-owned
 X25519 key at generation, the gateway relays opaque bytes, and control unseals at
-receipt before re-encrypting at rest. Closes agent#165.
+receipt before re-encrypting at rest.~~ Closes agent#165. **Re-encrypting at rest survives; the
+seal and the relay do not.**
 
 ## Motivation
 

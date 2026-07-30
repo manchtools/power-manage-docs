@@ -1,14 +1,28 @@
 ---
 title: "LPS sealed password transport (end-to-end agent→control encryption)"
-status: implemented
+status: superseded
+superseded_by: 41-gateway-removal
 created: 2026-07-01
+superseded: 2026-07-30
 ---
 
 # LPS sealed password transport
 
 ## Overview
 
-LPS (Local Password Solution) rotated passwords currently travel agent → gateway → control as cleartext inside mTLS tunnels; the gateway process momentarily holds every rotated password in memory, and the password also sits cleartext inside the agent's result metadata. This spec seals each rotated password on the agent to a control-owned X25519 public key at the moment of generation, makes the gateway a pure opaque relay, and has control unseal at receipt before re-encrypting with the existing at-rest path. Operator recovery (`GetDeviceLpsPasswords`) is unchanged. Closes manchtools/power-manage-agent#62 (option C).
+> **~~SUPERSEDED by [spec 41](41-gateway-removal.md) — do not implement or preserve the transport
+> sealing described below.~~** The sealing exists to keep the **gateway** from reading rotated
+> passwords; `sdk/crypto/lps.go:15` states that purpose outright. Spec 41 deletes the gateway, so
+> the agent's mTLS terminates at control — the only party that could open the blob anyway — and
+> the seal defends against nobody.
+>
+> **What must survive the deletion:** the context AAD binding `(device, action, username)`, which
+> prevents a valid blob being **relocated** to another record and is independent of the relay, and
+> the LPS/LUKS domain separation. Both move to the at-rest path (spec 41, criteria 8–9). At-rest
+> encryption itself is unaffected — it uses `sdk/crypto/aead.go` (AES-256-GCM), a *different*
+> primitive from `seal`.
+
+~~LPS (Local Password Solution) rotated passwords currently travel agent → gateway → control as cleartext inside mTLS tunnels; the gateway process momentarily holds every rotated password in memory, and the password also sits cleartext inside the agent's result metadata. This spec seals each rotated password on the agent to a control-owned X25519 public key at the moment of generation, makes the gateway a pure opaque relay, and has control unseal at receipt before re-encrypting with the existing at-rest path.~~ Operator recovery (`GetDeviceLpsPasswords`) is unchanged and survives. Closes manchtools/power-manage-agent#62 (option C).
 
 ## Motivation
 
