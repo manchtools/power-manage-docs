@@ -58,7 +58,8 @@ which cannot proceed while per-device queues exist to feed gateways.
    `.TerminateGatewayTerminalSession`.
 3. `ControlService.ListGateways`, `.RevokeGatewayCertificate`,
    `.GetCertificateRevocationList`.
-4. All eight `InternalService/Proxy*` RPCs and `server/internal/handler/control_proxy.go`.
+4. All eight `InternalService` RPCs — the six `Proxy*` relays plus `VerifyDevice` and
+   `RenewGatewayCertificate` — and `server/internal/handler/control_proxy.go`.
 5. The device→gateway binding registry and `server/internal/api/gateway_binding.go`.
 6. **LPS/LUKS transport sealing:** `sdk/crypto/lps.go`, `sdk/crypto/luks.go`, the transport use
    of `sdk/crypto/seal.go`, control's sealing keypair, the signed `lps_public_key`
@@ -137,9 +138,10 @@ Numbered, testable. Each has a rejection path.
 
 ### Surface
 
-10. Given the ControlService descriptor after the change, then exactly the 14 RPCs listed under
-    Scope items 2–4 are absent and **no others**. The comparison is against a checked-in golden
-    list derived from the predecessor descriptor, not regenerated from the new one.
+10. Given the full service descriptor set after the change (the removals span ControlService,
+    GatewayService, GatewayAuthService and InternalService), then exactly the 14 RPCs listed
+    under Scope items 2–4 are absent and **no others**. The comparison is against a checked-in
+    golden list derived from the predecessor descriptor, not regenerated from the new one.
     *Rejection:* deriving both sides from the post-change descriptor lets an accidentally
     dropped RPC vanish from both and pass.
 11. Given the built control binary and the module graph, then no package under
