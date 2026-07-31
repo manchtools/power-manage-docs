@@ -70,11 +70,12 @@ which cannot proceed while per-device queues exist to feed gateways.
 8. **Agent-certificate revocation.** A stolen device certificate must stop working. This is
    *not* the gateway CRL; it is control checking its own table during the mTLS handshake. No
    published list, no distribution, no agent-side cache.
-9. **The context AAD binding.** `lpsSealAAD(device, action, username)` and
-   `luksSealAAD(device, action)` prevent a valid blob being **relocated** to another
-   device/action/user record. That is integrity, independent of the relay, and the source notes
-   it already mirrors the server's at-rest `SecretAAD` construction. It moves to the at-rest
-   path; it does not disappear with the seal.
+9. **The context AAD binding — LUKS fully, LPS partially.** `luksSealAAD(device, action)` is
+   byte-identical to the at-rest `SecretAAD(device, action, "luks")`, so LUKS relocation
+   protection carries over untouched. `lpsSealAAD(device, action, username)` does **not**: at-rest
+   is `SecretAAD(device, action, "lps")` and ADR 0009 omits the username on purpose. Cross-device
+   and cross-action relocation stay closed for both; the within-action username binding ends with
+   the seal. See criterion 8a — this is a stated consequence, not an oversight.
 10. **LPS/LUKS domain separation** (distinct HKDF info strings, `TestLuksLpsDomainSeparation`)
     carries over to the at-rest domain tags.
 11. `sdk/crypto/aead.go` (AES-256-GCM) — the at-rest primitive, untouched, and a *different*
@@ -115,10 +116,22 @@ Numbered, testable. Each has a rejection path.
 7. Given an agent reports a rotated LPS password or a LUKS passphrase, when it submits over the
    direct mTLS stream, then the value is transmitted without X25519 sealing and stored encrypted
    at rest with `aead`.
-8. Given a stored LPS or LUKS secret, when its at-rest AAD is constructed, then it binds
-   `(device, action, username)` / `(device, action)` exactly as the transport AAD did.
-   *Rejection:* a blob valid for `(device A, action X)` accepted for `(device B, action X)`
-   fails.
+8. **LUKS only** — given a stored LUKS secret, when its at-rest AAD is constructed, then it binds
+   `(device, action)` under the LUKS domain **exactly as the transport AAD did**; verified:
+   `SecretAAD(device, action, "luks")` is byte-identical to the transport `luksSealAAD`.
+   *Rejection:* a blob valid for `(device A, action X)` accepted for `(device B, action X)` fails.
+
+8a. **LPS — the username component is NOT preserved, and an earlier draft of this criterion
+   wrongly claimed it was.** Verified: the at-rest AAD is `SecretAAD(device, action, "lps")` with
+   no username, and ADR 0009 omits it deliberately — *"a within-action username swap is a minor
+   residual inside a single trusted rotation batch."* The transport AAD bound the username; at-rest
+   never has. So this criterion does **not** require preserving it.
+
+   What ends is an end-to-end correctness check, not a confidentiality boundary: a caller
+   authorised for `GetDeviceLpsPasswords` on a device already receives every username's password,
+   so nothing is newly disclosed. Adding username to the LPS at-rest AAD would close ADR 0009's
+   accepted residual and restore the check — **ruled separately, not required by this spec**,
+   because the residual predates this change and is unaffected by it.
 9. Given a LUKS secret, when opened under the LPS domain tag, then it fails. *Rejection:* domain
    separation must hold at rest, as `TestLuksLpsDomainSeparation` asserts for transport today.
 
