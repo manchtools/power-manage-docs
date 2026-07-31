@@ -26,9 +26,9 @@ A new RPC that operates on per-device data has to wire `userFilterID(ctx, "<RPCN
 
 ## User groups
 
-<!-- docref: begin src=server:internal/dynamicquery/eval.go#UserContext:cdac5e61,server:internal/dynamicquery/eval.go#EvaluateUser:f50e3793 -->
-A user group is a named collection of users that grants roles (and through them, permissions) additively. Membership is either static (operator picks users) or dynamic (a query over user-profile fields — email, display_name, preferred_username, locale, disabled, totp_enabled, has_password — using the same grammar as device groups).
-<!-- docref: end -->
+A user group is a named collection of OIDC/SCIM-provisioned users that grants
+roles additively. Membership may be static or derived from non-secret identity
+profile fields supplied by the configured provider.
 
 <!-- docref: begin src=server:internal/store/queries/user_groups.sql:e8021084 -->
 Permissions are unioned across a user's direct roles and all groups they belong to. There is no "deny" semantic. To take a permission away, remove the user from the group that grants it.
@@ -36,6 +36,7 @@ Permissions are unioned across a user's direct roles and all groups they belong 
 
 ## Identity providers and SCIM
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#CreateIdentityProviderRequest.auto_create_users:07cee631,server:internal/scim/users.go:6ba4e92a -->
-For SSO, OIDC identity providers create users on first sign-in when `auto_create_users` is on. SCIM v2 endpoints accept full user and group provisioning from upstream IdPs. Both paths map onto the same event types the web UI emits, so the audit trail looks the same no matter how the change came in.
-<!-- docref: end -->
+OIDC may create users on first sign-in when provider policy allows it. SCIM v2
+handles upstream user and group provisioning. Both paths use ordinary
+transactions and the same mandatory audit boundary as operator-initiated
+changes.

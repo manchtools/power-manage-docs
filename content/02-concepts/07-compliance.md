@@ -44,25 +44,23 @@ You write compliance in two stages because it lives in two artefacts:
 
 3. **Assign the policy** to a device group. The Assign button on the policy's detail page targets device groups exactly the way action / action-set assignments do.
 
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.detectChanges:3371df74,server:internal/compliance/evaluator.go#Evaluator.EvaluateInTx:c9e84084 -->
-The agent now evaluates the policy every reconciliation tick: it runs the detection script and always reports the result back, even when it hasn't changed. Status transitions are events; the audit log replays them per device.
-<!-- docref: end -->
+The agent evaluates the policy on its reconciliation cadence and reports the
+result. Control stores current compliance state in ordinary tables and records
+each transition as an audited effect.
 
 ## Lifecycle on a device
 
-<!-- docref: begin src=sdk:proto/pm/v1/common.proto#ComplianceStatus:60eadbe6,server:internal/compliance/evaluator.go#Evaluator.EvaluateInTx:c9e84084 -->
 1. Agent evaluates the policy on its reconciliation tick.
 2. Detection passes → rule is `COMPLIANT`. Detection fails → rule enters `IN_GRACE_PERIOD` for the duration of the grace period.
 3. Still failing when the grace period ends → rule transitions to `NON_COMPLIANT`.
 
-The events table records each transition. "When did this device stop being compliant with rule X?" is one query against the events for that device.
-<!-- docref: end -->
+The audit log records each transition under the originating operation ID.
 
 ## Reporting
 
-Each device's detail page has a **Compliance** tab listing every rule that reaches it, the current status, and the time the rule has been in that status. The events table backs the historical view, so you can prove compliance over a time window for an auditor without running ad-hoc reports.
-
-Group-level pass/fail rollups and a fleet-level worst-rule view are on the roadmap but not in 2026.06. Today the device-detail view is the primary surface; for group views, query the events table directly.
+Each device's detail page has a **Compliance** tab listing every applicable
+rule, its current status, and time in that status. Historical transition
+evidence comes from the audit log; application state is never replayed from it.
 
 ## Compliance vs. action: when to pick which
 

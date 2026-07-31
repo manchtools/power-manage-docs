@@ -60,9 +60,10 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `AGENT_UPDATE` | Self-update the agent binary. SHA-256 verified, swap-and-restart. |
 
-<!-- docref: begin src=server:internal/api/action_dispatch.go#ActionHandler.DispatchInstantAction:0c9f64b1,sdk:proto/pm/v1/actions.proto#SignedActionEnvelope:05aac70b,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
-`REBOOT` and `SYNC` are the only **instant actions** today. They dispatch over the agent's mTLS stream immediately rather than waiting for the next reconciliation tick. Like every dispatch, they carry a CA-signed `SignedActionEnvelope` whose bytes bind the action type, execution ID, desired state, timeout, and target device. The agent verifies the signature over those exact bytes before acting, so a compromised gateway or Valkey can't forge a fleet-wide reboot or retarget a captured envelope.
-<!-- docref: end -->
+`REBOOT` and `SYNC` are the only **instant actions** today. Control first
+commits their delivery, then offers it immediately on the device's direct mTLS
+stream. The agent durably records the delivery ID before acknowledging
+receipt. Ordinary application frames are not separately signed.
 
 <!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService.DispatchAssignedActions:031cd7e5 -->
 There's also a separate "rerun a device's current policy now" operator action — `DispatchAssignedActions`. That one is *not* an instant action: it walks the device's assignments and re-dispatches each through the normal action path. Reach for it when you want a device to converge on its assigned state without rebooting or waiting for the next reconciliation tick.

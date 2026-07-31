@@ -3,9 +3,10 @@ title: Dynamic device groups
 ---
 # Dynamic device groups
 
-<!-- docref: begin src=server:internal/projectors/device_listener.go#enqueueDynamicDeviceGroupsForDevice:18e1abc5,server:cmd/control/periodic.go#startDynamicGroupWorker:0805db00 -->
-A dynamic group is a query, not a list. Label changes and newly registered devices queue the groups for re-evaluation, and a server-side worker recomputes membership on its evaluation interval — so queries over slower-moving inventory fields converge on the periodic pass.
-<!-- docref: end -->
+A dynamic group is a query, not an authored member list. Relevant CRUD changes
+mark affected groups due for evaluation in the same database transaction. A
+bounded database-backed worker evaluates due rows; a periodic sweep recovers a
+missed in-process wakeup.
 
 ## Query language
 
@@ -55,9 +56,10 @@ A built-in dynamic group called "All Devices" is seeded on first boot. Its query
 
 ## When membership recomputes
 
-<!-- docref: begin src=server:internal/projectors/device_listener.go#enqueueDynamicDeviceGroupsForDevice:18e1abc5,server:cmd/control/periodic.go#startDynamicGroupWorker:0805db00,server:cmd/control/flags.go#clampDurations:6460bc95 -->
-- **Event-queued.** A label change or device registration enqueues the affected dynamic groups for re-evaluation inside the projector transaction. The queue is drained by a server worker on the `DYNAMIC_GROUP_EVAL_INTERVAL` cadence (default `1h`, clamped to 30m–8h), with a full re-evaluation every 24h as a safety net.
-<!-- docref: end -->
+- **Change-triggered.** A label, inventory, membership, or registration
+  mutation marks affected groups due in the same transaction.
+- **Swept.** A periodic database scan catches due work even when an in-process
+  signal was lost.
 <!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService.EvaluateDynamicGroup:9567a7bf -->
 - **Manual.** The `EvaluateDynamicGroup` RPC forces a re-evaluation on demand.
 <!-- docref: end -->

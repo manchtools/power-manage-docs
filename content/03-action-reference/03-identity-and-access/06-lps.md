@@ -56,7 +56,11 @@ desired_state: PRESENT
 ## Gotchas
 
 <!-- docref: begin src=sdk:crypto/lps.go#SealLpsPassword:db41abd7,agent:internal/executor/lps.go#Executor.setupLpsPasswords:daa2a2c0,server:internal/api/internal_handler.go#InternalHandler.ProxyStoreLpsPasswords:da6698e9 -->
-- Passwords flow **agent → control**, sealed to the control server's X25519 LPS public key before they leave the device — the relaying gateway carries an opaque blob it cannot open. The seal is bound to (device, action, username), so a blob can't be replayed into another record. The agent seals *before* setting the password locally: if it can't seal (no verified control key yet), it refuses to rotate rather than strand a credential. Control unseals and re-encrypts with its at-rest key.
+- Passwords flow **agent → control**, sealed to control's pinned X25519
+  recipient key before they leave the device. The envelope binds direction,
+  message field, device, action, and username context, so it cannot be replayed
+  into another record. The agent seals before setting the password locally;
+  control unseals only at the narrow sink and re-encrypts for at-rest storage.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/api/audit_handler.go#eventRedactionSchemas:dd5d7439,server:internal/api/device_handler.go#DeviceHandler.GetDeviceLpsPasswords:b7af4816 -->
 - Passwords never appear in the audit log — the rotation event's password field is redacted from the audit API; only "rotation occurred" is visible. Retrieval goes through `GetDeviceLpsPasswords`, gated on the dedicated `GetDeviceLpsPasswords` permission — and every retrieval is itself audited: a `LpsPasswordsViewed` event records who read which entries (rotation IDs and usernames only, never the password), and a handler-tier denial (absent device, decrypt failure) records `LpsPasswordsViewDenied` without changing the uniform NotFound response.

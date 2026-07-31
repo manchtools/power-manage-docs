@@ -4,7 +4,10 @@ title: SYNC
 # SYNC
 
 <!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb,agent:cmd/power-manage-agent/runtime.go#periodicSync:2e2cbb96 -->
-Triggers an out-of-band [reconciliation tick](/concepts/reconciliation). The agent immediately fetches its assignments from the gateway and runs a **full** desired-state reconcile — it re-applies every assigned action, not just new or changed ones, exactly like a fresh connection does. That's the lever for correcting drift *now* instead of within the next reconciliation interval.
+Triggers an out-of-band [reconciliation tick](/concepts/reconciliation).
+Control commits the delivery and offers it on the direct agent stream; the
+agent runs a full desired-state reconcile immediately instead of waiting for
+its normal cadence.
 <!-- docref: end -->
 
 `SYNC` is an **instant action**. It bypasses the reconciliation cadence; the actions it triggers still respect their own schedules and maintenance windows.

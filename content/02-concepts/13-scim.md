@@ -44,10 +44,10 @@ flowchart LR
 `POST /Users` has four outcomes: an externalID that's already linked re-syncs and returns 200 (idempotent for clients that re-POST every sync cycle); with `auto_link_by_email` on, an already-linked email re-syncs (200) and an unlinked existing user gets an identity link (201); a genuinely new user is created passwordless with a derived Linux username/UID, the provider's default role, and an identity link. If the global server settings have provisioning or SSH-for-all enabled, the new user inherits those flags immediately.
 <!-- docref: end -->
 
-{% callout type="warn" title="Linking to local password accounts" %}
-<!-- docref: begin src=server:internal/scim/users_create.go#Handler.createUser:21f88ec6,sdk:proto/pm/v1/control.proto#IdentityProvider.trust_email_assertions:cb24a82d -->
-A SCIM client can assert any email. Auto-linking an asserted email to a pre-existing **local password** account would let a compromised or over-trusted IdP seize that account, so it is refused with `409 Conflict` unless the operator has explicitly set `trust_email_assertions: true` on the provider. See [SSO](/concepts/sso) for the full semantics of that flag.
-<!-- docref: end -->
+{% callout type="warn" title="Email assertions are a trust decision" %}
+A SCIM client can assert any email. Treat provider email-linking policy as an
+identity boundary and enable it only when that provider is authoritative for
+the namespace. Power Manage has no local-password account to fall back to.
 {% /callout %}
 
 <!-- docref: begin src=server:internal/scim/users_mutate.go#Handler.replaceUser:77423f94,server:internal/scim/users_mutate.go#Handler.patchUser:73140c23 -->
@@ -61,7 +61,11 @@ A SCIM client can assert any email. Auto-linking an asserted email to a pre-exis
 ## Deprovisioning
 
 <!-- docref: begin src=server:internal/scim/users.go#Handler.deleteUser:b258daeb -->
-`DELETE /Users/{id}` first removes the provider's identity link. Only if that was the user's **last** link is the user actually deleted — a user linked to other providers (or usable via password) keeps their account. A real deletion routes through the same crypto-shred flow as an API `DeleteUser` (the user's encryption key is destroyed, redacting their event-log PII), and the user's system actions (provisioned Linux accounts, SSH grants, TTY accounts) are cleaned up from their assigned devices.
+`DELETE /Users/{id}` first removes the provider's identity link. Only if that
+was the user's last link is the user deleted; a user linked to another provider
+remains. Deletion removes ordinary personal state, destroys the subject key for
+encrypted audit detail, and schedules cleanup of the user's device-side system
+actions.
 <!-- docref: end -->
 
 <!-- docref: begin src=server:internal/scim/groups.go#Handler.deleteGroup:77a577bf -->

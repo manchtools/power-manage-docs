@@ -7,6 +7,6 @@ icon: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' s
 
 Three pages to take you from zero to a managed device:
 
-- [**Installation**](/get-started/installation) — install the control + gateway servers and your first agent.
+- [**Installation**](/get-started/installation) — install one control server and enrol your first agent.
 - [**The web UI**](/get-started/web-ui) — what's hosted, what's not, and the trust model behind it.
 - [**Quick start**](/get-started/quick-start) — a 5-step walk-through installing `curl` across a dynamic group of production devices.

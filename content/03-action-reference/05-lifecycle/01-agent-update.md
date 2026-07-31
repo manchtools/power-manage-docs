@@ -3,7 +3,10 @@ title: AGENT_UPDATE
 ---
 # AGENT_UPDATE
 
-Updates the agent binary itself. The agent downloads the new binary, verifies its SHA-256 (against a checksum file, or against a hash pinned inside the CA-signed action), runs a self-test, and swaps the binary in place. Failed self-tests keep the old binary running.
+Updates the agent binary itself. The agent downloads the new binary, verifies
+its SHA-256 against a checksum file or the hash carried in the authenticated
+delivery, runs a self-test, and swaps the binary in place. Failed self-tests
+keep the old binary running.
 
 <!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
 This is the *only* way the agent rolls itself forward in a fleet. There's no other path: distro packages aren't shipped, and `SERVICE` refuses to manage `power-manage-agent.service`.
@@ -17,7 +20,7 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 | `amd64` | object | no\* | Binary source for x86_64. |
 | `amd64.binary_url` | string | yes if `amd64` set | HTTPS URL to the agent binary. |
 | `amd64.checksum_url` | string | no\*\* | HTTPS URL to a SHA256SUMS-style checksum file. The default integrity source — lets an action track "latest" release assets hands-off. |
-| `amd64.expected_sha256` | string | no\*\* | Pinned SHA-256 of the binary, 64 lowercase hex chars. When set it is authoritative and **overrides** `checksum_url`: the hash travels inside the CA-signed action, so integrity doesn't depend on the download origin. Use for staged rollouts / stronger authenticity. |
+| `amd64.expected_sha256` | string | no\*\* | Pinned SHA-256 of the binary, 64 lowercase hex chars. When set it is authoritative and **overrides** `checksum_url`; it arrives over the direct authenticated control stream. |
 | `arm64` | object | no\* | Binary source for arm64. Same sub-fields as `amd64`. |
 | `allow_downgrade` | bool | no | Install even if the target version is older than the running one. Without it the agent refuses a downgrade (anti-rollback). |
 | `allow_redirect` | bool | no | Follow a redirect that changes host or scheme during download (e.g. GitHub release assets 302 to a CDN host). Default false: a cross-origin redirect is refused. SHA-256 verification and the https-only rule still apply either way. |
@@ -30,7 +33,7 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 <!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:3dca9d56,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1 -->
 1. The agent reads its own architecture and picks the matching entry. If there's no entry for this arch, the action exits with `changed=false` and a noted skip.
-2. It determines the expected hash: `expected_sha256` if pinned in the signed action, otherwise it fetches the checksum file (sha256sums format) and takes the entry whose filename matches the binary URL. All URLs must be HTTPS.
+2. It determines the expected hash: `expected_sha256` from the delivery when present; otherwise it fetches the checksum file and selects the entry whose filename matches the binary URL. All URLs must be HTTPS.
 3. It downloads the binary to a staging directory and verifies the SHA-256. A mismatch aborts before anything runs.
 4. It runs the downloaded binary's `version` command and compares with the running version. Same version → `changed=false`, done. An **older** version is refused unless `allow_downgrade` is set on the action (anti-rollback); an unparseable version fails closed.
 5. It runs the new binary in a subprocess as `power-manage-agent self-test` with a 60-second timeout. The self-test exercises the same wiring the new binary will need in production — see [below](#what-the-self-test-actually-does).
@@ -45,8 +48,12 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 The subprocess walks four checks in order and exits non-zero on the first failure:
 
 1. **Credentials load.** The new binary reads the agent's mTLS key + certificate from disk and parses them. Catches enrolment-state issues that would prevent the binary from connecting at all.
-2. **mTLS handshake.** It dials the gateway URL the agent is currently using and completes a TLS handshake with `https://` enforced (an `http://` gateway URL is a hard failure here). Catches CA-trust drift, cert expiry, gateway address regressions.
-3. **Bidirectional stream.** It opens the streaming RPC, sends `Hello`, and verifies it receives `Welcome` back. Catches proto mismatches between agent and gateway.
+2. **mTLS handshake.** It dials the configured control endpoint and completes
+   the authenticated TLS handshake. This catches CA-trust drift, certificate
+   expiry, and endpoint regressions.
+3. **Bidirectional stream.** It opens the agent RPC, sends `Hello`, and
+   verifies `Welcome`. This catches contract mismatches between agent and
+   control.
 4. **`SyncActions` round-trip.** It calls `SyncActions` to confirm the new binary can fetch its assignment set. Catches RPC-surface regressions before the binary takes over.
 
 Anything that fails surfaces as the test exit code; the running binary captures stdout/stderr from the subprocess into the execution event so you can see *what* failed. Side note: the self-test connects with the live agent's device identity, so the running agent briefly disconnects (a few seconds) while the probe holds the stream.

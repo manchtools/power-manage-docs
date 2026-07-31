@@ -70,7 +70,11 @@ The flow is:
 2. The operator issues the user a one-shot enrolment token from the device-detail page in the web UI.
 3. The user runs `power-manage-agent luks set-passphrase --token <token>` on the device (no sudo needed — the CLI is unprivileged).
 <!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:6a1f4df2 -->
-4. The CLI prompts enter + confirm (up to 3 attempts for a matching pair, with a 16-char floor as UX) and hands {token, passphrase} to the root agent's LUKS daemon over a local socket. The daemon validates the token via the agent's gateway session — single-use, device-bound, short-TTL — and enforces the action's min-length/complexity policy server-authoritatively, plus a reuse check against previous passphrase hashes.
+4. The CLI prompts enter + confirm (up to 3 attempts for a matching pair, with
+   a 16-char floor as UX) and hands {token, passphrase} to the root agent's
+   LUKS daemon over a local socket. The daemon validates the single-use,
+   device-bound, short-lived token through the direct control session and
+   enforces the action's password policy and reuse check.
 5. If the input clears the policy checks, the daemon fetches the current managed passphrase over the mTLS stream, revokes whatever device-bound key existed (e.g. a stale TPM seal), and enrols the user passphrase into slot 7.
 <!-- docref: end -->
 <!-- docref: begin src=sdk:sys/encryption/validate.go#HashPassphrase:b7c6e027 -->
@@ -113,7 +117,11 @@ desired_state: PRESENT
 - Rotating breaks any external tools that have a saved copy of the managed LUKS passphrase. If you have a separate recovery key in another keyslot, it survives rotation. The managed slot is the only one that gets rewritten.
 <!-- docref: end -->
 <!-- docref: begin src=sdk:crypto/luks.go#SealLuksPassphrase:4ce5127e,agent:internal/executor/luks.go#Executor.sealLuksPassphrase:f5802d0c,server:internal/api/internal_handler.go#InternalHandler.ProxyStoreLuksKey:87fb66ea -->
-- Managed passphrases are **sealed in transit** (spec 25): the agent encrypts each one to the control server's X25519 key before it leaves the device, so the relaying gateway only ever carries opaque bytes — the same transport model LPS rotation uses, under a distinct crypto domain. Without a verified control key the agent refuses to rotate (fail-closed, before any LUKS slot is touched); control rejects anything that doesn't unseal and stores nothing.
+- Managed passphrases are sealed to control's X25519 recipient key before they
+  leave the device, with device, action, field, and direction bound in AAD.
+  Without the pinned recipient key the agent refuses to rotate before touching
+  a LUKS slot. Control rejects invalid envelopes and re-encrypts accepted values
+  for at-rest storage.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/api/device_handler.go#DeviceHandler.GetDeviceLuksKeys:b41f8631 -->
 - The current managed passphrase (and its history) is retrievable through the web UI's device-detail page under **Encryption** via the `GetDeviceLuksKeys` RPC, gated on the dedicated `GetDeviceLuksKeys` permission. Keys are stored encrypted at rest and decrypted per request. Every retrieval is itself audited: a `LuksKeysViewed` event records who read which keys (rotation IDs and device paths only, never the passphrase), and a handler-tier denial records `LuksKeysViewDenied`.

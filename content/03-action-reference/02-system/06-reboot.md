@@ -35,5 +35,7 @@ type: REBOOT
 <!-- docref: end -->
 - A reboot dispatched while the agent is offline waits in the device's queue and is delivered as soon as the agent reconnects — instant actions aren't stored in the agent's offline scheduler. There's no TTL on the queued dispatch, so cancel a stale reboot by acting before the device reconnects.
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.VerifyEnvelope:ea44180f,agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb -->
-- The action's CA signature is verified over the exact envelope bytes — which bind the action type and target device — before the agent acts, so a compromised gateway or Valkey can't trigger a fleet-wide reboot or replay a captured envelope onto another device.
+- The reboot arrives on the authenticated direct mTLS stream and is tied to a
+  durable delivery for the target device. The agent's receipt and boot marker
+  make retries and post-crash outcome resolution explicit.
 <!-- docref: end -->

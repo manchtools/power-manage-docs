@@ -28,7 +28,10 @@ For fine-grained group membership, combine with `GROUP`. For managed `authorized
 <!-- docref: end -->
 
 <!-- docref: begin src=agent:internal/executor/action_user.go#Executor.createUser:9a526821,agent:internal/executor/action_user.go#createUserSetsPassword:89c9052b -->
-On creation of a plain enabled account (none of `no_password` / `system_user` / `disabled` set), the agent generates a random 16-char temporary password, sets it, and expires it so it must be changed on first login. The temporary password is reported back to the server sealed to the control LPS public key — the gateway never sees it in cleartext.
+On creation of a plain enabled device account (none of `no_password` /
+`system_user` / `disabled` set), the agent generates a random temporary
+password, sets it, and expires it for first login. The value is X25519-sealed
+to control before transport and re-encrypted for at-rest storage.
 <!-- docref: end -->
 
 ## Idempotency

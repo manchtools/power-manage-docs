@@ -8,6 +8,10 @@ This repo holds only **content + assets**. The rendering engine is
 container image — bring up `compose.yml` and you get a searchable,
 themed docs site.
 
+System architecture is intentionally not duplicated here. The sole design
+authority is `../DESIGN_2026_07_31/00_TARGET_DESIGN.md` in the workspace.
+This repository contains product and operator guidance only.
+
 ## Layout
 
 ```
@@ -27,8 +31,6 @@ content/                         markdown source
     05-lifecycle/                AGENT_UPDATE
   04-security/...
   05-operations/...
-  06-specs/                      feature specs (point-in-time; not docref-scanned)
-adr/                             decisions about the docs site itself
 static/                          favicons, OG card, screenshots
 compose.yml                      runtime composition (open-docs:latest)
 docref.toml / docref.lock        docref config + pinned code-repo revisions
@@ -104,8 +106,9 @@ aliases in `docref.toml` and pinned to origin/main revisions in
   never hand-write hashes).
 - After code lands in a sibling repo: `docref update`, re-read any
   claims that went stale, fix or `docref approve`, commit the lock.
-- `content/06-specs/` and `adr/` are deliberately outside the scan
-  (point-in-time artifacts).
+- Desired-state architecture claims belong only in the workspace target
+  design. Product pages should describe shipped behavior and use docref for
+  code-backed claims.
 
 ## Deploying
 

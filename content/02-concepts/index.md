@@ -5,10 +5,9 @@ icon: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' s
 
 # Concepts
 
-How power-manage works under the hood:
+Product concepts. System architecture lives only in the workspace target
+design; these pages explain operator-visible behavior.
 
-- [**Architecture**](/concepts/architecture) — control + gateway + agent, and what each one owns.
-- [**Event sourcing**](/concepts/event-sourcing) — every state change is an immutable event; reads come from projections.
 - [**Reconciliation**](/concepts/reconciliation) — desired state, drift detection, and idempotent actions.
 - [**RBAC and scopes**](/concepts/rbac) — dynamic roles, user groups, and `:self` / `:assigned` permission scopes.
 - [**Dynamic device groups**](/concepts/dynamic-groups) — the query language that drives assignment targeting.
@@ -17,7 +16,6 @@ How power-manage works under the hood:
 - [**Device inventory**](/concepts/device-inventory) — what the agent reports about each device, baseline + osquery layered.
 - [**Log collection**](/concepts/log-collection) — on-demand journalctl queries dispatched from the UI.
 - [**osquery**](/concepts/osquery) — opt-in integration for richer inventory and ad-hoc SQL queries.
-- [**Action architecture**](/concepts/action-architecture) — why actions aren't 1:1 with shell programs, and how the SDK substrate makes them pluggable.
 - [**SSO (OIDC)**](/concepts/sso) — identity providers, the login flow, identity linking, and auto-provisioning.
 - [**SCIM provisioning**](/concepts/scim) — automated user and group sync from your IdP, token handling, deprovisioning.
-- [**Search**](/concepts/search) — the valkey-search index behind global search, and how results honour object visibility.
+- [**Search**](/concepts/search) — PostgreSQL FTS now, FTS5 in the final SQLite port, with stable user-visible semantics.
