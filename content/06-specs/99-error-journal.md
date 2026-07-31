@@ -30,6 +30,18 @@ a mistake, fix the rules, not just the output.
 
 <!-- Entries are appended below this line. Never delete entries. -->
 
+## [2026-07-31] [Drifted from spec] Treated the superseded PostgreSQL target as current after the CRUD ruling
+
+**What happened**: I described the operator-approved SQLite CRUD architecture as a conflicting redesign and treated the older PostgreSQL/event-sourcing target as authoritative.
+
+**What the user said**: "my project descicion was to move to CRUD and all the other parts like valkey and gateway removal. How on earth was this lost"
+
+**Root cause**: The later ruling existed in the adjacent monorepo, while the workspace `CLAUDE.md`, the older target document, and the monorepo README still asserted the prior PostgreSQL/event-sourcing model. There was no explicit precedence rule in the loaded project Harness, so a context reset could revive the older document's self-declaration that it was the specification. Execution then split the final architecture into a gateway-only polyrepo change whose own scope explicitly deferred Valkey removal and the datastore/projector replacement.
+
+**Harness fix**: The workspace `CLAUDE.md` now names the monorepo decisions, specification, and plan as the current authority; records SQLite CRUD, one control, no event sourcing/PostgreSQL/Gateway/Valkey/Asynq; and forbids counting a gateway-only polyrepo change as implementation of the final target.
+
+**Prevention**: Every structural task must resolve document precedence before coding and must follow the combined current target rather than an independently convenient legacy-repository slice.
+
 ## [2026-07-05] [Drifted from spec] Snapshot target was a plaintext projection dump instead of the replayed ciphertext events
 
 **What happened**: The spec-19 retention snapshot was implemented as a serialized dump of the (decrypted, plaintext) projection tables via a pg_temp shadow replay, and that dump was written into the cold archive. This put plaintext PII into archives and would have let a snapshot-based restore reproduce PII even with the DEK table empty — defeating crypto-shred and contradicting AC 21a and the spec's "cold archives hold only ciphertext PII."
