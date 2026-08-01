@@ -16,8 +16,10 @@ enrolled agent. See [Installation](/get-started/installation) first.
 - An **assignment** connects an Action, ActionSet, or Definition to a target.
 
 Assigning an Action or ActionSet creates one flat manifest. Assigning a
-Definition creates one manifest per contained ActionSet. Duplicate authored
-occurrences are preserved.
+Definition creates one manifest per contained ActionSet and uses the Definition
+schedule for each emitted manifest. Compilation does not rewrite the ActionSet;
+assigning that ActionSet independently still uses its own schedule. Duplicate
+authored occurrences are preserved.
 
 ## Install a package on a group
 
@@ -37,7 +39,9 @@ delivery, so a reconnect does not execute the same delivery twice.
 
 ## Scheduling and failure policy
 
-ActionSets retain independent schedules and failure policies.
+ActionSets retain independent schedules and failure policies. A Definition
+temporarily overrides the schedule of manifests compiled from its member sets,
+while their failure policies remain independent.
 `on_failure` defaults to `CONTINUE`; choose `STOP` explicitly when later
 actions must not run. The agent can execute already received work during a
 temporary control outage.
