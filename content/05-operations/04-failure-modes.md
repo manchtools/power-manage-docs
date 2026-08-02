@@ -30,8 +30,12 @@ The associated mutation rolls back. Audit evidence and state cannot diverge.
 
 ## Backup destination unavailable
 
-Control remains available, but backup age and replication lag alert. Recovery
-point risk grows until replication resumes.
+Control remains available. Once the last verified backup is older than
+`backup_max_lag`, `control backup-status` reports it as stale and the
+backup-inspection job records a stale backup posture; when `webhook_url` is
+configured, that job also emits the backup-lag notification. Copying backups
+off-host is operator-owned, so control raises no signal when that transport
+stalls. Recovery point risk grows until backups resume.
 
 ## Control host lost
 

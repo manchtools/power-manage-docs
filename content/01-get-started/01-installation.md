@@ -3,13 +3,6 @@ title: Installation
 ---
 # Installation
 
-{% callout type="warn" title="Consolidation in progress" %}
-This page describes the approved deployment target. Until the consolidation
-work lands, a development branch may still contain legacy services. Do not
-deploy Gateway, Valkey, Asynq, or a separate indexer as part of the target
-stack.
-{% /callout %}
-
 ## Target stack
 
 The deployment contains:
@@ -40,12 +33,17 @@ Use the deployment tooling shipped with the server. It:
 1. creates or accepts the control CA;
 2. generates secure deployment secrets without printing them;
 3. validates file ownership and permissions;
-4. configures Traefik's HTTPS route and SNI TCP passthrough route;
-5. creates the SQLite database and its baseline schema on first start; and
-6. creates a short-lived, single-use bootstrap-admin URL.
+4. configures Traefik's HTTPS route and SNI TCP passthrough route; and
+5. creates the state, artifact and backup directories and writes control's
+   configuration.
 
-There are no local user passwords or local TOTP accounts. Use the bootstrap
-URL once to configure OIDC/SCIM and establish the real administrator identity.
+Control itself creates the SQLite database and its baseline schema the first
+time it starts.
+
+Once the stack is up, issue the administrator setup URL yourself with
+`docker compose exec control control bootstrap-admin`. There are no local user
+passwords or local TOTP accounts. Use that short-lived, single-use URL once to
+configure OIDC/SCIM and establish the real administrator identity.
 
 ## Enrolling an agent
 

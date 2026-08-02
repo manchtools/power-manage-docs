@@ -25,6 +25,11 @@ does not depend on engine-specific ranking.
 - deterministic per-facet ordering and pagination
 - 50 default and 200 maximum results per page
 
-Typo-tolerant matching is required, but its threshold and ordering relative to
-prefix hits still need a small corpus-based acceptance decision. Do not hide
-that decision behind a database-specific extension.
+Typo tolerance is bounded per query token. Tokens shorter than four characters
+must match exactly or by prefix, tokens of four to seven characters tolerate one
+edit, and longer tokens tolerate two. Insertion, deletion, substitution and
+adjacent transposition each cost one edit.
+
+Exact and prefix hits always precede fuzzy-only hits. Fuzzy-only hits order by
+total edit cost, then by which field matched, then by entity ID, so pagination
+stays deterministic across the combined result set.

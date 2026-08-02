@@ -18,15 +18,20 @@ Control embeds SQLite in WAL mode with `synchronous=FULL`. Restrict the database
 file and the backup path to control with strict filesystem permissions; there is
 no database port to expose or authenticate.
 
-Mount artifacts and backups explicitly. Monitor the last successful backup and
-off-host replication lag. A temporary backup-destination outage should alert
-without taking the control plane offline.
+Mount artifacts and backups explicitly. Run `backup.sh` from a host timer and
+check the last verified backup with `docker compose exec control control
+backup-status`, which reports stale once that backup is older than
+`backup_max_lag` (26 hours by default). Copying backups off-host is your own
+transport; monitor it with your own tooling. A temporary backup-destination
+outage never takes the control plane offline: backup age is not part of
+readiness, and the optional `webhook_url` carries the backup-lag notification
+when you configure one.
 
 ## Keys and secrets
 
-Keep CA keys, JWT signing keys, database credentials, sealing keys, and
-at-rest encryption keys in restricted files or deployment-secret mechanisms.
-Setup must never print generated credentials.
+Keep CA keys, JWT signing keys, sealing keys, and at-rest encryption keys in
+restricted files or deployment-secret mechanisms. There are no database
+credentials. Setup must never print generated credentials.
 
 Classified agent/control fields use X25519 sealing in transit. At-rest secrets
 use AES-256-GCM with resource-context AAD. Diagnostic export is allowlist-based
