@@ -11,7 +11,7 @@ Before any operation, the agent self-heals the package manager: clears `apt` / `
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#PackageParams:b0220890 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#PackageParams:b0220890 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `name` | string | no\* | — | Generic package name; used when no manager-specific override is set. Max 255 chars. |
@@ -73,6 +73,6 @@ desired_state: ABSENT
 <!-- docref: begin src=agent:internal/executor/action_package.go#Executor.checkPackageVersionAndPin:9585d74e -->
 - `version` is exact-match. The agent doesn't try to interpret version constraints (`>=`, `~`). If you need a range, use the package manager's native syntax via `SHELL` instead.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:pkg/apt.go#apt.Pin:0ea3323d,sdk:pkg/dnf.go#dnf.Pin:057e9e38,sdk:pkg/pacman.go#pacman.Pin:8c78a70f,sdk:pkg/zypper.go#zypper.Pin:34d9f3a2 -->
+<!-- docref: begin src=sdk:pkg/apt.go#apt.Pin:0ea3323d,sdk:pkg/dnf.go#dnf.Pin:057e9e38,sdk:pkg/pacman.go#pacman.Pin:c404444f,sdk:pkg/zypper.go#zypper.Pin:34d9f3a2 -->
 - Pinning holds the named package only. The package manager controls whether dependencies get pulled in regardless. Verify with the device's pin list (`apt-mark showhold`, `dnf versionlock list`) if it matters. A pin that fails to apply fails the action — you won't see "installed and pinned" when only the install happened.
 <!-- docref: end -->

@@ -7,7 +7,7 @@ Installs a Flatpak from a configured remote. Most fleets default to `flathub`; y
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#FlatpakParams:9451b1ba,agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:db63062a -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#FlatpakParams:9451b1ba,agent:internal/executor/action_flatpak.go#Executor.executeFlatpak:db63062a -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `app_id` | string | yes | — | Reverse-DNS application ID (e.g. `org.mozilla.firefox`). Max 255 chars; flag-shaped values are rejected. |

@@ -3,24 +3,24 @@ title: SCRIPT_RUN
 ---
 # SCRIPT_RUN
 
-Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/system/shell), different lifecycle: `SCRIPT_RUN` is not idempotent across time. It runs when dispatched and — unlike every other action type — is never stored in the agent's offline scheduler, so it won't re-run on the agent's schedule afterwards.
+Runs a one-off script with output capture. Same parameter set as [`SHELL`](/action-reference/system/shell), and the same executor path — what differs is intent: `SCRIPT_RUN` is what you dispatch when you want the output, not convergence, and it carries no detection script to make it idempotent across time.
 
-Use `SCRIPT_RUN` for things you want captured in the audit log without writing a detection script first: diagnostics, ad-hoc reports, one-shot data collection.
+Use `SCRIPT_RUN` for things you want captured against the execution record without writing a detection script first: diagnostics, ad-hoc reports, one-shot data collection.
 
 For idempotent shell work, use [`SHELL`](/action-reference/system/shell) with a `detection_script`.
 
 ## Parameters
 
-<!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnActionWithStreaming:06e9eebb,agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
-Same `ShellParams` proto as `SHELL` — see [the SHELL reference](/action-reference/system/shell) for the full list. The agent executes both types through the exact same shell path, so `detection_script` and `is_compliance` behave the same *within a single run* (a passing detection still skips the script). The differences are lifecycle:
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:1170ff78,agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6,server:internal/manifest/compiler.go#OneShotAction:0361b848,agent:internal/store/store.go#calculateNextExecuteFromSchedule:f4df1dad -->
+Same `ShellParams` proto as `SHELL` — see [the SHELL reference](/action-reference/system/shell) for the full list. The agent runs both types through the exact same case of its executor, so `detection_script` and `is_compliance` behave identically (a passing detection still skips the script). What differs is how you use them:
 
 - **`script` is what you want.** The web form expects one; a detection-only SCRIPT_RUN is technically accepted by the server but is just a one-shot compliance probe.
-- **No scheduled re-runs.** SHELL actions are stored on the agent and re-run on their schedule; a SCRIPT_RUN executes once per dispatch and is forgotten.
+- **The action type does not control re-runs; the manifest schedule does.** An explicit dispatch compiles a one-shot manifest whose schedule is empty, so the agent runs it as soon as it records the delivery. An empty schedule is not "never again", though: with no cron and no interval the agent falls back to its 8-hour drift interval, so a dispatched SCRIPT_RUN behaves like any other stored delivery afterwards. Write scripts that are safe to repeat.
 <!-- docref: end -->
 
 ## Example
 
-Capture disk usage and route it to the audit log:
+Capture disk usage and route it to the execution record:
 
 ```yaml
 type: SCRIPT_RUN
@@ -33,11 +33,11 @@ script: |
 ## Gotchas
 
 <!-- docref: begin src=sdk:sys/exec/types.go#MaxOutputBytes:380cb4fa,sdk:sys/exec/capped_buffer.go#truncationMarker:593e1237 -->
-- Output goes to the execution event in the audit log, capped at 1 MiB per stream (stdout and stderr separately). Anything over that is dropped and the output ends with `[output truncated]`.
+- Output goes to the execution record, capped at 1 MiB per stream (stdout and stderr separately). Anything over that is dropped and the output ends with `[output truncated]`.
 <!-- docref: end -->
-<!-- docref: begin src=agent:cmd/power-manage-agent/runtime.go#periodicSync:2e2cbb96 -->
-- "Runs once per dispatch" includes re-dispatches: a SCRIPT_RUN in an assignment runs again whenever the device does a *full* desired-state reconcile — a fresh agent connection or an operator-triggered `SYNC` — though not on the incremental periodic tick. Don't put anything destructive in one without making it safe to repeat.
+<!-- docref: begin src=agent:cmd/power-manage-agent/runtime.go#periodicSync:3db80acb,agent:cmd/power-manage-agent/runtime.go#syncStateFromControl:d8a54242,agent:internal/store/manifest.go#Store.RecordManifestDelivery:b40ecef4 -->
+- Re-delivery is not re-execution. The periodic sync tick and an operator-triggered `SYNC` run the same delivery sync, and re-recording a delivery the agent already holds is a replay-safe no-op that leaves its schedule and execution state untouched. Repeat runs come from the manifest schedule instead — so make anything destructive safe to repeat.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
-- For sensitive output (passwords, tokens), prefer `SHELL` with a detection script that doesn't echo the value. The audit redactor scrubs the script *body*, not the script's output.
+<!-- docref: begin src=server:internal/store/audit.go#AuditOperation:42ce04d3,server:internal/store/audit.go#AuditEffect:4a8afbb5 -->
+- For sensitive output (passwords, tokens), prefer `SHELL` with a detection script that doesn't echo the value. Nothing scrubs script output: it is stored verbatim with the execution record, and there is no redactor behind it — the audit log is metadata-only, recording code-derived operation descriptors and the names of changed fields rather than any parameter or output value.
 <!-- docref: end -->

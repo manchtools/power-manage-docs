@@ -7,7 +7,7 @@ Grants a list of users SSH access by managing a dedicated Linux group plus an `s
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#SshParams:c8bd2df2,agent:internal/executor/action_ssh.go#Executor.executeSsh:54e5fbc4 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#SshParams:c8bd2df2,agent:internal/executor/action_ssh.go#Executor.executeSsh:54e5fbc4 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `allow_pubkey` | bool | no | `false` | Allow public-key authentication. The web UI pre-checks it; an action with the field unset writes `PubkeyAuthentication no`. |

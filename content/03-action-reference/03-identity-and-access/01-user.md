@@ -9,7 +9,7 @@ For fine-grained group membership, combine with `GROUP`. For managed `authorized
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#UserParams:43c50847,sdk:sys/user/user.go#IsValidName:32396361 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#UserParams:43c50847,sdk:sys/user/user.go#IsValidName:32396361 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `username` | string | yes | — | Linux username. 1–32 alphanumeric chars; the agent additionally requires a lowercase first letter. |
@@ -27,7 +27,7 @@ For fine-grained group membership, combine with `GROUP`. For managed `authorized
 | `no_password` | bool | no | `false` | Skip the temporary-password generation entirely; the account stays at the shadow-locked `!` default. Meant for system-managed nologin accounts reached only via setuid (`pm-tty-*`); do not set it for general-purpose users. |
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.createUser:9a526821,agent:internal/executor/action_user.go#createUserSetsPassword:89c9052b -->
+<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.createUser:6c3d0a9b,agent:internal/executor/action_user.go#createUserSetsPassword:89c9052b -->
 On creation of a plain enabled device account (none of `no_password` /
 `system_user` / `disabled` set), the agent generates a random temporary
 password, sets it, and expires it for first login. The value is X25519-sealed
@@ -40,7 +40,7 @@ to control before transport and re-encrypted for at-rest storage.
 The agent checks each field individually against the device's current state (the passwd entry, `~/.ssh/authorized_keys` content, the AccountsService override for `hidden`). Mismatched fields are updated, matching ones are skipped; nothing to change reports `changed=false`.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.removeUser:9bb20cfd -->
+<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.removeUser:31a10f0d -->
 `desired_state: ABSENT` removes the user. The agent kills the user's sessions first, then runs the removal with home-directory deletion always enabled — there is no flag to keep the home. Back up the home directory before deleting an account if you need it.
 <!-- docref: end -->
 
@@ -82,16 +82,17 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.removeUser:9bb20cfd -->
-- The agent refuses to remove its own service user: `desired_state: ABSENT` for `power-manage` is rejected. That is the only protected name — there is no built-in guard against disabling `root`, so be deliberate with the `disabled` flag.
+<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.removeUser:31a10f0d,agent:internal/executor/action_user.go#Executor.updateUser:50055ffa -->
+- **There is no protected-username list for removal.** The agent removes whatever account the action names, `root` included: it checks only that the account exists, then deletes it together with its home directory. The agent runs as `root` from its systemd unit rather than under a dedicated service account, so there is no agent user left to shield. The only name-level check is the format rule (1–32 alphanumeric characters, lowercase first letter); everything past that is on the author. Be deliberate with `desired_state: ABSENT`.
+- **Disabling is different, and the superuser is deliberately protected.** `disabled` locks the password for any account, but the nologin shell default is applied only when the account's UID is not 0. The superuser keeps its login shell, so a password lock never costs you `sudo -i` or key-based root SSH. The rule is keyed on UID 0 rather than the name `root`, so a renamed superuser is covered too.
 <!-- docref: end -->
 - `uid` autoassignment uses the next free UID in the normal range (or system range if `system_user: true`). To pin a UID across a fleet, set `uid` explicitly.
-<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.setupSSHKeys:1fd8b218 -->
+<!-- docref: begin src=agent:internal/executor/action_user.go#Executor.setupSSHKeys:ebcccdd6 -->
 - SSH keys are managed with exact-content semantics: the agent rewrites `~/.ssh/authorized_keys` to exactly the listed keys (0600, owned by the user). Keys added out-of-band are removed on the next reconciliation. Entries not starting with `ssh-`/`ecdsa-` are skipped with a warning; an entry with an embedded newline fails the whole action.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/action_user.go#setUserHidden:2e91da4a -->
 - `hidden` requires `accountsservice` installed (the agent looks for `/var/lib/AccountsService/users/`). On systems without it the field is **silently** skipped — no execution event records the skip today. If you need the GUI-hide behaviour, treat `accountsservice` as a hard prerequisite on the target fleet rather than relying on the audit log to flag it.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#UserParams.no_password:578574db -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#UserParams.no_password:578574db -->
 - `no_password` is deliberately explicit, not derived from `shell: /usr/sbin/nologin`. Setting it closes every PAM-protected login path (password, `su`) for the account permanently — only root setuid invocations still work.
 <!-- docref: end -->

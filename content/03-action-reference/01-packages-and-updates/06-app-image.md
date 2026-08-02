@@ -11,7 +11,7 @@ Default install location is `/opt/appimages/`.
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AppInstallParams:76caae4c,server:internal/api/action_validators.go#validateAppInstallParams:113e9432,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AppInstallParams:76caae4c,server:internal/authoring/state.go#validateActionSafety:94532069,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `url` | string | yes | — | HTTPS URL to fetch the AppImage from. Plain `http://` is rejected. |

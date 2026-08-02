@@ -5,11 +5,11 @@ title: SHELL
 
 Runs a shell script on the device. The general-purpose action for when no specialised type fits. Add a detection script and SHELL becomes idempotent: the agent only runs the remediation script if the detection script reports drift.
 
-For one-off commands that don't need idempotency, use `SCRIPT_RUN`. Same parameters, different lifecycle: `SCRIPT_RUN` runs once per dispatch and is never stored for scheduled re-runs.
+For one-off commands that don't need idempotency, use [`SCRIPT_RUN`](/action-reference/system/script-run). Same parameters and the same executor path; what differs is that a `SCRIPT_RUN` carries no detection script, so it is not idempotent across time.
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ShellParams:0ec72f48,server:internal/api/action_validators.go#validateShellScriptChoice:cffddecf,agent:internal/executor/executor.go#maxScriptSize:e74b340a -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ShellParams:0ec72f48,server:internal/authoring/state.go#validateActionSafety:94532069,agent:internal/executor/executor.go#maxScriptSize:e74b340a -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `script` | string | conditional | — | The remediation script body. Max 1 MiB. At least one of `script` or `detection_script` is required — server-side validation and the agent both reject a SHELL action with neither set. |
@@ -66,7 +66,7 @@ is_compliance: true
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:a9a78b2a -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:1170ff78 -->
 - The exit code of the *remediation* script doesn't gate idempotency — only the detection script does. But a non-zero exit from either script fails the action (`script exited with code <n>`). It doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.runShellScript:78290ce4,agent:internal/executor/executor.go#Executor.runShellScriptPerUser:c8cd91af -->
@@ -74,8 +74,8 @@ is_compliance: true
 - The script body is passed as an argument (`<interpreter> -c <script>`), not on stdin. `/bin/bash`, `/usr/bin/python3`, `/usr/bin/perl` all work as `interpreter` as long as they accept `-c`.
 - The child environment is a curated baseline (`HOME`, `USER`) plus your validated `environment` entries — the agent's own environment does **not** leak through, and the SDK runner forces `LC_ALL=C` and a sanitized `PATH`.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
-- Secrets in `script` or `detection_script` get redacted from the audit log, but they're sent to the agent in cleartext over mTLS. For credentials at rest, use `LPS`, `ENCRYPTION`, or the IdP credential store instead.
+<!-- docref: begin src=server:internal/store/audit.go#AuditOperation:42ce04d3,server:internal/store/audit.go#AuditEffect:4a8afbb5,server:internal/agentsecrets/service.go#Service.StoreLpsPasswords:0a592b91 -->
+- Don't put secrets in `script` or `detection_script`. There is no redactor: the audit log is metadata-only — an operation row of code-derived constants plus effect rows naming the *fields* that changed, never their values — so it holds no script body to scrub, but the body itself is stored verbatim as the action's parameters and sent to the agent in cleartext over mTLS. For credentials, use `LPS` or `ENCRYPTION`, whose secret fields travel sealed and are re-encrypted at rest before control stores them.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.executeShellStreaming:be2fc8f6 -->
 - The detection-verify-retry sequence runs detection twice if the remediation script ran. Budget for that.

@@ -11,7 +11,7 @@ Runs the device's package manager in upgrade mode. Equivalent to `apt dist-upgra
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#UpdateParams:5efdd421 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#UpdateParams:5efdd421 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `security_only` | bool | no | `false` | Install only security updates. Supported on apt (`unattended-upgrade`), dnf (`--security`), and zypper (`patch --category security`). On pacman it stays **fail-closed** — nothing is upgraded and the action reports the **Not applicable** status rather than silently widening to a full upgrade. |
@@ -45,6 +45,6 @@ reboot_if_required: true
 - `reboot_if_required` schedules the reboot 1 minute out, not immediate, and notifies signed-in users ("A system update requires a reboot. This system will reboot in 1 minute."). It only fires when *this* run created the reboot requirement — a device that already needed a reboot before the upgrade won't be rebooted by it. A reboot that fails to schedule fails the action.
 <!-- docref: end -->
 - A failing upgrade does not roll back. The package manager's transaction semantics apply; on Fedora that's atomic per transaction, on Debian it's not.
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:c2a9b671 -->
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
 - Run inside a maintenance window. A daily upgrade dispatched outside one will queue until the window opens.
 <!-- docref: end -->

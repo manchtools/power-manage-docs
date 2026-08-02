@@ -7,7 +7,7 @@ Installs a `.deb` package from a URL. Used when the package isn't in a repositor
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AppInstallParams:76caae4c,server:internal/api/action_validators.go#validateAppInstallParams:113e9432,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AppInstallParams:76caae4c,server:internal/authoring/state.go#validateActionSafety:94532069,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `url` | string | yes | — | HTTPS URL to fetch the `.deb` from. Plain `http://` is rejected. |
@@ -21,7 +21,7 @@ Installs a `.deb` package from a URL. Used when the package isn't in a repositor
 The agent downloads the `.deb` to a temp file, reads the canonical package name out of the file's control metadata (`dpkg-deb`, via the SDK), then checks whether that package is already installed. If it is, `changed=false`. Otherwise the SDK installs the local file through `apt`, which resolves dependencies and runs maintainer scripts. Removal goes through `apt remove <name>` for the same reason.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.debAbsentPackageName:0d94750e -->
+<!-- docref: begin src=agent:internal/executor/action_deb.go#Executor.debAbsentPackageName:c940d828 -->
 For `desired_state: ABSENT` the same download-and-read-name flow runs so the agent knows what to remove — but only when the artifact is verifiable (https + checksum): origin-served control-file bytes may only pick the removal target after checksum verification, so with no verifiable checksum the agent derives the name from the signed URL instead. The same `name_version_arch.deb` filename fallback covers a failed download — the artifact was deleted upstream after the install — so a stale-URL ABSENT still converges to "already absent".
 <!-- docref: end -->
 

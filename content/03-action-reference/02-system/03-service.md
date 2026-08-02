@@ -3,27 +3,28 @@ title: SERVICE
 ---
 # SERVICE
 
-<!-- docref: begin src=sdk:sys/service/service.go#New:91064f53,agent:cmd/power-manage-agent/backend.go#applyBackendOverrides:7377f3da -->
-Manages a service unit: installed, enabled at boot, and in the desired runtime state. **systemd is the only backend implemented.** OpenRC, runit, and s6 exist as reserved enum values in the proto so a future backend doesn't churn the wire format, but the SDK builds only a systemd manager and the agent refuses to start without `systemctl` on PATH. Requesting a non-systemd backend via the agent's `POWER_MANAGE_SERVICE_BACKEND` environment variable logs a loud startup warning and every SERVICE action on that host fails.
+<!-- docref: begin src=sdk:sys/service/service.go#Backend:11393461,sdk:sys/service/service.go#New:91064f53,agent:cmd/power-manage-agent/backend.go#applyBackendOverrides:4051f61c -->
+Manages a service unit: installed, enabled at boot, and in the desired runtime state. **systemd is the only backend, and it is not selectable.** The SDK's backend constructor fails closed on anything but systemd (`ErrUnknownBackend`), the OpenRC / runit / s6 scaffolds are gone rather than reserved, and the agent refuses to start at all when `systemctl` is not on PATH. There is no proto field and no environment variable for choosing a different service manager.
 <!-- docref: end -->
 
 The `unit_content` field is what you'd put in a `.service` file. Set it and the agent writes the file before evaluating state. Leave it unset and the agent assumes the unit already exists, only managing enable and state.
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ServiceParams:bdf30b85,sdk:proto/pm/v1/actions.proto#ServiceUnitState:fcffc2f4,sdk:sys/service/systemd.go#ValidateUnitName:b5a98d4d -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ServiceParams:6fec68cc,sdk:proto/powermanage/v1/actions.proto#ServiceUnitState:fcffc2f4,sdk:sys/service/systemd.go#ValidateUnitName:b5a98d4d -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `unit_name` | string | yes | — | Full unit name **including its type suffix** (e.g. `nginx.service`, `telnet.socket`). Max 255 chars; the agent validates it against systemd's unit-name grammar. |
 | `desired_state` | enum | no | — | `STARTED`, `STOPPED`, or `RESTARTED`. Unset leaves the runtime state alone — the action then only manages `unit_content` and `enable`. |
 | `enable` | bool | no | `false` | Enable at boot. **Unset means `false`, which actively disables an enabled unit** — there is no "leave it alone" value. |
 | `unit_content` | string | no | — | Full unit file body. Max 64 KB. |
-| `backend` | enum | no | `SYSTEMD` | Reserved. The agent currently ignores this field — its service backend is fixed at startup, and only systemd is implemented. |
+
+There is no `backend` field. The message carries exactly the four fields above; the service manager is not part of the action.
 <!-- docref: end -->
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
+<!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c5c6fd44 -->
 Three things get checked independently.
 
 **Unit content.** If `unit_content` is set, the agent SHA-256s it against the file on disk (`/etc/systemd/system/<unit_name>`). Match means no write; a change triggers the write plus a daemon-reload.
@@ -76,7 +77,7 @@ enable: false
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
+<!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c5c6fd44 -->
 - `power-manage-agent.service` is protected. The agent refuses to manage itself through `SERVICE` (`cannot manage protected service: power-manage-agent`). Self-update uses `AGENT_UPDATE` instead.
 - A masked unit can't be enabled. If the agent sees a masked unit when `enable: true` is set, it fails with `unit <name> is masked (run 'systemctl unmask <name>' first)`.
 - Because `enable` defaults to `false`, an action that only means to write `unit_content` for an *enabled* unit will disable it unless you also set `enable: true`. Always state `enable` explicitly.

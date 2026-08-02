@@ -13,7 +13,7 @@ The agent validates every field aggressively — before any privileged side effe
 
 Common:
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#RepositoryParams.name:5ec81592,sdk:sys/repo/validate.go#validateName:8b5ba27c -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#RepositoryParams.name:5ec81592,sdk:sys/repo/validate.go#validateName:8b5ba27c -->
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Repository identifier used for file naming. **Alphanumeric only, max 64 chars** (enforced by server-side validation — `._-` are accepted by the agent-side grammar but rejected by the proto validator before the action ever reaches the agent). |
@@ -21,7 +21,7 @@ Common:
 
 APT — written in deb822 format to `/etc/apt/sources.list.d/<name>.sources`, with the signing key dearmored into `/etc/apt/keyrings/<name>.gpg` and referenced via `Signed-By`:
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AptRepository:b85e7783,sdk:sys/repo/repo.go#AptConfig:301a1d74 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AptRepository:b85e7783,sdk:sys/repo/repo.go#AptConfig:301a1d74 -->
 | Field | Type | Description |
 |---|---|---|
 | `apt.url` | string | Repository URL. Deliberately not restricted to https — apt's trust anchor is the GPG-signed Release file. |
@@ -36,7 +36,7 @@ APT — written in deb822 format to `/etc/apt/sources.list.d/<name>.sources`, wi
 
 DNF — written to `/etc/yum.repos.d/<name>.repo`:
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#DnfRepository:a665871d,sdk:sys/repo/repo.go#DnfConfig:293e80af,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#DnfRepository:a665871d,sdk:sys/repo/repo.go#DnfConfig:293e80af,sdk:sys/repo/dnf.go#manager.applyDnf:c628e81a -->
 | Field | Type | Description |
 |---|---|---|
 | `dnf.baseurl` | string | Repo base URL (supports `$releasever` / `$basearch`). |
@@ -50,7 +50,7 @@ DNF — written to `/etc/yum.repos.d/<name>.repo`:
 
 Pacman — a section appended to `/etc/pacman.conf`:
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#PacmanRepository:7bda81df,sdk:sys/repo/repo.go#PacmanConfig:55f06a3c,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#PacmanRepository:7bda81df,sdk:sys/repo/repo.go#PacmanConfig:55f06a3c,sdk:sys/repo/pacman.go#manager.applyPacman:48d11c15 -->
 | Field | Type | Description |
 |---|---|---|
 | `pacman.server` | string | Mirror URL (supports `$repo` / `$arch`). |
@@ -60,7 +60,7 @@ Pacman — a section appended to `/etc/pacman.conf`:
 
 Zypper — configured through `zypper addrepo` / `modifyrepo`:
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ZypperRepository:0189fb9d,sdk:sys/repo/repo.go#ZypperConfig:fc91e2c5,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ZypperRepository:0189fb9d,sdk:sys/repo/repo.go#ZypperConfig:fc91e2c5,sdk:sys/repo/zypper.go#manager.applyZypper:159c1fe5 -->
 | Field | Type | Description |
 |---|---|---|
 | `zypper.url` | string | Repo URL. |
@@ -75,7 +75,7 @@ Zypper — configured through `zypper addrepo` / `modifyrepo`:
 
 ## Idempotency
 
-<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/apt.go#manager.updateAptKey:f3733dcc,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
+<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/apt.go#manager.updateAptKey:f3733dcc,sdk:sys/repo/dnf.go#manager.applyDnf:c628e81a,sdk:sys/repo/pacman.go#manager.applyPacman:48d11c15,sdk:sys/repo/zypper.go#manager.applyZypper:159c1fe5 -->
 apt, dnf, and pacman compare the desired config against what's on disk and skip the write when nothing changed (`changed=false`): apt compares the deb822 source *and* the dearmored key bytes, dnf requires a byte-identical `.repo` file, pacman compares its rebuilt `pacman.conf`. zypper is the exception — it reconfigures via `removerepo` + `addrepo` on every run and always reports `changed=true`.
 <!-- docref: end -->
 
@@ -100,7 +100,7 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#RepositoryParams.name:5ec81592,sdk:sys/repo/validate.go#validateName:8b5ba27c -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#RepositoryParams.name:5ec81592,sdk:sys/repo/validate.go#validateName:8b5ba27c -->
 - Repository names are validated as alphanumeric-only at the server boundary. Dots and dashes are filesystem-safe but the proto's `alphanum` rule refuses them — if you need them for parity with a vendor's repo-name convention, file a tracker so we can either loosen the rule or document the workaround.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/action_repository.go#Executor.downloadAptKey:267f071b,sdk:sys/repo/repo.go#DnfConfig:293e80af -->
@@ -109,6 +109,6 @@ desired_state: PRESENT
 <!-- docref: begin src=sdk:sys/repo/repo.go#AptConfig:301a1d74 -->
 - `apt.trusted: true` skips signature verification. Don't use it outside dev / preview repos. It's ignored whenever a key is configured.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/dnf.go#manager.applyDnf:0bc9b98b,sdk:sys/repo/pacman.go#manager.applyPacman:5119b927,sdk:sys/repo/zypper.go#manager.applyZypper:af6eddc9 -->
+<!-- docref: begin src=sdk:sys/repo/apt.go#manager.applyApt:41e17944,sdk:sys/repo/dnf.go#manager.applyDnf:c628e81a,sdk:sys/repo/pacman.go#manager.applyPacman:48d11c15,sdk:sys/repo/zypper.go#manager.applyZypper:159c1fe5 -->
 - A repository action refreshes the metadata cache after the config changes (`apt update`, `dnf makecache --repo <name>`, `pacman -Sy`, `zypper refresh`), so the next `PACKAGE` action sees it. The refresh is non-fatal for reachability problems — a typo'd URL surfaces as a warning in the output, but the config still lands. The exception: if apt rejects the just-written source file at parse time, the write is rolled back and the action fails rather than leaving apt broken on the host.
 <!-- docref: end -->

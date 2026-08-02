@@ -9,7 +9,7 @@ For directories, use `DIRECTORY`. For multi-file fragments under `/etc/sshd_conf
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#FileParams:2db44133,sdk:sys/fs/fs.go#WriteOptions.Mode:d9fda01b -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#FileParams:2db44133,sdk:sys/fs/fs.go#WriteOptions.Mode:d9fda01b -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `path` | string | yes | — | Absolute path on the device. |

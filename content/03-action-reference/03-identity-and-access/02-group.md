@@ -7,7 +7,7 @@ Creates or removes a system group and manages its membership exactly. Use it whe
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#GroupParams:3253df6b -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#GroupParams:3253df6b -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `name` | string | yes | — | Group name. 1–32 chars. |
@@ -22,8 +22,8 @@ Creates or removes a system group and manages its membership exactly. Use it whe
 The agent checks the group for existence and exact member set (order-insensitive). If the group is missing it gets created. If members don't match the list exactly, the agent adds missing and removes extras. Matching means `changed=false`.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/executor/group.go#Executor.removeGroup:6b3ce48c -->
-`desired_state: ABSENT` removes all members from the group and deletes it. The `power-manage` group is protected; the agent refuses to delete it.
+<!-- docref: begin src=agent:internal/executor/group.go#Executor.removeGroup:f8b1dd95 -->
+`desired_state: ABSENT` removes all members from the group and deletes it. There is no protected group name — the agent deletes whatever group the action names, so an action pointed at `sudo`, `wheel`, or any other system group will strip its membership and remove it. The only name-level check is the format rule shared with `USER`.
 <!-- docref: end -->
 
 ## Example

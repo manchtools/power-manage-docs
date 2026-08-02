@@ -7,7 +7,7 @@ Manages a directory: presence, ownership, and mode. The complement to [`FILE`](/
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#DirectoryParams:d1d2593e,agent:internal/executor/fs.go#createDirectoryWithPermissions:369e2021 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#DirectoryParams:d1d2593e,agent:internal/executor/fs.go#createDirectoryWithPermissions:369e2021 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `path` | string | yes | — | Absolute directory path. |
@@ -51,7 +51,7 @@ desired_state: ABSENT
 <!-- docref: begin src=sdk:sys/fs/dir.go#manager.RemoveDir:cc6942ae -->
 - `desired_state: ABSENT` is recursive. The whole subtree gets removed. There is no opt-in for the recursive flag because a half-removed tree isn't a useful state.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/executor/action_directory.go#Executor.executeDirectory:f63af3d7,sdk:sys/fs/protected.go#IsProtectedPath:3887b7ed,sdk:sys/fs/protected.go#IsUnderProtectedPrefix:4231d9a0 -->
+<!-- docref: begin src=agent:internal/executor/action_directory.go#Executor.executeDirectory:f63af3d7,sdk:sys/fs/protected.go#IsProtectedPath:e6dc7f89,sdk:sys/fs/protected.go#IsUnderProtectedPrefix:4231d9a0 -->
 - The protected-path refusal is deny-by-default across whole subtrees, not just a top-level list: `/`, `/etc`, `/usr`, `/var`, `/home`, anything *under* security-relevant prefixes (`/etc/sudoers.d`, `/home/<user>`, `/boot/efi`, …), any immediate child of `/`, and the resolved symlink target as well as the literal path. A symlink at `/srv/etc` pointing to `/etc` doesn't bypass it.
 <!-- docref: end -->
 - `recursive` controls `mkdir -p` behaviour for creation only. It doesn't affect removal.

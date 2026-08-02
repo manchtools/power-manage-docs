@@ -4,7 +4,7 @@ icon: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' s
 ---
 # Action reference
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#ActionType:89f99edb,sdk:proto/pm/v1/common.proto#AssignmentMode.ASSIGNMENT_MODE_UNINSTALL:7a58be77 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ActionType:21da45c8,sdk:proto/powermanage/v1/common.proto#AssignmentMode.ASSIGNMENT_MODE_UNINSTALL:7a58be77 -->
 The agent supports 23 action types grouped by what they manage. Where it makes sense, an action carries a desired state (`PRESENT` or `ABSENT`) so re-dispatching it against an already-converged device is a no-op. An assignment can also use `UNINSTALL` mode to force `ABSENT` on the action without rewriting the action itself.
 <!-- docref: end -->
 
@@ -30,7 +30,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 |---|---|
 | `SHELL` | Run a shell script. An optional detection script gives you idempotency. |
 | `SCRIPT_RUN` | Run a one-shot script with output capture (no idempotency expected) |
-| `SERVICE` | Manage a service unit. systemd today; OpenRC, runit, and s6 slots are reserved in the proto but not yet implemented. |
+| `SERVICE` | Manage a systemd unit: write or refresh the unit file, enable/disable it, and start, stop, or restart it. There is no backend field; systemd is what the action means. |
 | `FILE` | Manage file content, ownership, and mode. Managed-block diffing for fragments inside a larger file. |
 | `DIRECTORY` | Manage directory presence, ownership, and mode |
 | `REBOOT` | Reboot the device |
@@ -51,7 +51,7 @@ Before any package operation the agent self-heals the package manager: clears ap
 
 | Action | Purpose |
 |---|---|
-| `ENCRYPTION` | LUKS passphrase rotation with optional TPM or user-passphrase enrolment. GELI and CGD are proto-enum placeholders only. |
+| `ENCRYPTION` | LUKS passphrase rotation with optional TPM or user-passphrase enrolment. LUKS is the only backend. |
 | `WIFI` | Manage NetworkManager wireless profiles |
 
 ## Lifecycle
@@ -65,24 +65,24 @@ commits their delivery, then offers it immediately on the device's direct mTLS
 stream. The agent durably records the delivery ID before acknowledging
 receipt. Ordinary application frames are not separately signed.
 
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService.DispatchAssignedActions:031cd7e5 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/control.proto#ControlService.DispatchAssignedActions:031cd7e5 -->
 There's also a separate "rerun a device's current policy now" operator action — `DispatchAssignedActions`. That one is *not* an instant action: it walks the device's assignments and re-dispatches each through the normal action path. Reach for it when you want a device to converge on its assigned state without rebooting or waiting for the next reconciliation tick.
 <!-- docref: end -->
 
 ## Conventions
 
-<!-- docref: begin src=agent:internal/executor/executor.go#IsInstantAction:401666e5,agent:internal/executor/action_service.go#Executor.executeService:c2202793 -->
+<!-- docref: begin src=agent:internal/executor/executor.go#IsInstantAction:401666e5,agent:internal/executor/action_service.go#Executor.executeService:c5c6fd44 -->
 - Most actions are idempotent. `REBOOT`, `SYNC`, `SCRIPT_RUN`, and `SERVICE` with `desired_state: RESTARTED` are the explicit exceptions; each says so on its own page.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/eventtypes/types.go#ExecutionCreated:cb8bc377,server:internal/eventtypes/types.go#ExecutionCompleted:cb8bc377,server:internal/eventtypes/types.go#ExecutionFailed:cb8bc377 -->
-- Every action emits an `ExecutionCreated` event on dispatch and a terminal `ExecutionCompleted`, `ExecutionFailed`, `ExecutionTimedOut`, or `ExecutionNotApplicable` event when it finishes. The events table is the audit log.
+<!-- docref: begin src=server:internal/execution/result.go#Service.ApplyActionResult:9d9ace81,server:internal/store/audit.go#AuditOperation:42ce04d3 -->
+- An execution is an ordinary row, not an event stream. Dispatch creates it; the agent's first non-terminal result moves it to `running`; a terminal result writes `success`, `failed`, `skipped`, `timeout`, `not_applicable`, or `indeterminate` with its output, duration, and changed/compliant flags. Replaying the identical terminal result is a no-op; a *different* one is rejected as a conflicting replay rather than overwriting the recorded outcome. Each of those writes lands in the same transaction as an append-only audit operation attributed to the reporting device.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/audit_handler.go#actionRedactionSchemas:c90a68f4 -->
-- `SHELL`, `SCRIPT_RUN`, `FILE`, `SERVICE`, `ADMIN_POLICY`, `REPOSITORY`, `ENCRYPTION`, and `WIFI` actions can carry secret content. The audit redactor strips `script`, `detectionScript`, `content`, `unitContent`, `customConfig`, `gpgKey`, `presharedKey`, `psk`, and `clientKey` from the visible trail.
+<!-- docref: begin src=server:internal/store/audit.go#AuditEffect:4a8afbb5 -->
+- `SHELL`, `SCRIPT_RUN`, `FILE`, `SERVICE`, `ADMIN_POLICY`, `REPOSITORY`, `ENCRYPTION`, and `WIFI` actions can carry secret content, and none of it can reach the audit trail — there is no redactor and no field denylist to keep current. An audit effect has **no free-form value field**: it records the *names* of changed fields (`params`), a reference to another row, a state flag, a count, a non-reversible digest, or per-subject sealed detail, and nothing else is representable. Parameter values live only in the action row, protected by RBAC.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:sys/exec/runner.go#Command:f10920f4,agent:cmd/power-manage-agent/backend.go#setPrivilegeBackend:7eb6fc62 -->
+<!-- docref: begin src=sdk:sys/exec/runner.go#Command:f10920f4,agent:cmd/power-manage-agent/backend.go#setPrivilegeBackend:0de2458c -->
 - Privileged operations dispatch through the SDK's injected `sys/exec` Runner with `Command.Escalate` set, never through `os/exec` directly. The privilege backend — direct root, sudo, or doas — is resolved once at agent startup.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:c2a9b671 -->
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
 - Maintenance windows apply per device group. An action assigned to a group with a window only runs during that window in the device's local timezone. See [Maintenance windows](/concepts/maintenance-windows).
 <!-- docref: end -->

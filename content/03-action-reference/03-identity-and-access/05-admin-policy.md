@@ -13,13 +13,13 @@ The agent creates a dedicated Linux group per action (`pm-sudo-<actionId>`), wri
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#AdminPolicyParams:7d689d80,sdk:proto/pm/v1/actions.proto#AdminAccessLevel:628b1d01 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AdminPolicyParams:fb87f1a1,sdk:proto/powermanage/v1/actions.proto#AdminAccessLevel:628b1d01 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `access_level` | enum | yes | — | `FULL`, `LIMITED`, or `CUSTOM` (plus the reserved `TERMINAL_ADMIN_*` levels used by the server). |
 | `users` | string[] | yes | — | Usernames to grant access. At least one; each 1–32 chars. |
 | `custom_config` | string | yes if `CUSTOM` | — | Raw sudoers syntax. Supports `{group}` placeholder. Max 64 KB. |
-| `backend` | enum | no | `SUDO` | `SUDO` is the only working value. `DOAS` is reserved in the proto but not yet wired up. |
+| `backend` | enum (`PrivilegeBackend`) | no | `SUDO` | `SUDO` is the only value the `ADMIN_POLICY` executor implements — it always writes `/etc/sudoers.d/`. `DOAS` exists in the proto but the executor ignores the field. |
 <!-- docref: end -->
 
 ## What each template means

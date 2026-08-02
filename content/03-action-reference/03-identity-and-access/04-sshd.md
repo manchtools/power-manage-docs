@@ -9,10 +9,10 @@ For "who can SSH at all", use [`SSH`](/action-reference/identity-and-access/ssh)
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/pm/v1/actions.proto#SshdParams:0404be19,sdk:proto/pm/v1/actions.proto#SshdDirective:2012e676 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#SshdParams:0404be19,sdk:proto/powermanage/v1/actions.proto#SshdDirective:2012e676 -->
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `priority` | uint32 | no | Drop-in ordering. Lower loads first. Server auto-assigns; agents don't pick it. |
+| `priority` | uint32 | no | Drop-in ordering. Lower loads first — it becomes the zero-padded prefix of the fragment filename. Carried on the action's parameters; unset means `0`. |
 | `directives` | object[] | yes | At least one directive. |
 | `directives[].key` | string | yes | sshd_config directive name. 1–128 chars. |
 | `directives[].value` | string | yes | Directive value. 1–1024 chars. |
@@ -51,8 +51,8 @@ desired_state: PRESENT
 <!-- docref: begin src=agent:internal/executor/helpers.go#Executor.writeAndValidateConfig:207cd164 -->
 - Directive keys and values are written verbatim (control characters are rejected), but the whole fragment is validated with `sshd -t` before it takes effect. A malformed value never lands: the invalid fragment is removed and the action reports the validation failure.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/api/action_crud.go#ActionHandler.CreateAction:0ddb0654,server:internal/api/action_crud.go#ActionHandler.UpdateActionParams:e51f8a16 -->
-- `priority` is assigned by the server at creation time (the count of existing SSHD actions) and **preserved across parameter updates** — you can't edit it later. To change the load order, delete the action and recreate it in the desired sequence.
+<!-- docref: begin src=server:internal/authoring/actions.go#Handlers.CreateAction:c629c8b4,server:internal/authoring/actions.go#Handlers.UpdateActionParams:14db83f1,server:internal/authoring/state.go#Service.UpdateActionParams:60b80407 -->
+- **`priority` is authored, not derived.** The control server validates the parameters and stores them verbatim; it never assigns, counts, or renumbers the value. `UpdateActionParams` also replaces the whole parameter object rather than merging into it, so an update that leaves `priority` out resets it to `0` and moves the fragment to the front of the load order. Send the priority you want with every update, and keep the numbering consistent yourself across the `SSHD` actions a device receives.
 <!-- docref: end -->
 - Drop-in files override `sshd_config` only for directives `sshd` recognises as overridable. Some directives (`Subsystem`, certain log settings) take only the first occurrence; check your `sshd` version.
 <!-- docref: begin src=agent:internal/executor/action_ssh.go#generateSshdGlobalConfig:a3971b09 -->

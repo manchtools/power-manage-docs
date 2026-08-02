@@ -18,7 +18,7 @@ labels.environment equals "production" and labels.role equals "web"
 
 Operators:
 
-<!-- docref: begin src=server:internal/dynamicquery/ast.go:fddf4b09,server:internal/dynamicquery/parser.go#Parse:6cdbf956 -->
+<!-- docref: begin src=server:internal/dynamicquery/ast.go:ff596b1b,server:internal/dynamicquery/parser.go#Parse:6cdbf956 -->
 - `equals`, `notEquals`
 - `contains`, `notContains`
 - `startsWith`, `endsWith`
@@ -29,14 +29,14 @@ Operators:
 
 Fields:
 
-<!-- docref: begin src=server:internal/dynamicquery/eval.go#evalDeviceAtom:45abf0a5 -->
+<!-- docref: begin src=server:internal/dynamicquery/eval.go#evalDeviceAtom:47fd0ba1 -->
 - `labels.<key>` for device labels (the key match is case-insensitive)
 - `device.os`, `device.kernel`, `device.hostname`, ... for inventory fields
 - `device.group` for membership of other groups, so you can compose
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/dynamicquery/parser.go#Parse:6cdbf956,server:cmd/control/setup.go#bootstrapAllDevicesGroup:04b9912a -->
-Compose with `and`, `or`, `not`, and parentheses. An empty query matches every device.
+<!-- docref: begin src=server:internal/dynamicquery/parser.go#Parse:6cdbf956 -->
+Compose with `and`, `or`, `not`, and parentheses. An empty query parses to an atom that always matches, so it selects every device.
 <!-- docref: end -->
 
 ## Examples
@@ -46,12 +46,12 @@ Compose with `and`, `or`, `not`, and parentheses. An empty query matches every d
 | `labels.environment equals "production"` | every production device |
 | `device.os equals "linux" and labels.role in "web,api"` | Linux web and api hosts |
 | `not labels.role equals "deprecated"` | everything not flagged for removal |
-| (empty) | every registered device (what the **All Devices** seed group uses)|
+| (empty) | every registered device |
 
-{% callout type="info" title="All Devices" %}
-<!-- docref: begin src=server:cmd/control/setup.go#bootstrapAllDevicesGroup:04b9912a -->
-A built-in dynamic group called "All Devices" is seeded on first boot. Its query is empty, so it matches every registered device. Use it as the default target for fleet-wide actions.
-<!-- docref: end -->
+{% callout type="info" title="Fleet-wide targeting" %}
+Control seeds no device groups. If you want a standing fleet-wide target, create
+a dynamic group yourself and leave its query empty — it then matches every
+registered device, and new enrolments join it as they arrive.
 {% /callout %}
 
 ## When membership recomputes
@@ -60,10 +60,10 @@ A built-in dynamic group called "All Devices" is seeded on first boot. Its query
   mutation marks affected groups due in the same transaction.
 - **Swept.** A periodic database scan catches due work even when an in-process
   signal was lost.
-<!-- docref: begin src=sdk:proto/pm/v1/control.proto#ControlService.EvaluateDynamicGroup:9567a7bf -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/control.proto#ControlService.EvaluateDynamicGroup:9567a7bf -->
 - **Manual.** The `EvaluateDynamicGroup` RPC forces a re-evaluation on demand.
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/store/queries/devices.sql:fca66bbb,sdk:proto/pm/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
-A group's `sync_interval_minutes` field is **not** a group re-evaluation timer — it sets the agent sync cadence for the group's member devices (a device-level override wins; otherwise the smallest non-zero interval across the device's groups applies).
+<!-- docref: begin src=server:internal/agentsync/service.go#Service.Sync:bdb44301,sdk:proto/powermanage/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
+A group's `sync_interval_minutes` field is **not** a group re-evaluation timer — it is an agent sync-cadence setting stored on the group record. The cadence control actually hands an agent is the device's own `sync_interval_minutes`, carried on each sync state; the group-level field is stored and editable but is not currently folded into that value.
 <!-- docref: end -->
