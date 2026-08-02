@@ -5,13 +5,12 @@ title: FAQ
 
 ## Which database should I deploy?
 
-PostgreSQL during consolidation. SQLite is the final target, but the port
-happens only after CRUD, audit, dispatch, and search semantics are stable.
+None. Control embeds SQLite in WAL mode with `synchronous=FULL` and owns the
+database file directly. There is no database service to run.
 
 ## Which search service should I run?
 
-None. Control uses PostgreSQL full-text search during consolidation and FTS5
-after the final SQLite port.
+None. Control uses SQLite FTS5 with an application-owned matcher.
 
 ## Do I need Valkey or Asynq?
 
@@ -36,7 +35,5 @@ The bootstrap-admin URL is a one-time setup path, not a local account.
 
 ## What must I back up?
 
-During consolidation: PostgreSQL, artifacts, CA/key material, and deployment
-configuration. After the final port: the SQLite database, artifacts, keys, and
-configuration. Replicate database and artifacts off-host and monitor backup
-age and lag.
+The SQLite database, artifacts, CA/key material, and deployment configuration.
+Replicate database and artifacts off-host and monitor backup age and lag.

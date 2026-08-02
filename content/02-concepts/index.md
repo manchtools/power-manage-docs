@@ -18,4 +18,4 @@ design; these pages explain operator-visible behavior.
 - [**osquery**](/concepts/osquery) — opt-in integration for richer inventory and ad-hoc SQL queries.
 - [**SSO (OIDC)**](/concepts/sso) — identity providers, the login flow, identity linking, and auto-provisioning.
 - [**SCIM provisioning**](/concepts/scim) — automated user and group sync from your IdP, token handling, deprovisioning.
-- [**Search**](/concepts/search) — PostgreSQL FTS now, FTS5 in the final SQLite port, with stable user-visible semantics.
+- [**Search**](/concepts/search) — SQLite FTS5 with an application-owned matcher and stable user-visible semantics.

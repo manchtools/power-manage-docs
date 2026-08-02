@@ -12,16 +12,14 @@ stack.
 
 ## Target stack
 
-The consolidation deployment contains:
+The deployment contains:
 
 - Traefik as the only internet-facing component;
-- one control process;
-- PostgreSQL; and
+- one control process with an embedded SQLite database; and
 - an artifact directory plus an off-host backup destination.
 
-PostgreSQL remains intentionally while the server is converted to CRUD,
-database-backed jobs, a dedicated audit log, and PostgreSQL full-text search.
-SQLite and FTS5 replace it only in the final datastore port.
+There is no separate database service. Control owns a SQLite file in WAL mode
+with `synchronous=FULL`, and search runs on SQLite FTS5.
 
 The web UI remains a separate client. Agents initiate one outbound mTLS
 connection that Traefik TCP-passes directly to control's dedicated agent
@@ -32,22 +30,19 @@ listener. Control never dials a managed device.
 - A Linux host with Docker and Compose
 - One HTTPS/API DNS name and one SNI name for the agent listener
 - TCP 443 reachable by administrators and enrolled agents
-- Durable storage for PostgreSQL, artifacts, certificates, and backups
+- Durable storage for the database file, artifacts, certificates, and backups
 - An OIDC provider and, when provisioning is required, SCIM
-
-The final SQLite deployment removes the PostgreSQL service but keeps the same
-public RPC and agent contract.
 
 ## Initial setup
 
-Use the deployment tooling shipped with the consolidation branch. It must:
+Use the deployment tooling shipped with the server. It:
 
-1. create or accept the control CA;
-2. generate secure deployment secrets without printing them;
-3. validate file ownership and permissions;
-4. configure Traefik's HTTPS route and SNI TCP passthrough route;
-5. initialize PostgreSQL and the control schema; and
-6. create a short-lived, single-use bootstrap-admin URL.
+1. creates or accepts the control CA;
+2. generates secure deployment secrets without printing them;
+3. validates file ownership and permissions;
+4. configures Traefik's HTTPS route and SNI TCP passthrough route;
+5. creates the SQLite database and its baseline schema on first start; and
+6. creates a short-lived, single-use bootstrap-admin URL.
 
 There are no local user passwords or local TOTP accounts. Use the bootstrap
 URL once to configure OIDC/SCIM and establish the real administrator identity.

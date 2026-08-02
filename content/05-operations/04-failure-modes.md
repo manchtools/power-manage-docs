@@ -3,10 +3,11 @@ title: Failure modes
 ---
 # Failure modes
 
-## PostgreSQL unavailable
+## Database unavailable
 
-Control cannot safely mutate state, audit, dispatch, or search. Readiness fails
-until the database recovers. Do not buffer unbounded writes in memory.
+If the SQLite file is unreadable or its schema is not current, control cannot
+safely mutate state, audit, dispatch, or search. Readiness fails until the
+database recovers. Do not buffer unbounded writes in memory.
 
 ## Agent disconnected
 

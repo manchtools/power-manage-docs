@@ -14,9 +14,9 @@ title: Deployment hardening
 
 ## Data
 
-Use authenticated PostgreSQL during consolidation. Restrict database access to
-control and the backup path. The final datastore phase replaces PostgreSQL
-with SQLite in WAL mode and `synchronous=FULL`.
+Control embeds SQLite in WAL mode with `synchronous=FULL`. Restrict the database
+file and the backup path to control with strict filesystem permissions; there is
+no database port to expose or authenticate.
 
 Mount artifacts and backups explicitly. Monitor the last successful backup and
 off-host replication lag. A temporary backup-destination outage should alert

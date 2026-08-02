@@ -9,14 +9,26 @@ indexer to inspect.
 
 ## Control is not ready
 
-Check that:
+Control serves `/health` and `/ready` on both the public and the agent
+listener. `/health` is liveness only and always answers while the process is
+up. `/ready` re-checks the dependencies that can change after startup:
 
-- the PostgreSQL schema is current;
-- CA, JWT, sealing, and at-rest encryption keys are readable with safe
-  permissions;
-- artifact and backup paths are writable;
-- the agent listener can query revocation state; and
-- Traefik routes the API and SNI passthrough listeners correctly.
+- the database answers;
+- the revocation lookup the agent listener needs works; and
+- the artifact path is writable.
+
+Configuration, file permissions, the SQLite schema version, and the CA, JWT,
+sealing, and at-rest encryption key material are validated while control
+starts. Control refuses to start rather than serving with unusable material, so
+these never appear as a readiness failure.
+
+Backup age is deliberately not part of readiness: a backup-destination outage
+must not take the control plane offline. Inspect it with `docker compose exec
+control control backup-status`, which exits non-zero when the last success is
+older than `backup_max_lag`.
+
+If readiness passes but clients cannot reach control, check that Traefik routes
+the API and the SNI passthrough listener correctly.
 
 ## Agent is offline
 
@@ -33,10 +45,9 @@ running. Do not create a parallel queue or manually mint a second delivery ID.
 
 ## Search is wrong
 
-During consolidation, inspect the owning CRUD row and its PostgreSQL FTS
-document in the same transaction domain. There is no asynchronous external
-search index to rebuild. After the final datastore port, inspect the
-corresponding FTS5 row.
+Inspect the owning CRUD row and its FTS5 search document, which are written in
+the same transaction. There is no asynchronous external search index to
+rebuild.
 
 ## Suspected secret leak
 

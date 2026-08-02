@@ -33,7 +33,7 @@ authored occurrences are preserved.
 5. Watch the per-action and manifest results in the device execution view.
 
 Control commits the manifest and delivery record before attempting to send.
-If a device is offline, delivery waits in PostgreSQL and is offered after
+If a device is offline, delivery waits in the database and is offered after
 reconnect. The agent records durable receipt before control acknowledges
 delivery, so a reconnect does not execute the same delivery twice.
 

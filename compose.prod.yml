@@ -3,7 +3,7 @@
 # Designed to drop in next to the power-manage server stack: shares
 # its Traefik (`letsencrypt` cert resolver, `websecure` entrypoint),
 # but lives on its OWN network so the docs container can't reach
-# postgres / valkey / control / gateway and they can't reach back.
+# control and it can't reach back.
 # Clean separation; only Traefik bridges the two stacks.
 #
 # One-time setup on the deploy host:
@@ -42,7 +42,7 @@ services:
       PUBLIC_BRAND_NAME: "power-manage"
       PUBLIC_BRAND_TAGLINE: "docs"
       PUBLIC_SITE_TITLE: "power-manage · Documentation"
-      PUBLIC_SITE_DESCRIPTION: "power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated agents, an event-sourced audit log, OIDC and SCIM provisioning, and twenty-three idempotent action types."
+      PUBLIC_SITE_DESCRIPTION: "power-manage is an open-source platform for managing Linux endpoints. mTLS-authenticated agents, an append-only audit log, OIDC and SCIM provisioning, and twenty-three idempotent action types."
       PUBLIC_SITE_URL: "https://power-manage.docs.manchtools.com"
       PUBLIC_REPO_URL: "https://github.com/manchtools/power-manage-docs"
 
@@ -76,8 +76,8 @@ networks:
   # power-manage-docs pm-traefik` works without guesswork.
   #
   # Power-manage server stack lives on `pm-internal` and is NOT
-  # attached here, so docs can't reach postgres / valkey / control /
-  # gateway. Only Traefik (multi-homed) bridges the boundary.
+  # attached here, so docs can't reach control. Only Traefik
+  # (multi-homed) bridges the boundary.
   docs:
     name: power-manage-docs
     driver: bridge

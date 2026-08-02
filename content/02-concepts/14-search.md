@@ -6,15 +6,15 @@ title: Global search
 The Search RPC serves global search and the ten scoped entity facets. Search
 documents are derived data and never authoritative state.
 
-## Consolidation engine
+## Engine
 
-During consolidation, search uses PostgreSQL full-text search. Index updates
-commit in the same transaction as the owning CRUD row, so a successful
-mutation is immediately reflected and erasure removes searchable personal data
-atomically.
+Search uses SQLite FTS5. Index updates commit in the same transaction as the
+owning CRUD row, so a successful mutation is immediately reflected and erasure
+removes searchable personal data atomically.
 
-FTS5 replaces PostgreSQL FTS only during the final SQLite port. The engine
-change must not alter the RPC or observable search behavior.
+FTS5's trigram tokenizer retrieves candidates only; one bounded application
+matcher makes the final accept/reject and ordering decision, so search behavior
+does not depend on engine-specific ranking.
 
 ## Contract
 
