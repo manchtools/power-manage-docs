@@ -83,6 +83,6 @@ There's also a separate "rerun a device's current policy now" operator action �
 <!-- docref: begin src=sdk:sys/exec/runner.go#Command:f10920f4,agent:cmd/power-manage-agent/backend.go#setPrivilegeBackend:0de2458c -->
 - Privileged operations dispatch through the SDK's injected `sys/exec` Runner with `Command.Escalate` set, never through `os/exec` directly. The privilege backend — direct root, sudo, or doas — is resolved once at agent startup.
 <!-- docref: end -->
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
-- Maintenance windows apply per device group. An action assigned to a group with a window only runs during that window in the device's local timezone. See [Maintenance windows](/concepts/maintenance-windows).
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb -->
+- Maintenance windows apply per device group, and they gate *assigned* work. An action assigned to a group with a window only runs during that window in the device's local timezone. An explicit dispatch is exempt — it compiles a one-shot delivery and runs at once. See [Maintenance windows](/concepts/maintenance-windows).
 <!-- docref: end -->

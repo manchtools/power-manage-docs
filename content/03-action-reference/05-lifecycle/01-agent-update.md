@@ -14,7 +14,7 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:88b81031,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:df685c58,server:internal/authoring/state.go#validateActionSafety:94532069 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:88b81031,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:df685c58,server:internal/authoring/state.go#validateActionSafety:d9103ea9 -->
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `amd64` | object | no\* | Binary source for x86_64. |
@@ -89,6 +89,6 @@ arm64:
 <!-- docref: end -->
 - The checksum file is the same for both architectures by convention; the agent searches it for the filename matching its binary URL.
 - A successful self-update restarts the agent process. The current mTLS stream drops and reconnects on the new binary. Operators watching the device's "online" status will see a brief offline blip (the self-test itself also causes one).
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.runDue:3c5302a2 -->
-- Maintenance windows **do apply**: a scheduled `AGENT_UPDATE` defers like any other due action while the window is closed. Only stream-dispatched instant actions (e.g. "reboot now") bypass the window.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb,server:internal/manifest/compiler.go#AsOneShot:4dcee40c -->
+- Maintenance windows **do apply to the assigned action**: an `AGENT_UPDATE` that runs off the device's assignments defers like any other due delivery while the window is closed. What is exempt is the *delivery kind*, not the action type — an `AGENT_UPDATE` you dispatch explicitly compiles a one-shot manifest and runs immediately, window or no window, exactly once.
 <!-- docref: end -->

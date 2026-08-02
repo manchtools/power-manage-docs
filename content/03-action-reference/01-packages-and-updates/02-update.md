@@ -45,6 +45,6 @@ reboot_if_required: true
 - `reboot_if_required` schedules the reboot 1 minute out, not immediate, and notifies signed-in users ("A system update requires a reboot. This system will reboot in 1 minute."). It only fires when *this* run created the reboot requirement — a device that already needed a reboot before the upgrade won't be rebooted by it. A reboot that fails to schedule fails the action.
 <!-- docref: end -->
 - A failing upgrade does not roll back. The package manager's transaction semantics apply; on Fedora that's atomic per transaction, on Debian it's not.
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
-- Run inside a maintenance window. A daily upgrade dispatched outside one will queue until the window opens.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb -->
+- Run inside a maintenance window. A daily upgrade that comes due from an *assignment* outside the window queues until the window opens. Dispatching an `UPDATE` explicitly does not queue — a one-shot delivery is exempt from the window and starts right away, so use dispatch only when you actually mean "upgrade this box now".
 <!-- docref: end -->

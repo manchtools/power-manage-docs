@@ -7,7 +7,7 @@ Installs a `.deb` package from a URL. Used when the package isn't in a repositor
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AppInstallParams:76caae4c,server:internal/authoring/state.go#validateActionSafety:94532069,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AppInstallParams:76caae4c,server:internal/authoring/state.go#validateActionSafety:d9103ea9,agent:internal/executor/action_rpm.go#requireVerifiedArtifact:5563f54d -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `url` | string | yes | — | HTTPS URL to fetch the `.deb` from. Plain `http://` is rejected. |

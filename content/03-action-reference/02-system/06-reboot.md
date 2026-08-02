@@ -7,8 +7,8 @@ title: REBOOT
 Reboots the device. Scheduled 5 minutes out (`shutdown -r +5`), with a best-effort desktop/wall notification to logged-in users: *"System Reboot: This system will reboot in 5 minutes. Please save your work."*
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3,agent:internal/scheduler/scheduler.go#Scheduler.runDue:3c5302a2,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
-`REBOOT` is an **instant action**: control offers it on the agent's direct stream right away, and recording the delivery wakes the agent's scheduler instead of leaving it for the next [reconciliation tick](/concepts/reconciliation). It is *not* exempt from maintenance windows — the scheduler gates every delivery on the device's resolved window before it runs anything, so a reboot dispatched during a freeze waits for the window to open. With no window configured, nothing is gated and it runs at once.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355,server:internal/manifest/compiler.go#OneShotAction:84372c04 -->
+`REBOOT` is an **instant action**: control offers it on the agent's direct stream right away, and recording the delivery wakes the agent's scheduler instead of leaving it for the next [reconciliation tick](/concepts/reconciliation). It compiles to a one-shot manifest, and one-shot deliveries are **exempt from maintenance windows** — "reboot now" means now, so a reboot dispatched during a freeze still runs. The scheduler gates only non-one-shot deliveries on the device's resolved window. It also runs exactly once: the delivery is not rescheduled after its run.
 <!-- docref: end -->
 
 ## Parameters

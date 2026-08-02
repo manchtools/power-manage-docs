@@ -3,8 +3,8 @@ title: Maintenance windows
 ---
 # Maintenance windows
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/common.proto#MaintenanceWindow:528399a5,agent:internal/scheduler/scheduler.go#Scheduler.runDue:3c5302a2 -->
-A maintenance window is a set of weekly time ranges, attached to a device group, during which scheduled work for that group's devices is allowed to run. Outside the window, the agent defers due work and runs it when the window opens.
+<!-- docref: begin src=sdk:proto/powermanage/v1/common.proto#MaintenanceWindow:528399a5,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb -->
+A maintenance window is a set of weekly time ranges, attached to a device group, during which **scheduled** work for that group's devices is allowed to run. Outside the window, the agent defers due scheduled work and runs it when the window opens. A one-shot delivery — what any explicit dispatch compiles to — is the deliberate exception and runs regardless of the window.
 <!-- docref: end -->
 
 <!-- docref: begin src=sdk:proto/powermanage/v1/common.proto#MaintenanceWindowEntry:7c3003a6,sdk:maintenance/window.go#IsAllowed:99ea5428 -->
@@ -33,8 +33,8 @@ A window can carry multiple schedule entries, and a device can sit in several gr
 
 ## How the agent enforces it
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/agent.proto#SyncState.maintenance_window:fd69fb07,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
-The resolved window union rides on every sync state — the agent never computes group membership itself. The scheduler's due-work loop checks the window against the device-local clock on each pass; when the window is closed it defers everything due and re-checks on the next pass (about once a minute), so work starts within a minute of the window opening.
+<!-- docref: begin src=sdk:proto/powermanage/v1/agent.proto#SyncState.maintenance_window:fd69fb07,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb -->
+The resolved window union rides on every sync state — the agent never computes group membership itself. The scheduler's due-work loop checks the window against the device-local clock on each pass; when the window is closed it defers every due delivery except the one-shot ones and re-checks on the next pass (about once a minute), so deferred work starts within a minute of the window opening.
 <!-- docref: end -->
 
 <!-- docref: begin src=sdk:maintenance/window.go#IsAllowed:99ea5428,agent:internal/scheduler/scheduler.go#Scheduler.SetMaintenanceWindow:8a80f35f -->
@@ -43,8 +43,13 @@ There is no clock-skew tolerance: if the device's local time is wrong, windows m
 
 ## What the window does and does not gate
 
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.runDue:3c5302a2,server:internal/dispatch/handlers.go#Handlers.DispatchInstantAction:df9720ed,agent:internal/handler/handler.go#Handler.OnQuery:2e6b242b -->
-The window gates the **scheduler**, and the scheduler runs everything that is dispatched as work — including `AGENT_UPDATE`, compliance checks, and the instant `REBOOT` and `SYNC` actions. There is no bypass tier: `DispatchInstantAction` compiles a one-shot manifest and submits it through the same durable dispatch pipeline as any other occurrence, so the agent treats it as ordinary due work and defers it while the window is closed. If you need a reboot to happen outside the window, widen the window rather than expecting the dispatch to jump the queue.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb,server:internal/manifest/compiler.go#AsOneShot:4dcee40c,server:internal/dispatch/handlers.go#Handlers.DispatchInstantAction:df9720ed,server:internal/dispatch/handlers.go#Handlers.DispatchAssignedActions:e22e7c71,agent:internal/handler/handler.go#Handler.OnQuery:2e6b242b -->
+The window gates the **scheduler**, and it gates it by delivery kind, not by action type. The scheduler checks the window once per pass and then skips only the due deliveries whose manifest is *not* marked one-shot. So:
+
+- **Scheduled (assigned) work defers.** Anything the device runs off its own assignments — `AGENT_UPDATE`, package upgrades, compliance checks, ordinary `SHELL` reconciliation — waits for the window, including a `DispatchAssignedActions` re-run, which re-dispatches assignments on their authored schedules.
+- **Explicit dispatches run immediately.** Every Dispatch RPC other than `DispatchAssignedActions` compiles a one-shot manifest, and one-shot deliveries are exempt: an operator asking for it "now" means now. That covers the instant `REBOOT` and `SYNC` actions and equally a dispatched action, inline action, ActionSet, Definition, multi-device, or group dispatch — including a dispatched `AGENT_UPDATE` or package upgrade.
+
+Widening the window is therefore about the *assigned* layer. If you don't want an operator forcing expensive work mid-day, control it with RBAC on the dispatch permissions, not with the window.
 
 What the window never touches is the interactive traffic the agent answers straight off its stream without going through the scheduler: remote terminal sessions, on-demand OSQuery and log queries, inventory requests, and LUKS key exchange.
 <!-- docref: end -->

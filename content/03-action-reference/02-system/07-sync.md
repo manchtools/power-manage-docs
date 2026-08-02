@@ -12,8 +12,8 @@ the device has not yet recorded are stored and acknowledged, and the resolved
 maintenance window and sync interval are re-applied.
 <!-- docref: end -->
 
-<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3,agent:internal/scheduler/scheduler.go#Scheduler.runDue:3c5302a2,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355 -->
-`SYNC` is an **instant action**: recording the delivery wakes the agent's scheduler rather than leaving it for the next tick. Like every other delivery it is still gated on the device's resolved maintenance window, so a `SYNC` dispatched during a freeze waits for the window to open; with no window configured nothing is gated. The actions it pulls in respect their own schedules on top of that.
+<!-- docref: begin src=agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3,agent:internal/scheduler/scheduler.go#Scheduler.runDue:b20ae0bb,agent:internal/scheduler/scheduler.go#Scheduler.dispatchAllowed:fcb93355,server:internal/manifest/compiler.go#OneShotAction:84372c04 -->
+`SYNC` is an **instant action**: recording the delivery wakes the agent's scheduler rather than leaving it for the next tick. It compiles to a one-shot manifest, so it is **exempt from the maintenance window** and runs even during a freeze, and it runs exactly once rather than being rescheduled. That exemption covers the `SYNC` occurrence itself, not what it pulls in: the assigned actions it fetches still respect their own schedules *and* the window.
 <!-- docref: end -->
 
 ## Parameters
