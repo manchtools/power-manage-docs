@@ -21,11 +21,11 @@ no database port to expose or authenticate.
 Mount artifacts and backups explicitly. Run `backup.sh` from a host timer and
 check the last verified backup with `docker compose exec control control
 backup-status`, which reports stale once that backup is older than
-`backup_max_lag` (26 hours by default). Copying backups off-host is your own
-transport; monitor it with your own tooling. A temporary backup-destination
-outage never takes the control plane offline: backup age is not part of
-readiness, and the optional `webhook_url` carries the backup-lag notification
-when you configure one.
+`POWER_MANAGE_BACKUP_MAX_LAG` (26 hours by default). Copying backups off-host
+is your own transport; monitor it with your own tooling. A temporary
+backup-destination outage never takes the control plane offline: backup age is
+not part of readiness, and the optional `POWER_MANAGE_WEBHOOK_URL` carries the
+backup-lag notification when you set it.
 
 ## Keys and secrets
 

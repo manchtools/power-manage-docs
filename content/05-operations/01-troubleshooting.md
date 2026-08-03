@@ -25,7 +25,7 @@ these never appear as a readiness failure.
 Backup age is deliberately not part of readiness: a backup-destination outage
 must not take the control plane offline. Inspect it with `docker compose exec
 control control backup-status`, which exits non-zero when the last success is
-older than `backup_max_lag`.
+older than `POWER_MANAGE_BACKUP_MAX_LAG`.
 
 If readiness passes but clients cannot reach control, check that Traefik routes
 the API and the SNI passthrough listener correctly.
