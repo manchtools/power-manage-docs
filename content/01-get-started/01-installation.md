@@ -9,7 +9,8 @@ The deployment contains:
 
 - Traefik as the only internet-facing component;
 - one control process with an embedded SQLite database; and
-- an artifact directory plus an off-host backup destination.
+- an artifact directory plus an audit archive and backup destination on a
+  filesystem of its own.
 
 There is no separate database service. Control owns a SQLite file in WAL mode
 with `synchronous=FULL`, and search runs on SQLite FTS5.
@@ -23,19 +24,35 @@ listener. Control never dials a managed device.
 - A Linux host with Docker and Compose
 - One HTTPS/API DNS name and one SNI name for the agent listener
 - TCP 443 reachable by administrators and enrolled agents
-- Durable storage for the database file, artifacts, certificates, and backups
+- Durable storage for the database file, artifacts, and certificates
+- A **second filesystem** for the audit archive and backups. The archive path
+  (`POWER_MANAGE_BACKUP_PATH`) must be a filesystem distinct from the one
+  holding the database. Control checks this at startup and **refuses to start**
+  when the two share a mount, naming both paths. Evidence that shares a disk
+  with the records it attests to is not evidence: one root account, one disk
+  failure, or one ransomware pass takes the audit rows and their proof
+  together. A second local mount satisfies the check; remote storage under
+  separate credentials is what the property is for. Mount that storage at the
+  archive path or point a symlink at it — either arrangement works, because the
+  check follows symlinks.
 - An OIDC provider and, when provisioning is required, SCIM
 
 ## Initial setup
 
 Use the deployment tooling shipped with the server. It:
 
-1. creates or accepts the control CA;
-2. generates secure deployment secrets without printing them;
-3. validates file ownership and permissions;
-4. configures Traefik's HTTPS route and SNI TCP passthrough route; and
-5. creates the state, artifact and backup directories and writes control's
-   configuration.
+1. creates the state, artifact and archive directories, then refuses — before
+   generating anything else — when the archive would share a filesystem with
+   the database, naming both paths;
+2. creates or accepts the control CA;
+3. generates secure deployment secrets without printing them;
+4. validates file ownership and permissions;
+5. configures Traefik's HTTPS route and SNI TCP passthrough route; and
+6. writes control's configuration.
+
+Because the archive check runs before any key material is generated, an install
+that stops there leaves an empty directory tree. Provide the storage and run the
+setup step again.
 
 Control itself creates the SQLite database and its baseline schema the first
 time it starts.
