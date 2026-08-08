@@ -12,7 +12,7 @@ Rotates the passphrase on an encrypted root volume. The agent generates a new pa
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#EncryptionParams:de2180b0,sdk:proto/powermanage/v1/actions.proto#EncryptionDeviceBoundKeyType:c35263d8 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#EncryptionParams:0883d851,sdk:proto/powermanage/v1/actions.proto#EncryptionDeviceBoundKeyType:c35263d8 -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `preshared_key` | string | yes | — | Pre-shared passphrase used for initial ownership. Once the agent has rotated to a managed passphrase, the PSK is no longer needed. 1–256 chars. |
@@ -31,7 +31,7 @@ Generated managed passphrases are word-based: at least `min_words` capitalised w
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:cc4a0407,agent:internal/executor/luks.go#Executor.takeOwnership:489ba4a4,agent:internal/executor/luks.go#Executor.checkAndRotate:d7d6bc42 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:3e19531e,agent:internal/executor/luks.go#Executor.takeOwnership:b34213e4,agent:internal/executor/luks.go#Executor.checkAndRotate:d7d6bc42 -->
 The agent auto-detects the encrypted volume on first run (preferring the volume the PSK unlocks, falling back to heuristic detection). Subsequent runs:
 
 1. Check the local rotation-state store. If never managed, take ownership using `preshared_key`, generate a managed passphrase, enrol it, and send it to the control server. The old key is only removed after the server confirms — and round-trips — the new one.
@@ -57,7 +57,7 @@ LUKS2 has eight slots (0–7). The agent uses them as follows:
 
 A device with `device_bound_key_type=NONE` has no device-bound slot at all.
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:489ba4a4,server:internal/authoring/secrets.go#Handlers.prepareEncryptionParams,server:internal/manifest/compiler.go#Compiler.encryptionParams,agent:internal/executor/sealing.go#Executor.executeSealedLuks -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:b34213e4,server:internal/authoring/secrets.go#Handlers.prepareEncryptionParams:2269e347,server:internal/manifest/compiler.go#Compiler.encryptionParams:cd29936c,agent:internal/executor/sealing.go#Executor.executeSealedLuks:a833377c -->
 The pre-shared key from the action's `preshared_key` field is consumed during the very first rotation: the agent uses it to authenticate against an existing keyslot, adds the new managed passphrase to a fresh slot, verifies the server round-trip, then wipes the PSK slot. After that, the PSK is gone from the device and not retrievable from the server.
 
 The field is write-only in action authoring. Action reads return only
@@ -75,12 +75,12 @@ The flow is:
 
 1. The operator assigns an `ENCRYPTION` action with `device_bound_key_type=USER_PASSPHRASE`.
 2. The operator issues the user a one-shot enrolment token from the device-detail page in the web UI.
+<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#resolveLuksToken:0972a499,agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:22686747 -->
 3. The user runs `power-manage-agent luks set-passphrase` on the device (no
    sudo needed — the CLI is unprivileged) and enters the token at the hidden
    prompt. For non-interactive use, supply it through a private mode-0600 file
    with `--token-file <path>` or through `PM_LUKS_TOKEN`; never put the token on
    the command line.
-<!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:22686747 -->
 4. The CLI prompts enter + confirm (up to 3 attempts for a matching pair, with
    a 16-char floor as UX) and hands {token, passphrase} to the root agent's
    LUKS daemon over a local socket. The daemon validates the single-use,
@@ -121,13 +121,13 @@ desired_state: PRESENT
 ## Gotchas
 
 - The pre-shared key only matters for the very first rotation on a device. After that the agent uses its own managed passphrase. Don't reuse the PSK across many devices; it gets you owned-keyslot ownership and that's it.
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:cc4a0407,agent:internal/executor/luks.go#Executor.enrollTpm:e3a16272 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.setupLuks:3e19531e,agent:internal/executor/luks.go#Executor.enrollTpm:e3a16272 -->
 - TPM enrolment is best-effort. If the device has no TPM (no `/dev/tpm0` / `/dev/tpmrm0`), the device-key reconciliation fails with "TPM2 device not found" — the failure is noted in the execution output and the agent log, but the action itself doesn't fail and the volume stays passphrase-only. It is not surfaced as a distinct audit event, so check execution output if you expect TPM auto-unlock.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/luks.go#Executor.checkAndRotate:d7d6bc42 -->
 - Rotating breaks any external tools that have a saved copy of the managed LUKS passphrase. If you have a separate recovery key in another keyslot, it survives rotation. The managed slot is the only one that gets rewritten.
 <!-- docref: end -->
-<!-- docref: begin src=sdk:crypto/field_context.go#FieldSealContext:dc8c1166,sdk:crypto/seal.go#SealToPublicKey:6b2352e6,agent:internal/executor/sealing.go#Executor.SealLuksPassphrase:ad9eb826,server:internal/agentsecrets/service.go#Service.StoreLuksKey:deef512c -->
+<!-- docref: begin src=sdk:crypto/field_context.go#FieldSealContext:dc8c1166,sdk:crypto/seal.go#SealToPublicKey:6b2352e6,agent:internal/executor/sealing.go#Executor.SealLuksPassphrase:ad9eb826,server:internal/agentsecrets/service.go#Service.StoreLuksKey:352ea8b7 -->
 - Managed passphrases are sealed to control's X25519 recipient key before they
   leave the device, using the SDK's generic versioned field seal rather than a
   LUKS-specific routine. The seal context binds the transport direction, the
@@ -138,7 +138,7 @@ desired_state: PRESENT
   version or context does not match, and re-encrypts an accepted value for
   at-rest storage inside the same transaction that records the rotation.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/device/secrets.go#Handlers.ListLuksKeys:049392bf,server:internal/device/secrets.go#Handlers.RevealLuksKey:2ebb8c09,server:internal/device/secrets.go#Handlers.recordSecretReveal:09f0a4fb -->
+<!-- docref: begin src=server:internal/device/secrets.go#Handlers.ListLuksKeys:049392bf,server:internal/device/secrets.go#Handlers.RevealLuksKey:6b31b36f,server:internal/device/secrets.go#Handlers.recordSecretReveal:09f0a4fb -->
 - **Retrieval is split into a metadata list and an explicit one-key reveal.**
   `ListLuksKeys` takes a device ID and returns current plus bounded history
   metadata — entry ID, device, action, device path, rotation time and reason,

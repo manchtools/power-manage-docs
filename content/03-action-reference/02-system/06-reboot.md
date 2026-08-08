@@ -35,7 +35,7 @@ type: REBOOT
 - The 5-minute delay is fixed, and the reboot machinery refuses anything under a 1-minute grace window by design. Use `SHELL` with `shutdown -r +<n>` if you need a different timing.
 - The notification text is hard-coded today; there's no per-action message field.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/agentsync/service.go#Service.Sync:bdb44301,agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3 -->
+<!-- docref: begin src=server:internal/agentsync/service.go#Service.Sync:5e0653b5,agent:internal/scheduler/scheduler.go#Scheduler.RecordDelivery:921ce6b3 -->
 - A reboot dispatched while the agent is offline stays a pending delivery on control and is handed over on the agent's next sync, which records it durably and wakes the scheduler. There's no TTL on the queued dispatch, so cancel a stale reboot by acting before the device reconnects.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/handler/handler.go#Handler.OnManifestDelivery:11a78405,agent:internal/scheduler/scheduler.go#Scheduler.executeManifest:c462e71c,agent:internal/scheduler/scheduler.go#Scheduler.recoverInterruptedOccurrences:27fae712 -->

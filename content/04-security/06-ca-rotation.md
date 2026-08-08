@@ -7,7 +7,7 @@ Setup creates `certs/ca-trust-bundle.crt` containing the active CA and configure
 control with `POWER_MANAGE_CA_TRUST_BUNDLE_FILE`. The bundle is read only at
 startup; changing it has no effect until control is restarted.
 
-<!-- docref: begin src=server:cmd/control/main.go#run,server:internal/ca/ca.go#CA.SetTrustBundle -->
+<!-- docref: begin src=server:cmd/control/main.go#run:065ded94,server:internal/ca/ca.go#CA.SetTrustBundle:3b932aea -->
 The active certificate and key still come from `POWER_MANAGE_CA_CERT_FILE` and
 `POWER_MANAGE_CA_KEY_FILE`. They issue new leaves. The trust bundle is separate:
 it controls which old and new agent leaves the mTLS listener accepts during the
@@ -30,7 +30,7 @@ anchor swap.
    issuers through the same bundle.
 5. Restart the control and reverse-proxy containers so both reload the bundle.
 
-<!-- docref: begin src=server:internal/enrollment/handlers.go#Handlers.RenewCertificate,sdk:crypto/cert.go#VerifyCAContinuity,agent:cmd/power-manage-agent/cert_rotation.go#applyRenewal -->
+<!-- docref: begin src=server:internal/enrollment/handlers.go#Handlers.RenewCertificate:543152d4,sdk:crypto/cert.go#VerifyCAContinuity:30b656cc,agent:cmd/power-manage-agent/cert_rotation.go#applyRenewal:49ccae95 -->
 Existing agents continue connecting with predecessor-issued leaves. At their
 normal certificate-renewal point, control signs a new leaf with the active
 successor and returns the successor CA certificate. Before saving either value,
