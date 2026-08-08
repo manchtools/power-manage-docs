@@ -57,8 +57,14 @@ LUKS2 has eight slots (0–7). The agent uses them as follows:
 
 A device with `device_bound_key_type=NONE` has no device-bound slot at all.
 
-<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:489ba4a4 -->
+<!-- docref: begin src=agent:internal/executor/luks.go#Executor.takeOwnership:489ba4a4,server:internal/authoring/secrets.go#Handlers.prepareEncryptionParams,server:internal/manifest/compiler.go#Compiler.encryptionParams,agent:internal/executor/sealing.go#Executor.executeSealedLuks -->
 The pre-shared key from the action's `preshared_key` field is consumed during the very first rotation: the agent uses it to authenticate against an existing keyslot, adds the new managed passphrase to a fresh slot, verifies the server round-trip, then wipes the PSK slot. After that, the PSK is gone from the device and not retrievable from the server.
+
+The field is write-only in action authoring. Action reads return only
+`preshared_key_configured`; leaving the field empty while editing preserves the
+stored credential. Control encrypts it at rest and seals it to the selected
+device before persisting a delivery, and the agent opens it only at the LUKS
+executor boundary.
 <!-- docref: end -->
 
 ## Setting a USER_PASSPHRASE

@@ -76,8 +76,13 @@ desired_state: PRESENT
 <!-- docref: begin src=sdk:sys/network/network.go#CertBaseDir:a04abcf1 -->
 - Certificates and keys land in `/var/lib/power-manage/wifi/<actionId>/`. The client private key is written 0600; the PSK reaches NetworkManager via a 0600 keyfile under `/etc/NetworkManager/system-connections/`, never via argv.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/store/audit.go#AuditEffect:4a8afbb5 -->
-- `psk` and `client_key` never reach the audit log, and there is no redaction schema to configure or forget. An audit effect has **no free-form value field at all**: it can record the *names* of changed fields, a reference to another row, a state flag, a count, a non-reversible digest, or per-subject sealed detail — nothing else is representable. A credential stays out of the trail by construction rather than by a filter list someone has to keep current. The action parameters themselves are stored like any other action's — protected by RBAC, not field-level encryption — so treat the control-server database as secret-bearing.
+<!-- docref: begin src=server:internal/store/audit.go#AuditEffect:4a8afbb5,server:internal/authoring/secrets.go#Handlers.prepareWifiParams,server:internal/manifest/compiler.go#Compiler.wifiParams,agent:internal/executor/sealing.go#Executor.executeSealedWifi -->
+- `psk` and `client_key` never reach the audit log, and there is no redaction schema to configure or forget. An audit effect has **no free-form value field at all**: it can record the *names* of changed fields, a reference to another row, a state flag, a count, a non-reversible digest, or per-subject sealed detail — nothing else is representable. A credential stays out of the trail by construction rather than by a filter list someone has to keep current.
+- `psk` and `client_key` are write-only. Action reads return only whether each
+  credential is configured; leaving an edit field empty preserves it. Control
+  encrypts the authored value at rest and seals it to the selected device before
+  persisting a delivery. Switching authentication mode removes the credential
+  belonging to the old mode.
 <!-- docref: end -->
 - The action configures the profile but doesn't disconnect the current network. If the device is on Ethernet, it stays on Ethernet; the new Wi-Fi is only used when Ethernet drops or the user explicitly switches.
 - `priority` maps to NetworkManager's `connection.autoconnect-priority` and resolves ties when several known networks are in range simultaneously; higher is preferred.
