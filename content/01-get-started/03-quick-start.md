@@ -54,6 +54,7 @@ in shell scripts, logs, errors, audit payloads, or support bundles.
 
 ## Where to read next
 
+- [Operator CLI](/get-started/operator-cli)
 - [Action reference](/action-reference)
 - [Reconciliation](/concepts/reconciliation)
 - [RBAC and scopes](/concepts/rbac)

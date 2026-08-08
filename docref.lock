@@ -1,9 +1,8 @@
 [repos.server]
-rev = "f92238bf91222aa8149ddfe804d470e2d79adb84"
+rev = "5b766b4906e6196ab1778a3a4042bedf79607344"
 
 [repos.agent]
 rev = "fd9cbbc13758c63a08a0b2d872f538394ddb26b2"
 
 [repos.sdk]
-rev = "f761803c4049ef284b2aa414da57c9a7620b8f44"
-
+rev = "7d4a32e91bc02d87f36c2cfa06e47b9550ff4c57"

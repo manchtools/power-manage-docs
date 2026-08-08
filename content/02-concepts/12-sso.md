@@ -15,6 +15,8 @@ and can never satisfy `:self`.
 
 ## Login flow
 
+### Browser client
+
 1. The client requests an authorization URL for a configured provider.
 2. Control creates one-shot state, nonce, and PKCE material with a short
    expiry.
@@ -24,6 +26,18 @@ and can never satisfy `:self`.
 
 Redirect URLs are allowlisted. OIDC discovery, token exchange, and JWKS fetches
 use bounded network timeouts.
+
+### Native CLI client
+
+<!-- docref: begin src=server:internal/identity/sso.go#Handlers.BeginCLILogin:f2f124f8,server:internal/identity/sso.go#Handlers.ExchangeCLISession:9a08d920 -->
+The [operator CLI](/get-started/operator-cli) uses a public OIDC client and a
+literal `127.0.0.1` callback. It creates the PKCE verifier and exchanges the
+authorization code directly with the identity provider. Control creates and
+consumes the one-shot state and nonce, verifies the returned ID token against
+the CLI client audience, then issues the ordinary application session.
+
+Browser and CLI login states cannot be used across the two flows.
+<!-- docref: end -->
 
 ## Linking and provisioning
 
