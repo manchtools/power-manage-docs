@@ -75,7 +75,11 @@ The flow is:
 
 1. The operator assigns an `ENCRYPTION` action with `device_bound_key_type=USER_PASSPHRASE`.
 2. The operator issues the user a one-shot enrolment token from the device-detail page in the web UI.
-3. The user runs `power-manage-agent luks set-passphrase --token <token>` on the device (no sudo needed — the CLI is unprivileged).
+3. The user runs `power-manage-agent luks set-passphrase` on the device (no
+   sudo needed — the CLI is unprivileged) and enters the token at the hidden
+   prompt. For non-interactive use, supply it through a private mode-0600 file
+   with `--token-file <path>` or through `PM_LUKS_TOKEN`; never put the token on
+   the command line.
 <!-- docref: begin src=agent:cmd/power-manage-agent/cmd_luks.go#promptPassphrase:e5c5840b,agent:internal/luksd/server.go#Daemon.handleRequest:22686747 -->
 4. The CLI prompts enter + confirm (up to 3 attempts for a matching pair, with
    a 16-char floor as UX) and hands {token, passphrase} to the root agent's
