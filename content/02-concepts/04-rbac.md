@@ -3,7 +3,7 @@ title: RBAC and scopes
 ---
 # RBAC and scopes
 
-<!-- docref: begin src=server:internal/store/sqliteschema/schema.sql:60b69f25,server:internal/auth/reconcile.go#ReconcileSystemRoles:d0e2cd53,server:internal/auth/permissions.go#AllPermissions:1976054b -->
+<!-- docref: begin src=server:internal/store/sqliteschema/schema.sql:ac63d2a8,server:internal/auth/reconcile.go#ReconcileSystemRoles:d0e2cd53,server:internal/auth/permissions.go#AllPermissions:1976054b -->
 Permissions are dynamic. Operators define roles by picking from a fixed permission list, and a user can hold several roles directly or pick them up from user groups. The SQLite baseline schema seeds two **system** roles, `Admin` and `User`; control refreshes their permission sets from the code registry on every boot, and neither can be edited or deleted through the RPC surface. Author your own roles alongside them — the seeds are a starting point, not the only options.
 <!-- docref: end -->
 
