@@ -10,7 +10,7 @@ Install it from the SDK module, then set the control-server URL. Production
 URLs must use HTTPS; literal loopback HTTP is accepted for local development.
 
 ```bash
-go install github.com/manchtools/power-manage-sdk/cmd/powermanage@latest
+go install github.com/manchtools/power-manage-sdk/cmd/powermanage@main
 powermanage config set-server https://control.example
 ```
 
