@@ -14,6 +14,9 @@ go install github.com/manchtools/power-manage-sdk/cmd/powermanage@latest
 powermanage config set-server https://control.example
 ```
 
+The first release supports Unix-like operator workstations; Windows support is
+out of scope.
+
 ## Bootstrap OIDC
 
 Register a public/native OIDC client at your identity provider with a loopback
@@ -32,7 +35,7 @@ the API's ProtoJSON format:
 }
 ```
 
-<!-- docref: begin src=server:cmd/control/bootstrap_admin.go#writeBootstrapAdminOutput:665c9c92,sdk:cmd/powermanage/main.go#app.bootstrapCommand:92b98cd6 -->
+<!-- docref: begin src=server:cmd/control/bootstrap_admin.go#writeBootstrapAdminOutput:665c9c92,sdk:cmd/powermanage/main.go#app.bootstrapCommand:2cb480ba -->
 On the control host, pipe the single-use bootstrap token directly to the CLI:
 
 ```bash
@@ -45,7 +48,7 @@ The CLI spends the token only on provider creation and does not store it.
 
 ## Sign in
 
-<!-- docref: begin src=sdk:cmd/powermanage/main.go#app.login:996bcf79,server:internal/identity/sso.go#Handlers.BeginCLILogin:f2f124f8,server:internal/identity/sso.go#Handlers.ExchangeCLISession:9a08d920 -->
+<!-- docref: begin src=sdk:cmd/powermanage/main.go#app.login:d1bd9b1f,server:internal/identity/sso.go#Handlers.BeginCLILogin:f2f124f8,server:internal/identity/sso.go#Handlers.ExchangeCLISession:9a08d920 -->
 ```bash
 powermanage login --provider company --callback-port 8400
 powermanage whoami
