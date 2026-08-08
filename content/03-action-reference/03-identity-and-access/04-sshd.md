@@ -51,7 +51,7 @@ desired_state: PRESENT
 <!-- docref: begin src=agent:internal/executor/helpers.go#Executor.writeAndValidateConfig:207cd164 -->
 - Directive keys and values are written verbatim (control characters are rejected), but the whole fragment is validated with `sshd -t` before it takes effect. A malformed value never lands: the invalid fragment is removed and the action reports the validation failure.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/authoring/actions.go#Handlers.CreateAction:c629c8b4,server:internal/authoring/actions.go#Handlers.UpdateActionParams:14db83f1,server:internal/authoring/state.go#Service.UpdateActionParams:60b80407 -->
+<!-- docref: begin src=server:internal/authoring/actions.go#Handlers.CreateAction:35c76d95,server:internal/authoring/actions.go#Handlers.UpdateActionParams:6d5f3876,server:internal/authoring/state.go#Service.UpdateActionParams:60b80407 -->
 - **`priority` is authored, not derived.** The control server validates the parameters and stores them verbatim; it never assigns, counts, or renumbers the value. `UpdateActionParams` also replaces the whole parameter object rather than merging into it, so an update that leaves `priority` out resets it to `0` and moves the fragment to the front of the load order. Send the priority you want with every update, and keep the numbering consistent yourself across the `SSHD` actions a device receives.
 <!-- docref: end -->
 - Drop-in files override `sshd_config` only for directives `sshd` recognises as overridable. Some directives (`Subsystem`, certain log settings) take only the first occurrence; check your `sshd` version.

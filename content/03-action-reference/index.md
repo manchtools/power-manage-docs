@@ -74,7 +74,7 @@ There's also a separate "rerun a device's current policy now" operator action â€
 <!-- docref: begin src=agent:internal/executor/executor.go#IsInstantAction:401666e5,agent:internal/executor/action_service.go#Executor.executeService:c5c6fd44 -->
 - Most actions are idempotent. `REBOOT`, `SYNC`, `SCRIPT_RUN`, and `SERVICE` with `desired_state: RESTARTED` are the explicit exceptions; each says so on its own page.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/execution/result.go#Service.ApplyActionResult:9d9ace81,server:internal/store/audit.go#AuditOperation:42ce04d3 -->
+<!-- docref: begin src=server:internal/execution/result.go#Service.ApplyActionResult:6e334043,server:internal/store/audit.go#AuditOperation:42ce04d3 -->
 - An execution is an ordinary row, not an event stream. Dispatch creates it; the agent's first non-terminal result moves it to `running`; a terminal result writes `success`, `failed`, `skipped`, `timeout`, `not_applicable`, or `indeterminate` with its output, duration, and changed/compliant flags. Replaying the identical terminal result is a no-op; a *different* one is rejected as a conflicting replay rather than overwriting the recorded outcome. Each of those writes lands in the same transaction as an append-only audit operation attributed to the reporting device.
 <!-- docref: end -->
 <!-- docref: begin src=server:internal/store/audit.go#AuditEffect:4a8afbb5 -->

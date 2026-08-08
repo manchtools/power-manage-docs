@@ -55,7 +55,7 @@ desired_state: PRESENT
 
 ## Gotchas
 
-<!-- docref: begin src=sdk:crypto/field_context.go#FieldSealContext:dc8c1166,sdk:crypto/seal.go#SealToPublicKey:6b2352e6,agent:internal/executor/sealing.go#Executor.sealToControl:95f17a38,agent:internal/executor/lps.go#Executor.setupLpsPasswords:3285a1b0,server:internal/agentsecrets/service.go#Service.StoreLpsPasswords:0a592b91 -->
+<!-- docref: begin src=sdk:crypto/field_context.go#FieldSealContext:dc8c1166,sdk:crypto/seal.go#SealToPublicKey:6b2352e6,agent:internal/executor/sealing.go#Executor.sealToControl:95f17a38,agent:internal/executor/lps.go#Executor.setupLpsPasswords:3285a1b0,server:internal/agentsecrets/service.go#Service.StoreLpsPasswords:2823d761 -->
 - Passwords flow **agent → control**, sealed to control's pinned X25519
   recipient key before they leave the device. Sealing is the SDK's generic
   versioned field seal, not an LPS-specific routine: the context binds the
@@ -68,7 +68,7 @@ desired_state: PRESENT
   Control opens the envelope only at the narrow `openAgentField` sink and
   immediately re-encrypts the plaintext for at-rest storage.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/device/secrets.go#Handlers.ListLpsPasswords:29c2366e,server:internal/device/secrets.go#Handlers.RevealLpsPassword:c699cfdf,server:internal/device/secrets.go#Handlers.recordSecretReveal:09f0a4fb,server:internal/store/audit.go#AuditEffect:4a8afbb5 -->
+<!-- docref: begin src=server:internal/device/secrets.go#Handlers.ListLpsPasswords:29c2366e,server:internal/device/secrets.go#Handlers.RevealLpsPassword:472a8c85,server:internal/device/secrets.go#Handlers.recordSecretReveal:09f0a4fb,server:internal/store/audit.go#AuditEffect:4a8afbb5 -->
 - **Retrieval is split into a metadata list and an explicit one-entry reveal.**
   `ListLpsPasswords` takes a device ID and returns current plus bounded history
   entries — entry ID, device, action, username, rotation time, rotation reason.

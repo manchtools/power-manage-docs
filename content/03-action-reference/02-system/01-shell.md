@@ -70,7 +70,7 @@ is_compliance: true
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:1170ff78 -->
+<!-- docref: begin src=agent:internal/executor/executor.go#Executor.ExecuteWithStreaming:bafece8a -->
 - The exit code of the *remediation* script doesn't gate idempotency — only the detection script does. But a non-zero exit from either script fails the action (`script exited with code <n>`). It doesn't auto-retry; the next [reconciliation tick](/concepts/reconciliation) handles that.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.runShellScript:78290ce4,agent:internal/executor/executor.go#Executor.runShellScriptPerUser:c8cd91af -->
@@ -78,7 +78,7 @@ is_compliance: true
 - The script body is passed as an argument (`<interpreter> -c <script>`), not on stdin. `/bin/bash`, `/usr/bin/python3`, `/usr/bin/perl` all work as `interpreter` as long as they accept `-c`.
 - The child environment is a curated baseline (`HOME`, `USER`) plus your validated `environment` entries — the agent's own environment does **not** leak through, and the SDK runner forces `LC_ALL=C` and a sanitized `PATH`.
 <!-- docref: end -->
-<!-- docref: begin src=server:internal/store/audit.go#AuditOperation:42ce04d3,server:internal/store/audit.go#AuditEffect:4a8afbb5,server:internal/agentsecrets/service.go#Service.StoreLpsPasswords:0a592b91 -->
+<!-- docref: begin src=server:internal/store/audit.go#AuditOperation:42ce04d3,server:internal/store/audit.go#AuditEffect:4a8afbb5,server:internal/agentsecrets/service.go#Service.StoreLpsPasswords:2823d761 -->
 - Don't put secrets in `script` or `detection_script`. There is no redactor: the audit log is metadata-only — an operation row of code-derived constants plus effect rows naming the *fields* that changed, never their values — so it holds no script body to scrub, but the body itself is stored verbatim as the action's parameters and sent to the agent in cleartext over mTLS. For credentials, use `LPS` or `ENCRYPTION`, whose secret fields travel sealed and are re-encrypted at rest before control stores them.
 <!-- docref: end -->
 <!-- docref: begin src=agent:internal/executor/executor.go#Executor.executeShellStreaming:a1d14e71 -->

@@ -3,21 +3,48 @@ title: CA rotation
 ---
 # CA rotation
 
-Setup may create a control CA or accept an operator-managed CA. Ordinary
-startup never invents a replacement CA.
+Setup creates `certs/ca-trust-bundle.crt` containing the active CA and configures
+control with `POWER_MANAGE_CA_TRUST_BUNDLE_FILE`. The bundle is read only at
+startup; changing it has no effect until control is restarted.
 
-## Rotation requirements
+<!-- docref: begin src=server:cmd/control/main.go#run:065ded94,server:internal/ca/ca.go#CA.SetTrustBundle:3b932aea -->
+The active certificate and key still come from `POWER_MANAGE_CA_CERT_FILE` and
+`POWER_MANAGE_CA_KEY_FILE`. They issue new leaves. The trust bundle is separate:
+it controls which old and new agent leaves the mTLS listener accepts during the
+overlap. Startup rejects malformed bundles and bundles that omit the active CA.
+<!-- docref: end -->
 
-1. Install the new CA material with restrictive ownership and permissions.
-2. Publish the new trust anchor to enrolled agents over their authenticated
-   direct connection.
-3. Issue replacement device certificates from fresh CSRs.
-4. Confirm agents reconnect under the new chain.
-5. Revoke the old leaves in the control database and remove the old CA only
-   after the fleet is accounted for.
+## Rotation procedure
 
-Revocation is checked during the control-side TLS handshake; no distributed
-CRL or Gateway cache participates.
+The successor CA must be cross-signed by the current CA. Do not substitute an
+unrelated self-signed root: agents deliberately reject that as a silent trust-
+anchor swap.
 
-If trust continuity cannot be established, reinstall and cleanly re-enrol the
-pre-alpha agent rather than adding a compatibility bypass.
+1. Back up `certs/` and generate a new Ed25519 CA key and CSR.
+2. Sign the successor CA certificate with the current CA, with critical
+   `CA:TRUE` basic constraints and `keyCertSign,cRLSign` key usage.
+3. Concatenate the current CA certificate followed by the cross-signed successor
+   into `certs/ca-trust-bundle.crt`.
+4. Replace `certs/ca.crt` and `certs/ca.key` with the successor certificate and
+   key. Keep the current `control.crt` during the overlap; the proxy trusts both
+   issuers through the same bundle.
+5. Restart the control and reverse-proxy containers so both reload the bundle.
+
+<!-- docref: begin src=server:internal/enrollment/handlers.go#Handlers.RenewCertificate:543152d4,sdk:crypto/cert.go#VerifyCAContinuity:30b656cc,agent:cmd/power-manage-agent/cert_rotation.go#applyRenewal:49ccae95 -->
+Existing agents continue connecting with predecessor-issued leaves. At their
+normal certificate-renewal point, control signs a new leaf with the active
+successor and returns the successor CA certificate. Before saving either value,
+the agent verifies that the returned CA is identical to or signed by its enrolled
+CA. A failed continuity check leaves its existing certificate and CA untouched.
+<!-- docref: end -->
+
+After every enrolled agent has renewed and reconnected under the successor:
+
+1. Reissue `control.crt` under the successor if it is still predecessor-issued.
+2. Remove the predecessor from `ca-trust-bundle.crt`, leaving the successor.
+3. Restart control and the reverse proxy again.
+4. Revoke the predecessor-issued device leaves that are no longer needed.
+
+There is no live trust-bundle reload, CRL distribution RPC, or Gateway cache. If
+cross-signing continuity cannot be established, reinstall and cleanly re-enrol
+the pre-alpha agent.

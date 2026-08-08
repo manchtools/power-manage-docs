@@ -33,6 +33,26 @@ is hash-chained and its head is anchored off-host. Retention archives and
 verifies a chain prefix before deleting it, then commits a checkpoint for the
 deleted boundary.
 
+The archive path (`POWER_MANAGE_BACKUP_PATH`) must be a filesystem distinct
+from the one holding the database. Control checks this at startup and
+**refuses to start** when the two share a mount, naming both paths. Evidence
+that shares a disk with the records it attests to is not evidence: one root
+account, one disk failure, or one ransomware pass takes the audit rows and
+their proof together. A second local mount satisfies the check; remote storage
+under separate credentials is what the property is for.
+
+Verification compares an archived object against the digest recorded in the
+append-only checkpoint inside the database, never against the digest stored
+beside the object. The sidecar file in the archive directory describes what an
+object claims to be and is not evidence — anyone able to rewrite the artifact
+can rewrite that file in the same operation.
+
+Verification fails closed. Once an anchor has been published, the archive must
+still hold the object it names and every checkpoint's archived prefix must
+still be present; a missing or contradicting object is reported as a failure,
+not passed over. A deployment that has never anchored anything is the one case
+that verifies successfully without an anchor.
+
 ## Secrets and erasure
 
 Secret values never enter audit payloads. Fields are limited to durable

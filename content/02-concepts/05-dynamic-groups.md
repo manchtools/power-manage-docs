@@ -64,6 +64,6 @@ registered device, and new enrolments join it as they arrive.
 - **Manual.** The `EvaluateDynamicGroup` RPC forces a re-evaluation on demand.
 <!-- docref: end -->
 
-<!-- docref: begin src=server:internal/agentsync/service.go#Service.Sync:bdb44301,sdk:proto/powermanage/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
+<!-- docref: begin src=server:internal/agentsync/service.go#Service.Sync:5e0653b5,sdk:proto/powermanage/v1/control.proto#DeviceGroup.sync_interval_minutes:2e65300f -->
 A group's `sync_interval_minutes` field is **not** a group re-evaluation timer — it is an agent sync-cadence setting stored on the group record. The cadence control actually hands an agent is the device's own `sync_interval_minutes`, carried on each sync state; the group-level field is stored and editable but is not currently folded into that value.
 <!-- docref: end -->

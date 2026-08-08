@@ -93,7 +93,7 @@ materialising on a device.
 <!-- docref: end -->
 
 {% callout type="note" title="New SCIM/SSO users inherit the global flags" %}
-<!-- docref: begin src=server:internal/scim/users_write.go#Handler.applyDeploymentDefaults:710405de,server:internal/idp/linker.go#Linker.LinkOrCreate:3fdb3847 -->
+<!-- docref: begin src=server:internal/scim/users_write.go#Handler.applyDeploymentDefaults:710405de,server:internal/idp/linker.go#Linker.LinkOrCreate:0fb9e2d5 -->
 Both the SCIM create path and the SSO JIT-create path read the global server settings at creation time and enable per-user provisioning/SSH for the new subject when the corresponding global flag is on — in the same transaction as the create, and audited as its own effect.
 <!-- docref: end -->
 {% /callout %}
