@@ -4,9 +4,9 @@ title: AGENT_UPDATE
 # AGENT_UPDATE
 
 Updates the agent binary itself. The agent downloads the new binary, verifies
-its SHA-256 against the hash carried in the authenticated delivery or against a
-publisher-signed checksum manifest, runs a self-test, and swaps the binary in
-place. Failed self-tests keep the old binary running.
+the publisher signature over its checksum manifest, verifies the binary's
+SHA-256 against the trusted manifest entry, runs a self-test, and swaps the
+binary in place. Failed self-tests keep the old binary running.
 
 <!-- docref: begin src=agent:internal/executor/action_service.go#Executor.executeService:c5c6fd44 -->
 This is the *only* way the agent rolls itself forward in a fleet. There's no other path: distro packages aren't shipped, and `SERVICE` refuses to manage `power-manage-agent.service`.
@@ -14,26 +14,24 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:88b81031,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:df685c58,server:internal/authoring/state.go#validateActionSafety:d9103ea9 -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:e8611183,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:9e9a14e5,server:internal/authoring/state.go#validateActionSafety:3d2a12fb -->
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `amd64` | object | no\* | Binary source for x86_64. |
 | `amd64.binary_url` | string | yes if `amd64` set | HTTPS URL to the agent binary. |
-| `amd64.checksum_url` | string | no\*\* | HTTPS URL to a SHA256SUMS-style checksum file. The default integrity source — lets an action track "latest" release assets hands-off. The agent additionally requires a detached signature over that file (see [How it works](#how-it-works)). |
-| `amd64.expected_sha256` | string | no\*\* | Pinned SHA-256 of the binary, 64 lowercase hex chars. When set it is authoritative and **overrides** `checksum_url`; it arrives over the direct authenticated control stream. |
+| `amd64.checksum_url` | string | yes if `amd64` set | HTTPS URL to a SHA256SUMS-style checksum manifest. The agent requires and verifies its adjacent detached publisher signature before trusting a binary hash. |
 | `arm64` | object | no\* | Binary source for arm64. Same sub-fields as `amd64`. |
 | `allow_downgrade` | bool | no | Install even if the target version is older than the running one. Without it the agent refuses a downgrade (anti-rollback). |
 | `allow_redirect` | bool | no | Follow a redirect that changes host or scheme during download (e.g. GitHub release assets 302 to a CDN host). Default false: a cross-origin redirect is refused. SHA-256 verification and the https-only rule still apply either way. |
 
 \* At least one of `amd64` or `arm64` must be set.
-\*\* Per architecture, at least one of `checksum_url` or `expected_sha256` must be set — the server rejects an action with neither, so an update can never run without an integrity check.
 <!-- docref: end -->
 
 ## How it works
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:ebbc29c2,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1,agent:internal/executor/release_signature.go#verifyReleaseManifest:ef74f2a3 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:a7e14ba0,agent:internal/executor/agent_update.go#compareAgentVersion:708de6c1,agent:internal/executor/release_signature.go#verifyReleaseManifest:ef74f2a3 -->
 1. The agent reads its own architecture and picks the matching entry. If there's no entry for this arch, the action exits with `changed=false` and a noted skip.
-2. It determines the expected hash. `expected_sha256` from the delivery wins when present — it is control-authored, so a compromised download origin cannot vouch for a substituted binary. Otherwise the agent fetches `checksum_url` **and** `<checksum_url>.sig`, verifies the exact manifest bytes with the Ed25519 release-signing public key baked into the running binary, and only then reads out the hash for the filename matching the binary URL. A manifest whose signature does not verify is refused, and a build with no release key compiled in cannot use `checksum_url` at all. All URLs must be HTTPS.
+2. It fetches `checksum_url` **and** `<checksum_url>.sig`, verifies the exact manifest bytes with the Ed25519 release-signing public key baked into the running binary, and only then reads out the hash for the filename matching the binary URL. A manifest whose signature does not verify is refused, and a development build with no release key compiled in cannot self-update. The action cannot supply a replacement hash or public key. All URLs must be HTTPS.
 3. It downloads the binary to a staging directory and verifies the SHA-256. A mismatch aborts before anything runs.
 4. It runs the downloaded binary's `version` command and compares with the running version. Same version → `changed=false`, done. An **older** version is refused unless `allow_downgrade` is set on the action (anti-rollback); an unparseable version fails closed.
 5. It runs the new binary in a subprocess as `power-manage-agent self-test` with a 60-second timeout. The self-test exercises the same wiring the new binary will need in production — see [below](#what-the-self-test-actually-does).
@@ -61,7 +59,7 @@ Anything that fails surfaces as the test exit code; the running binary captures 
 
 ## Idempotency
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:ebbc29c2 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:a7e14ba0 -->
 The agent compares the downloaded binary's reported version against its own running version. Equal means `changed=false`. A newer version triggers the self-test and swap.
 <!-- docref: end -->
 
@@ -83,7 +81,7 @@ arm64:
 
 ## Gotchas
 
-<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:ebbc29c2 -->
+<!-- docref: begin src=agent:internal/executor/agent_update.go#Executor.executeAgentUpdate:a7e14ba0 -->
 - A failing self-test **fails the action**: the execution reports `FAILED` with the self-test's output in the execution event, and the old binary keeps running. Fix the underlying issue and let the next run retry.
 - No cooldown between retries. Retry frequency is governed entirely by the action's schedule — if the target version is broken and the action runs every 30 minutes, the agent re-downloads and re-tests it every 30 minutes until a fixed release is published or you cancel the assignment.
 <!-- docref: end -->
