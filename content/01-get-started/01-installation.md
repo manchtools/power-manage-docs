@@ -57,16 +57,26 @@ setup step again.
 Control itself creates the SQLite database and its baseline schema the first
 time it starts.
 
-Once the stack is up, issue the administrator setup URL yourself with
-`docker compose exec control control bootstrap-admin`. There are no local user
-passwords or local TOTP accounts. Use that short-lived, single-use URL once to
-configure OIDC/SCIM and establish the real administrator identity.
+<!-- docref: begin src=server:cmd/control/bootstrap_admin.go#writeBootstrapAdminOutput:665c9c92,sdk:cmd/powermanage/main.go#app.bootstrapCommand:2cb480ba -->
+Once the stack is up, choose either bootstrap path. For the hosted web client,
+issue the administrator setup URL with
+`docker compose exec control control bootstrap-admin`. For a CLI-only setup,
+follow the [operator CLI guide](/get-started/operator-cli) to request the raw
+token with `--output token` and pipe it directly to
+`powermanage bootstrap oidc`. There are no local user passwords or local TOTP
+accounts; both paths use the same short-lived, single-use bootstrap authority.
+<!-- docref: end -->
 
 ## Enrolling an agent
 
-Create an enrolment token in the web UI, then install and enrol the agent on
-the Linux endpoint using the release's installer. The device generates its own
-Ed25519 identity key and CSR; its private key never leaves the device.
+<!-- docref: begin src=sdk:cmd/powermanage/main.go#app.enrollmentTokenCommand:6b70d562 -->
+Create an enrolment token with `powermanage enrollment-token create`, as
+described in the [operator CLI guide](/get-started/operator-cli), or with the
+hosted web client.
+<!-- docref: end -->
+Then install and enrol the agent on the Linux endpoint using the release's
+installer. The device generates its own Ed25519 identity key and CSR; its
+private key never leaves the device.
 
 After enrolment, the agent connects directly to control with mTLS. Re-enrolment
 is a clean operation: remove the agent state directory and enrol again with a
@@ -82,6 +92,7 @@ certificate revocation. Backup lag is reported separately.
 ## Next steps
 
 - [Quick start](/get-started/quick-start)
+- [Operator CLI](/get-started/operator-cli)
 - [The web UI](/get-started/web-ui)
 - [mTLS and device identity](/security/mtls)
 - [Deployment hardening](/security/deployment-hardening)
