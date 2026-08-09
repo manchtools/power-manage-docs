@@ -5,7 +5,7 @@ title: Compliance
 
 Compliance in power-manage is "did the device pass this assertion?", separated cleanly from "make the device pass this assertion." Assertions live as **compliance check actions**, a specific kind of `SHELL` action. Policies bundle one or more checks and attach to device groups via assignments.
 
-<!-- docref: begin src=server:internal/compliance/handlers.go#Handlers.AddCompliancePolicyRule:d6eaf3e8,server:internal/compliance/state.go#validateComplianceAction:2a6ef4cb,server:internal/authoring/state.go#validateActionSafety:3d2a12fb -->
+<!-- docref: begin src=server:internal/compliance/handlers.go#Handlers.AddCompliancePolicyRule:d6eaf3e8,server:internal/compliance/state.go#validateComplianceAction:2a6ef4cb,server:internal/authoring/state.go#validateActionSafety:e4c2fa2c -->
 The split is enforced by the data model, and it is enforced twice. A compliance policy can only reference actions that are SHELL-type, carry `is_compliance: true`, **and** carry a non-empty `detection_script`. Authoring rejects a compliance action without a detection script when the action is created or updated, and `AddCompliancePolicyRule` rejects it again at attachment — a compliance rule that could never report a finding is refused rather than enrolled to evaluate nothing. Non-SHELL actions are refused outright; you can't promote a `PACKAGE` or `FILE` action into a compliance rule. That keeps the contract honest: compliance reports status, never side-effects state.
 <!-- docref: end -->
 
@@ -13,7 +13,7 @@ The split is enforced by the data model, and it is enforced twice. A compliance 
 
 Two layers.
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ShellParams.is_compliance:a2a51e26,sdk:proto/powermanage/v1/actions.proto#ShellParams.detection_script:74824474,agent:internal/executor/executor.go#Executor.executeShellStreaming:a1d14e71,server:internal/authoring/state.go#validateActionSafety:3d2a12fb -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ShellParams.is_compliance:a2a51e26,sdk:proto/powermanage/v1/actions.proto#ShellParams.detection_script:74824474,agent:internal/executor/executor.go#Executor.executeShellStreaming:a1d14e71,server:internal/authoring/state.go#validateActionSafety:e4c2fa2c -->
 A **compliance check action** is a `SHELL` action with `is_compliance: true` **and** a `detection_script` that returns exit code `0` when the device is compliant and non-zero when it isn't. Both are mandatory: the server refuses to author a compliance action without a detection script, so the pair cannot come apart in normal use. The agent enforces the same rule independently. `is_compliance` is the *first* thing its executor checks, before any other branch: with a detection script it runs that script and stops there, so the action body / remediation script is never executed even if you fill it in; with an empty detection script it **fails closed** — the action errors out with "compliance action requires a non-empty detection script" rather than falling through and running the body.
 <!-- docref: end -->
 

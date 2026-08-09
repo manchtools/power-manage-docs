@@ -14,7 +14,7 @@ This is the *only* way the agent rolls itself forward in a fleet. There's no oth
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:e8611183,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:9e9a14e5,server:internal/authoring/state.go#validateActionSafety:3d2a12fb -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#AgentUpdateParams:e8611183,sdk:proto/powermanage/v1/actions.proto#AgentUpdateArch:41e95e5c,server:internal/authoring/state.go#validateActionSafety:e4c2fa2c -->
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `amd64` | object | no\* | Binary source for x86_64. |

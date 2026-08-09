@@ -9,7 +9,7 @@ For one-off commands that don't need idempotency, use [`SCRIPT_RUN`](/action-ref
 
 ## Parameters
 
-<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ShellParams:0ec72f48,server:internal/authoring/state.go#validateActionSafety:3d2a12fb,agent:internal/executor/executor.go#maxScriptSize:e74b340a -->
+<!-- docref: begin src=sdk:proto/powermanage/v1/actions.proto#ShellParams:0ec72f48,server:internal/authoring/state.go#validateActionSafety:e4c2fa2c,agent:internal/executor/executor.go#maxScriptSize:e74b340a -->
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `script` | string | conditional | — | The remediation script body. Max 1 MiB. At least one of `script` or `detection_script` is required — server-side validation and the agent both reject a SHELL action with neither set. |
