@@ -46,6 +46,40 @@ verified email assertion. Optional auto-creation makes an OIDC-provisioned
 user; SCIM may create, update, disable, and group users according to the
 configured provider policy.
 
+<!-- docref: begin src=server:internal/idp/linker.go#Linker.LinkOrCreate:0fb9e2d5 -->
+### Trusted email and JIT creation
+
+Auto-linking and auto-creation act only on a **trusted** email: the ID token
+must carry the address in `email` and assert `email_verified: true`. An
+unverified address is discarded before any matching — control logs `ignoring
+email claim because email_verified is not true` — because an
+attacker-registered account with a colliding address at the identity provider
+must never bind to an existing subject. When a login still cannot be
+resolved, the refusal log names the gate that stopped it: `auto_create_users`
+disabled on the provider, or no trusted email claim.
+
+Authentik has no per-user verification flag; its email scope mapping *asserts*
+the claim. Make sure the provider's `email` scope mapping (Customization →
+Property Mappings) returns both claims:
+
+```python
+return {
+    "email": request.user.email,
+    "email_verified": True,
+}
+```
+
+### The default role
+
+Every account auto-creation provisions receives the provider's default role.
+Keep it at the least-privileged role that fits and elevate individuals
+explicitly: a provider whose default role is Admin makes an administrator of
+everyone the identity provider admits into the application. On a fresh
+deployment, elevate your first account from the control host — issue a
+bootstrap token with `control bootstrap-admin --output token` and call
+`AssignRoleToUser` with it.
+<!-- docref: end -->
+
 OIDC client secrets are encrypted at rest with resource-context AAD and never
 returned by read APIs. Login, linking, provisioning, rejection, and
 deprovisioning operations are audited without recording secret values.

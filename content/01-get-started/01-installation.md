@@ -74,9 +74,22 @@ Create an enrolment token with `powermanage enrollment-token create`, as
 described in the [operator CLI guide](/get-started/operator-cli), or with the
 hosted web client.
 <!-- docref: end -->
-Then install and enrol the agent on the Linux endpoint using the release's
-installer. The device generates its own Ed25519 identity key and CSR; its
+<!-- docref: begin src=agent:install.sh#download_binary:3f9090ea -->
+Then install and enrol the agent on the Linux endpoint with the installer
+**from the release's assets** — that copy embeds the release-signing public
+key and verifies the signed checksum manifest before anything lands on disk:
+
+```bash
+curl -fsSL https://github.com/manchtools/power-manage-agent/releases/download/v2026.08.09-rc1/install.sh -o install.sh
+sudo bash install.sh --server https://agents.example.com --token <enrollment token>
+```
+
+The copy of `install.sh` inside the repository is deliberately not
+installable: it carries a build-time placeholder instead of a signing key and
+refuses to run, because a fork signs its own releases and never inherits this
+project's key. The device generates its own Ed25519 identity key and CSR; its
 private key never leaves the device.
+<!-- docref: end -->
 
 After enrolment, the agent connects directly to control with mTLS. Re-enrolment
 is a clean operation: remove the agent state directory and enrol again with a
