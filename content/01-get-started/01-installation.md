@@ -80,7 +80,7 @@ Then install and enrol the agent on the Linux endpoint with the installer
 key and verifies the signed checksum manifest before anything lands on disk:
 
 ```bash
-curl -fsSL https://github.com/manchtools/power-manage-agent/releases/download/v2026.08.09-rc1/install.sh -o install.sh
+curl -fsSL https://github.com/manchtools/power-manage-agent/releases/download/v2026.08-rc2/install.sh -o install.sh
 sudo bash install.sh --server https://agents.example.com --token <enrollment token>
 ```
 
